@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "./supabase";
+imporimport { supabase } from "../lib/supabase";
 
 export default function Home() {
   const [showForm, setShowForm] = useState(false);
