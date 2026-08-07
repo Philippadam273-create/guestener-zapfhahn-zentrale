@@ -8,8 +8,13 @@ type Person = {
   name: string;
   drinks: number;
   liters: number;
-  cost: number;
   points: number;
+};
+
+type Payment = {
+  id: number;
+  personId: number;
+  amount: number;
 };
 
 export default function Home() {
@@ -17,75 +22,18 @@ export default function Home() {
   const [eventId, setEventId] = useState("");
   const [drinks, setDrinks] = useState<any[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
 
+  const [personName, setPersonName] = useState("");
   const [drinkName, setDrinkName] = useState("");
   const [liters, setLiters] = useState("0.5");
   const [alcohol, setAlcohol] = useState("5");
   const [price, setPrice] = useState("0");
 
-  const [personName, setPersonName] = useState("");
+  const [paymentPerson, setPaymentPerson] = useState("");
+  const [paymentAmount, setPaymentAmount] = useState("");
+
   const [message, setMessage] = useState("");
-
-  async function loadEvents() {
-    const { data, error } = await supabase
-      .from("events")
-      .select("id,title")
-      .order("start_date", { ascending: false });
-
-    if (error) {
-      setMessage("❌ Events konnten nicht geladen werden.");
-      return;
-    }
-
-    if (data && data.length > 0) {
-      setEvents(data);
-
-      const savedEvent =
-        localStorage.getItem("guesten-active-event");
-
-      const exists = data.some(
-        (event) => event.id === savedEvent
-      );
-
-      if (savedEvent && exists) {
-        setEventId(savedEvent);
-      } else {
-        setEventId(data[0].id);
-      }
-    }
-  }
-
-  async function loadDrinks(id: string) {
-    if (!id) return;
-
-    const { data } = await supabase
-      .from("drinks")
-      .select("*")
-      .eq("event_id", id)
-      .order("created_at", {
-        ascending: false,
-      });
-
-    if (data) {
-      setDrinks(data);
-    }
-  }
-
-  function loadPeople(id: string) {
-    const saved = localStorage.getItem(
-      "guesten-people-" + id
-    );
-
-    if (saved) {
-      try {
-        setPeople(JSON.parse(saved));
-      } catch {
-        setPeople([]);
-      }
-    } else {
-      setPeople([]);
-    }
-  }
 
   useEffect(() => {
     loadEvents();
@@ -101,6 +49,7 @@ export default function Home() {
 
     loadDrinks(eventId);
     loadPeople(eventId);
+    loadPayments(eventId);
   }, [eventId]);
 
   useEffect(() => {
@@ -112,16 +61,97 @@ export default function Home() {
     );
   }, [people, eventId]);
 
+  useEffect(() => {
+    if (!eventId) return;
+
+    localStorage.setItem(
+      "guesten-payments-" + eventId,
+      JSON.stringify(payments)
+    );
+  }, [payments, eventId]);
+
+  async function loadEvents() {
+    const { data } = await supabase
+      .from("events")
+      .select("id,title")
+      .order("start_date", {
+        ascending: false,
+      });
+
+    if (!data || data.length === 0) return;
+
+    setEvents(data);
+
+    const saved =
+      localStorage.getItem(
+        "guesten-active-event"
+      );
+
+    const exists = data.some(
+      (event) => event.id === saved
+    );
+
+    setEventId(
+      exists ? saved : data[0].id
+    );
+  }
+
+  async function loadDrinks(id: string) {
+    const { data } = await supabase
+      .from("drinks")
+      .select("*")
+      .eq("event_id", id)
+      .order("created_at", {
+        ascending: false,
+      });
+
+    if (data) setDrinks(data);
+  }
+
+  function loadPeople(id: string) {
+    const saved = localStorage.getItem(
+      "guesten-people-" + id
+    );
+
+    if (!saved) {
+      setPeople([]);
+      return;
+    }
+
+    try {
+      setPeople(JSON.parse(saved));
+    } catch {
+      setPeople([]);
+    }
+  }
+
+  function loadPayments(id: string) {
+    const saved = localStorage.getItem(
+      "guesten-payments-" + id
+    );
+
+    if (!saved) {
+      setPayments([]);
+      return;
+    }
+
+    try {
+      setPayments(JSON.parse(saved));
+    } catch {
+      setPayments([]);
+    }
+  }
+
   async function saveDrink() {
     setMessage("");
 
     if (!eventId) {
-      setMessage("❌ Bitte zuerst ein Event auswählen.");
+      setMessage("❌ Kein Event ausgewählt.");
       return;
     }
 
     if (!drinkName.trim()) {
-      setMessage("❌ Bitte ein Getränk eingeben.");
+      setMessage("❌ Bitte Getränk eingeben.");
       return;
     }
 
@@ -142,14 +172,9 @@ export default function Home() {
       ]);
 
     if (error) {
-      setMessage(
-        "❌ Getränk konnte nicht gespeichert werden: " +
-          error.message
-      );
+      setMessage("❌ " + error.message);
       return;
     }
-
-    setMessage("✅ Getränk gespeichert!");
 
     setDrinkName("");
     setLiters("0.5");
@@ -157,44 +182,58 @@ export default function Home() {
     setPrice("0");
 
     await loadDrinks(eventId);
+
+    setMessage("✅ Getränk gespeichert.");
   }
 
   function addPerson() {
     const name = personName.trim();
 
-    if (!name) {
-      setMessage("❌ Bitte Namen eingeben.");
+    if (!name) return;
+
+    if (
+      people.some(
+        (p) =>
+          p.name.toLowerCase() ===
+          name.toLowerCase()
+      )
+    ) {
+      setMessage(
+        "❌ Teilnehmer bereits vorhanden."
+      );
       return;
     }
 
-    const alreadyExists = people.some(
-      (person) =>
-        person.name.toLowerCase() ===
-        name.toLowerCase()
-    );
+    setPeople([
+      ...people,
+      {
+        id: Date.now(),
+        name,
+        drinks: 0,
+        liters: 0,
+        points: 0,
+      },
+    ]);
 
-    if (alreadyExists) {
-      setMessage("❌ Diese Person ist bereits dabei.");
-      return;
-    }
-
-    const newPerson: Person = {
-      id: Date.now(),
-      name,
-      drinks: 0,
-      liters: 0,
-      cost: 0,
-      points: 0,
-    };
-
-    setPeople([...people, newPerson]);
     setPersonName("");
-    setMessage("✅ Teilnehmer hinzugefügt!");
+
+    setMessage(
+      "✅ Teilnehmer hinzugefügt."
+    );
   }
 
   function removePerson(id: number) {
     setPeople(
-      people.filter((person) => person.id !== id)
+      people.filter(
+        (person) => person.id !== id
+      )
+    );
+
+    setPayments(
+      payments.filter(
+        (payment) =>
+          payment.personId !== id
+      )
     );
   }
 
@@ -203,17 +242,15 @@ export default function Home() {
     drinkId: string
   ) {
     const drink = drinks.find(
-      (item) => item.id === drinkId
+      (d) => d.id === drinkId
     );
 
     if (!drink) return;
 
     const litersValue = Number(
-      drink.liters ?? drink.menge ?? 0
-    );
-
-    const priceValue = Number(
-      drink.preis ?? 0
+      drink.liters ??
+        drink.menge ??
+        0
     );
 
     setPeople(
@@ -226,9 +263,8 @@ export default function Home() {
           ...person,
           drinks: person.drinks + 1,
           liters:
-            person.liters + litersValue,
-          cost:
-            person.cost + priceValue,
+            person.liters +
+            litersValue,
           points:
             person.points + 10,
         };
@@ -239,6 +275,58 @@ export default function Home() {
       "🍺 Getränk zugeordnet! +10 Punkte"
     );
   }
+
+  function addPayment() {
+    if (!paymentPerson) {
+      setMessage(
+        "❌ Bitte Person auswählen."
+      );
+      return;
+    }
+
+    const amount =
+      Number(paymentAmount);
+
+    if (!amount || amount <= 0) {
+      setMessage(
+        "❌ Bitte Betrag eingeben."
+      );
+      return;
+    }
+
+    setPayments([
+      ...payments,
+      {
+        id: Date.now(),
+        personId:
+          Number(paymentPerson),
+        amount,
+      },
+    ]);
+
+    setPaymentPerson("");
+    setPaymentAmount("");
+
+    setMessage(
+      "✅ Zahlung gespeichert."
+    );
+  }
+
+  function removePayment(id: number) {
+    setPayments(
+      payments.filter(
+        (payment) =>
+          payment.id !== id
+      )
+    );
+  }
+
+  const totalCost = drinks.reduce(
+    (sum, drink) =>
+      sum +
+      Number(drink.preis ?? 0),
+    0
+  );
 
   const totalLiters = drinks.reduce(
     (sum, drink) =>
@@ -251,10 +339,9 @@ export default function Home() {
     0
   );
 
-  const totalCost = drinks.reduce(
-    (sum, drink) =>
-      sum +
-      Number(drink.preis ?? 0),
+  const totalPaid = payments.reduce(
+    (sum, payment) =>
+      sum + payment.amount,
     0
   );
 
@@ -263,18 +350,33 @@ export default function Home() {
       ? totalCost / people.length
       : 0;
 
-  const totalPoints = people.reduce(
-    (sum, person) =>
-      sum + person.points,
-    0
-  );
-
   const ranking = [...people].sort(
     (a, b) => b.points - a.points
   );
 
-  const activeEvent = events.find(
-    (event) => event.id === eventId
+  const getPaid = (personId: number) =>
+    payments
+      .filter(
+        (payment) =>
+          payment.personId === personId
+      )
+      .reduce(
+        (sum, payment) =>
+          sum + payment.amount,
+        0
+      );
+
+  const balances = people.map(
+    (person) => {
+      const paid = getPaid(person.id);
+
+      return {
+        ...person,
+        paid,
+        balance:
+          paid - costPerPerson,
+      };
+    }
   );
 
   return (
@@ -282,7 +384,9 @@ export default function Home() {
       <div className="container">
 
         <header>
-          <div className="logo">🍻</div>
+          <div className="logo">
+            🍻
+          </div>
 
           <div>
             <h1>
@@ -296,7 +400,9 @@ export default function Home() {
         </header>
 
         <section className="card">
-          <h2>📅 Aktuelles Event</h2>
+          <h2>
+            📅 Aktuelles Event
+          </h2>
 
           <select
             value={eventId}
@@ -305,7 +411,7 @@ export default function Home() {
             }
           >
             <option value="">
-              Wähle dein Event
+              Event auswählen
             </option>
 
             {events.map((event) => (
@@ -317,40 +423,34 @@ export default function Home() {
               </option>
             ))}
           </select>
-
-          {activeEvent && (
-            <div className="activeEvent">
-              🍻 {activeEvent.title}
-            </div>
-          )}
         </section>
 
         <div className="stats">
 
-          <div className="stat">
-            <span>🍺</span>
+          <div>
+            🍺
             <b>{drinks.length}</b>
             <small>Getränke</small>
           </div>
 
-          <div className="stat">
-            <span>💧</span>
+          <div>
+            💧
             <b>
               {totalLiters.toFixed(1)}
             </b>
             <small>Liter</small>
           </div>
 
-          <div className="stat">
-            <span>💶</span>
+          <div>
+            💶
             <b>
               {totalCost.toFixed(2)} €
             </b>
             <small>Kosten</small>
           </div>
 
-          <div className="stat">
-            <span>👥</span>
+          <div>
+            👥
             <b>{people.length}</b>
             <small>Teilnehmer</small>
           </div>
@@ -358,86 +458,90 @@ export default function Home() {
         </div>
 
         <section className="card">
-          <h2>👥 Teilnehmer</h2>
+
+          <h2>
+            👥 Teilnehmer
+          </h2>
 
           <div className="addRow">
 
             <input
-              placeholder="Name eingeben"
+              placeholder="Name"
               value={personName}
               onChange={(e) =>
-                setPersonName(e.target.value)
+                setPersonName(
+                  e.target.value
+                )
               }
             />
 
-            <button onClick={addPerson}>
+            <button
+              onClick={addPerson}
+            >
               ➕ Hinzufügen
             </button>
 
           </div>
 
-          {people.length === 0 ? (
-            <div className="empty">
-              <div>👥</div>
-              <b>Noch keine Teilnehmer</b>
-              <p>
-                Füge die Personen deines Events hinzu.
-              </p>
-            </div>
-          ) : (
-            people.map((person) => (
-              <div
-                className="person"
-                key={person.id}
-              >
-                <div className="personIcon">
-                  {person.name
-                    .charAt(0)
-                    .toUpperCase()}
-                </div>
+          {people.map((person) => (
+            <div
+              className="person"
+              key={person.id}
+            >
 
-                <div className="personInfo">
-                  <b>{person.name}</b>
-
-                  <small>
-                    🍺 {person.drinks}
-                    {" · "}
-                    💧 {person.liters.toFixed(1)} L
-                    {" · "}
-                    💶 {person.cost.toFixed(2)} €
-                  </small>
-                </div>
-
-                <strong>
-                  🏆 {person.points}
-                </strong>
-
-                <button
-                  className="remove"
-                  onClick={() =>
-                    removePerson(person.id)
-                  }
-                >
-                  ×
-                </button>
+              <div className="avatar">
+                {person.name
+                  .charAt(0)
+                  .toUpperCase()}
               </div>
-            ))
-          )}
+
+              <div>
+                <b>{person.name}</b>
+
+                <small>
+                  🍺 {person.drinks}
+                  {" · "}
+                  💧{" "}
+                  {person.liters.toFixed(1)}
+                  L
+                  {" · "}
+                  🏆 {person.points}
+                </small>
+              </div>
+
+              <button
+                className="delete"
+                onClick={() =>
+                  removePerson(
+                    person.id
+                  )
+                }
+              >
+                ×
+              </button>
+
+            </div>
+          ))}
+
         </section>
 
         <section className="card">
 
-          <h2>🍺 Getränk hinzufügen</h2>
+          <h2>
+            🍺 Getränk hinzufügen
+          </h2>
 
           <input
             placeholder="Getränk"
             value={drinkName}
             onChange={(e) =>
-              setDrinkName(e.target.value)
+              setDrinkName(
+                e.target.value
+              )
             }
           />
 
-          <div className="inputs">
+          <div className="three">
 
             <input
               type="number"
@@ -445,17 +549,20 @@ export default function Home() {
               placeholder="Liter"
               value={liters}
               onChange={(e) =>
-                setLiters(e.target.value)
+                setLiters(
+                  e.target.value
+                )
               }
             />
 
             <input
               type="number"
-              step="0.1"
               placeholder="Alkohol %"
               value={alcohol}
               onChange={(e) =>
-                setAlcohol(e.target.value)
+                setAlcohol(
+                  e.target.value
+                )
               }
             />
 
@@ -465,7 +572,9 @@ export default function Home() {
               placeholder="Preis €"
               value={price}
               onChange={(e) =>
-                setPrice(e.target.value)
+                setPrice(
+                  e.target.value
+                )
               }
             />
 
@@ -482,61 +591,68 @@ export default function Home() {
 
         <section className="card">
 
-          <h2>🔗 Getränk zuordnen</h2>
+          <h2>
+            🔗 Getränk zuordnen
+          </h2>
 
           {people.length === 0 ? (
-            <div className="empty">
-              👥 Zuerst Teilnehmer hinzufügen.
-            </div>
-          ) : drinks.length === 0 ? (
-            <div className="empty">
-              🍺 Zuerst ein Getränk speichern.
-            </div>
+            <p>
+              👥 Zuerst Teilnehmer
+              hinzufügen.
+            </p>
           ) : (
             people.map((person) => (
               <div
-                className="assignment"
+                className="assign"
                 key={person.id}
               >
+
                 <b>
-                  👤 {person.name}
+                  {person.name}
                 </b>
 
                 <select
                   defaultValue=""
                   onChange={(e) => {
-                    if (e.target.value) {
+                    if (
+                      e.target.value
+                    ) {
                       assignDrink(
                         person.id,
                         e.target.value
                       );
 
-                      e.target.value = "";
+                      e.target.value =
+                        "";
                     }
                   }}
                 >
+
                   <option value="">
-                    🍺 Getränk auswählen
+                    Getränk auswählen
                   </option>
 
-                  {drinks.map((drink) => (
-                    <option
-                      key={drink.id}
-                      value={drink.id}
-                    >
-                      {drink.getraenk ||
-                        drink.drink_name ||
-                        "Getränk"}
-                      {" · "}
-                      {Number(
-                        drink.liters ??
-                          drink.menge ??
-                          0
-                      ).toFixed(1)}{" "}
-                      L
-                    </option>
-                  ))}
+                  {drinks.map(
+                    (drink) => (
+                      <option
+                        key={drink.id}
+                        value={drink.id}
+                      >
+                        {drink.getraenk ||
+                          drink.drink_name}
+                        {" · "}
+                        {Number(
+                          drink.liters ??
+                            drink.menge ??
+                            0
+                        ).toFixed(1)}
+                        L
+                      </option>
+                    )
+                  )}
+
                 </select>
+
               </div>
             ))
           )}
@@ -545,127 +661,284 @@ export default function Home() {
 
         <section className="card">
 
-          <h2>🍺 Getränke</h2>
+          <h2>
+            🍺 Getränke
+          </h2>
 
-          {drinks.length === 0 ? (
-            <div className="empty">
-              🍺 Noch keine Getränke.
+          {drinks.map((drink) => (
+            <div
+              className="drink"
+              key={drink.id}
+            >
+
+              <span>🍺</span>
+
+              <div>
+                <b>
+                  {drink.getraenk ||
+                    drink.drink_name}
+                </b>
+
+                <small>
+                  {Number(
+                    drink.liters ??
+                      drink.menge ??
+                      0
+                  ).toFixed(1)}
+                  {" Liter · "}
+                  {Number(
+                    drink.alcohol_percent ??
+                      drink.alkohol ??
+                      0
+                  ).toFixed(1)}
+                  %
+                </small>
+              </div>
+
+              <strong>
+                {Number(
+                  drink.preis ?? 0
+                ).toFixed(2)}
+                €
+              </strong>
+
             </div>
-          ) : (
-            drinks.map((drink) => (
-              <div
-                className="drink"
-                key={drink.id}
-              >
-                <div className="drinkIcon">
-                  🍺
-                </div>
+          ))}
 
-                <div>
+        </section>
+
+        <section className="card payment">
+
+          <h2>
+            💳 Wer hat bezahlt?
+          </h2>
+
+          <div className="three">
+
+            <select
+              value={paymentPerson}
+              onChange={(e) =>
+                setPaymentPerson(
+                  e.target.value
+                )
+              }
+            >
+              <option value="">
+                Person auswählen
+              </option>
+
+              {people.map(
+                (person) => (
+                  <option
+                    key={person.id}
+                    value={person.id}
+                  >
+                    {person.name}
+                  </option>
+                )
+              )}
+            </select>
+
+            <input
+              type="number"
+              step="0.01"
+              placeholder="Betrag €"
+              value={paymentAmount}
+              onChange={(e) =>
+                setPaymentAmount(
+                  e.target.value
+                )
+              }
+            />
+
+            <button
+              onClick={addPayment}
+            >
+              💶 Zahlung speichern
+            </button>
+
+          </div>
+
+          {payments.map(
+            (payment) => {
+              const person =
+                people.find(
+                  (p) =>
+                    p.id ===
+                    payment.personId
+                );
+
+              return (
+                <div
+                  className="paymentRow"
+                  key={payment.id}
+                >
+                  <span>
+                    💳{" "}
+                    {person?.name ||
+                      "Unbekannt"}
+                  </span>
+
                   <b>
-                    {drink.getraenk ||
-                      drink.drink_name ||
-                      "Getränk"}
+                    {payment.amount.toFixed(
+                      2
+                    )} €
                   </b>
 
-                  <small>
-                    {Number(
-                      drink.liters ??
-                        drink.menge ??
-                        0
-                    ).toFixed(1)}{" "}
-                    Liter ·{" "}
-                    {Number(
-                      drink.alcohol_percent ??
-                        drink.alkohol ??
-                        0
-                    ).toFixed(1)} %
-                  </small>
+                  <button
+                    className="delete"
+                    onClick={() =>
+                      removePayment(
+                        payment.id
+                      )
+                    }
+                  >
+                    ×
+                  </button>
                 </div>
-
-                <strong>
-                  {Number(
-                    drink.preis ?? 0
-                  ).toFixed(2)} €
-                </strong>
-              </div>
-            ))
+              );
+            }
           )}
 
         </section>
 
         <section className="card">
 
-          <h2>💶 Kostenaufteilung</h2>
+          <h2>
+            💶 Kostenaufteilung
+          </h2>
 
-          <div className="bigMoney">
+          <div className="money">
             {totalCost.toFixed(2)} €
           </div>
 
           <p className="center">
-            Gesamtkosten des Events
+            Gesamtkosten
           </p>
 
           <div className="costRow">
-            <span>👥 Teilnehmer</span>
-            <b>{people.length}</b>
-          </div>
+            <span>
+              👥 Teilnehmer
+            </span>
 
-          <div className="costRow">
-            <span>💶 Pro Person</span>
             <b>
-              {costPerPerson.toFixed(2)} €
+              {people.length}
             </b>
           </div>
 
           <div className="costRow">
-            <span>🏆 Gesamtpunkte</span>
-            <b>{totalPoints}</b>
+            <span>
+              💶 Anteil pro Person
+            </span>
+
+            <b>
+              {costPerPerson.toFixed(
+                2
+              )} €
+            </b>
           </div>
+
+          <div className="costRow">
+            <span>
+              💳 Bereits bezahlt
+            </span>
+
+            <b>
+              {totalPaid.toFixed(2)} €
+            </b>
+          </div>
+
+          <h3>
+            📊 Abrechnung
+          </h3>
+
+          {balances.map(
+            (person) => (
+              <div
+                className="balance"
+                key={person.id}
+              >
+
+                <div>
+                  <b>
+                    {person.name}
+                  </b>
+
+                  <small>
+                    Bezahlt:{" "}
+                    {person.paid.toFixed(
+                      2
+                    )} €
+                  </small>
+                </div>
+
+                <strong
+                  className={
+                    person.balance >= 0
+                      ? "plus"
+                      : "minus"
+                  }
+                >
+                  {person.balance >= 0
+                    ? "+"
+                    : ""}
+                  {person.balance.toFixed(
+                    2
+                  )} €
+                </strong>
+
+              </div>
+            )
+          )}
 
         </section>
 
         <section className="card">
 
-          <h2>🏆 Ranking</h2>
+          <h2>
+            🏆 Ranking
+          </h2>
 
-          {ranking.length === 0 ? (
-            <div className="empty">
-              🏆 Noch keine Teilnehmer.
-            </div>
-          ) : (
-            ranking.map(
-              (person, index) => (
-                <div
-                  className="ranking"
-                  key={person.id}
-                >
-                  <div className="place">
-                    {index === 0
-                      ? "🥇"
-                      : index === 1
-                      ? "🥈"
-                      : index === 2
-                      ? "🥉"
-                      : index + 1}
-                  </div>
+          {ranking.map(
+            (person, index) => (
+              <div
+                className="ranking"
+                key={person.id}
+              >
 
-                  <div>
-                    <b>{person.name}</b>
+                <span>
+                  {index === 0
+                    ? "🥇"
+                    : index === 1
+                    ? "🥈"
+                    : index === 2
+                    ? "🥉"
+                    : index + 1}
+                </span>
 
-                    <small>
-                      🍺 {person.drinks}
-                      {" · "}
-                      💧 {person.liters.toFixed(1)} L
-                    </small>
-                  </div>
+                <div>
+                  <b>
+                    {person.name}
+                  </b>
 
-                  <strong>
-                    {person.points}
-                    <small>Punkte</small>
-                  </strong>
+                  <small>
+                    🍺 {person.drinks}
+                    {" · "}
+                    💧{" "}
+                    {person.liters.toFixed(
+                      1
+                    )} L
+                  </small>
                 </div>
-              )
+
+                <strong>
+                  {person.points}
+                  <small>
+                    Punkte
+                  </small>
+                </strong>
+
+              </div>
             )
           )}
 
@@ -702,11 +975,8 @@ export default function Home() {
               #080c12 60%
             );
           color: white;
-          padding: 16px;
-          font-family:
-            Arial,
-            Helvetica,
-            sans-serif;
+          padding: 15px;
+          font-family: Arial, sans-serif;
         }
 
         .container {
@@ -716,14 +986,14 @@ export default function Home() {
 
         header {
           display: flex;
-          gap: 15px;
+          gap: 14px;
           align-items: center;
-          padding: 10px 4px 25px;
+          padding: 10px 5px 25px;
         }
 
         .logo {
           font-size: 38px;
-          background: #1b2734;
+          background: #1d2935;
           padding: 12px;
           border-radius: 18px;
         }
@@ -735,74 +1005,59 @@ export default function Home() {
 
         h2 {
           margin-top: 0;
-          font-size: 20px;
         }
 
-        p {
-          color: #98a6b5;
+        p,
+        small {
+          color: #94a3b8;
         }
 
         .card {
-          background: rgba(255,255,255,.065);
-          border: 1px solid rgba(255,255,255,.09);
+          background:
+            rgba(255,255,255,.06);
+          border:
+            1px solid
+            rgba(255,255,255,.08);
           border-radius: 20px;
           padding: 18px;
           margin-bottom: 15px;
-          box-shadow:
-            0 10px 30px
-            rgba(0,0,0,.15);
-        }
-
-        .activeEvent {
-          margin-top: 5px;
-          background: #172535;
-          padding: 12px;
-          border-radius: 12px;
-          color: #fbbf24;
-          font-weight: bold;
         }
 
         .stats {
           display: grid;
           grid-template-columns:
-            repeat(4, 1fr);
+            repeat(4,1fr);
           gap: 10px;
           margin-bottom: 15px;
         }
 
-        .stat {
+        .stats > div {
           text-align: center;
-          background: rgba(255,255,255,.06);
-          border-radius: 17px;
           padding: 14px 5px;
+          border-radius: 16px;
+          background:
+            rgba(255,255,255,.06);
         }
 
-        .stat span {
-          font-size: 22px;
+        .stats b,
+        .stats small {
           display: block;
         }
 
-        .stat b {
-          display: block;
+        .stats b {
           font-size: 20px;
-          margin: 5px 0;
-        }
-
-        .stat small {
-          color: #8997a6;
-          font-size: 11px;
+          margin: 5px;
         }
 
         input,
         select {
           width: 100%;
           padding: 13px;
-          border-radius: 12px;
-          border: 1px solid #344252;
-          background: #131b24;
+          background: #121a23;
           color: white;
+          border: 1px solid #344252;
+          border-radius: 12px;
           margin-bottom: 10px;
-          font-size: 15px;
         }
 
         button {
@@ -817,14 +1072,15 @@ export default function Home() {
 
         .addRow {
           display: grid;
-          grid-template-columns: 1fr auto;
+          grid-template-columns:
+            1fr auto;
           gap: 8px;
         }
 
-        .inputs {
+        .three {
           display: grid;
           grid-template-columns:
-            repeat(3, 1fr);
+            repeat(3,1fr);
           gap: 8px;
         }
 
@@ -835,77 +1091,83 @@ export default function Home() {
         .person {
           display: grid;
           grid-template-columns:
-            42px 1fr auto auto;
+            40px 1fr auto;
           gap: 10px;
           align-items: center;
-          background: rgba(255,255,255,.05);
-          padding: 10px;
+          background:
+            rgba(255,255,255,.05);
+          padding: 11px;
           border-radius: 14px;
           margin-top: 8px;
         }
 
-        .personIcon {
+        .avatar {
           width: 38px;
           height: 38px;
           border-radius: 50%;
+          background: #334155;
           display: flex;
           align-items: center;
           justify-content: center;
-          background: #334155;
           font-weight: bold;
-          font-size: 18px;
         }
 
-        .personInfo small,
+        .person small,
         .drink small,
-        .ranking small {
+        .ranking small,
+        .balance small {
           display: block;
-          color: #8d9aaa;
           margin-top: 4px;
         }
 
-        .remove {
+        .delete {
           background: #303b48;
           color: white;
           padding: 6px 11px;
         }
 
-        .assignment {
+        .assign {
           display: grid;
-          grid-template-columns: 1fr 1.5fr;
+          grid-template-columns:
+            1fr 1.5fr;
           gap: 10px;
           align-items: center;
         }
 
         .drink {
           display: flex;
-          align-items: center;
           gap: 12px;
-          background: rgba(255,255,255,.05);
+          align-items: center;
+          background:
+            rgba(255,255,255,.05);
           padding: 12px;
           border-radius: 14px;
           margin-top: 8px;
-        }
-
-        .drinkIcon {
-          font-size: 25px;
         }
 
         .drink > strong {
           margin-left: auto;
         }
 
-        .empty {
-          text-align: center;
-          padding: 20px;
-          color: #8d9aaa;
+        .payment {
+          border-color:
+            rgba(245,158,11,.25);
         }
 
-        .empty div {
-          font-size: 28px;
+        .paymentRow {
+          display: grid;
+          grid-template-columns:
+            1fr auto auto;
+          gap: 10px;
+          align-items: center;
+          padding: 10px;
+          background:
+            rgba(255,255,255,.05);
+          border-radius: 12px;
+          margin-top: 8px;
         }
 
-        .bigMoney {
+        .money {
           text-align: center;
           font-size: 40px;
           font-weight: bold;
@@ -919,10 +1181,30 @@ export default function Home() {
         .costRow {
           display: flex;
           justify-content: space-between;
-          background: rgba(255,255,255,.05);
           padding: 13px;
-          border-radius: 12px;
           margin-top: 8px;
+          background:
+            rgba(255,255,255,.05);
+          border-radius: 12px;
+        }
+
+        .balance {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 13px;
+          margin-top: 8px;
+          background:
+            rgba(255,255,255,.05);
+          border-radius: 12px;
+        }
+
+        .plus {
+          color: #4ade80;
+        }
+
+        .minus {
+          color: #fb7185;
         }
 
         .ranking {
@@ -931,15 +1213,15 @@ export default function Home() {
             45px 1fr auto;
           gap: 10px;
           align-items: center;
-          background: rgba(255,255,255,.05);
           padding: 13px;
-          border-radius: 14px;
           margin-top: 8px;
+          background:
+            rgba(255,255,255,.05);
+          border-radius: 14px;
         }
 
-        .place {
+        .ranking > span {
           font-size: 24px;
-          text-align: center;
         }
 
         .ranking > strong {
@@ -951,8 +1233,8 @@ export default function Home() {
           border-radius: 13px;
           background: #172535;
           color: #fbbf24;
-          margin-bottom: 15px;
           text-align: center;
+          margin-bottom: 15px;
         }
 
         footer {
@@ -970,10 +1252,10 @@ export default function Home() {
 
           .stats {
             grid-template-columns:
-              repeat(2, 1fr);
+              repeat(2,1fr);
           }
 
-          .inputs {
+          .three {
             grid-template-columns: 1fr;
           }
 
@@ -981,7 +1263,7 @@ export default function Home() {
             grid-template-columns: 1fr;
           }
 
-          .assignment {
+          .assign {
             grid-template-columns: 1fr;
           }
 
