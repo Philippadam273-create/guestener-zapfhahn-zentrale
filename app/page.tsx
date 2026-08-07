@@ -1,28 +1,67 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "./supabase";
 
 export default function Home() {
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
+  const [events, setEvents] = useState<any[]>([]);
 
-  function saveEvent() {
+  async function loadEvents() {
+    const { data, error } = await supabase
+      .from("events")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (!error && data) {
+      setEvents(data);
+    }
+  }
+
+  async function saveEvent() {
     if (!name.trim()) {
       setMessage("❗ Bitte einen Eventnamen eingeben.");
       return;
     }
 
+    const { error } = await supabase
+      .from("events")
+      .insert([
+        {
+          title: name,
+        },
+      ]);
+
+    if (error) {
+      setMessage("❌ Fehler beim Speichern");
+      console.log(error);
+      return;
+    }
+
     setMessage("🍻 Event wurde erstellt: " + name);
+    setName("");
+    setShowForm(false);
+
+    loadEvents();
   }
 
+  useEffect(() => {
+    loadEvents();
+  }, []);
+
   return (
-    <main>
+    <main style={{ padding: 20 }}>
+
       <h1>🍻 Güstener Zapfhahn Zentrale</h1>
 
-      <p>Deine Zentrale für Events, Getränke, Kosten und Rankings.</p>
+      <p>
+        Deine Zentrale für Events, Getränke, Kosten und Rankings.
+      </p>
 
-      <h2>📅 Aktuelles Event</h2>
+
+      <h2>📅 Aktuelle Events</h2>
 
       {!showForm && (
         <button onClick={() => setShowForm(true)}>
@@ -30,8 +69,10 @@ export default function Home() {
         </button>
       )}
 
+
       {showForm && (
         <div>
+
           <h2>Neues Event</h2>
 
           <input
@@ -46,15 +87,35 @@ export default function Home() {
             💾 Event speichern
           </button>
 
-          {message && <p>{message}</p>}
         </div>
       )}
+
+
+      {message && (
+        <p>{message}</p>
+      )}
+
+
+      <h2>🍻 Gespeicherte Events</h2>
+
+      {events.length === 0 && (
+        <p>Noch keine Events vorhanden.</p>
+      )}
+
+      {events.map((event) => (
+        <div key={event.id}>
+          🍻 {event.title}
+        </div>
+      ))}
+
 
       <h2>🏆 Statistik</h2>
 
       <p>🍺 Getränke: 0</p>
       <p>👥 Teilnehmer: 0</p>
       <p>💶 Kosten: 0 €</p>
+
+
     </main>
   );
 }
