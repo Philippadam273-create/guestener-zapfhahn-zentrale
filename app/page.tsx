@@ -4,34 +4,24 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
 type Person = {
-  id: number;
+  id: string;
   name: string;
+  points: number;
   drinks: number;
   liters: number;
-  points: number;
-};
-
-type Payment = {
-  id: number;
-  personId: number;
-  amount: number;
 };
 
 export default function Home() {
   const [events, setEvents] = useState<any[]>([]);
   const [eventId, setEventId] = useState("");
-  const [drinks, setDrinks] = useState<any[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [drinks, setDrinks] = useState<any[]>([]);
 
   const [personName, setPersonName] = useState("");
   const [drinkName, setDrinkName] = useState("");
   const [liters, setLiters] = useState("0.5");
   const [alcohol, setAlcohol] = useState("5");
   const [price, setPrice] = useState("0");
-
-  const [paymentPerson, setPaymentPerson] = useState("");
-  const [paymentAmount, setPaymentAmount] = useState("");
 
   const [message, setMessage] = useState("");
 
@@ -42,43 +32,29 @@ export default function Home() {
   useEffect(() => {
     if (!eventId) return;
 
-    localStorage.setItem(
-      "guesten-active-event",
-      eventId
-    );
-
-    loadDrinks(eventId);
-    loadPeople(eventId);
-    loadPayments(eventId);
+    loadPeople();
+    loadDrinks();
   }, [eventId]);
 
-  useEffect(() => {
-    if (!eventId) return;
-
-    localStorage.setItem(
-      "guesten-people-" + eventId,
-      JSON.stringify(people)
-    );
-  }, [people, eventId]);
-
-  useEffect(() => {
-    if (!eventId) return;
-
-    localStorage.setItem(
-      "guesten-payments-" + eventId,
-      JSON.stringify(payments)
-    );
-  }, [payments, eventId]);
-
   async function loadEvents() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("events")
       .select("id,title")
       .order("start_date", {
         ascending: false,
       });
 
-    if (!data || data.length === 0) return;
+    if (error) {
+      setMessage(
+        "❌ Events konnten nicht geladen werden."
+      );
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      setMessage("❌ Keine Events vorhanden.");
+      return;
+    }
 
     setEvents(data);
 
@@ -91,67 +67,174 @@ export default function Home() {
       (event) => event.id === saved
     );
 
-    setEventId(
-      exists ? saved : data[0].id
+    if (saved && exists) {
+      setEventId(saved);
+    } else {
+      setEventId(data[0].id);
+    }
+  }
+
+  async function loadPeople() {
+    if (!eventId) return;
+
+    const { data, error } = await supabase
+      .from("event_members")
+      .select("*")
+      .eq("event_id", eventId);
+
+    if (error) {
+      setMessage(
+        "❌ Teilnehmer konnten nicht geladen werden: " +
+          error.message
+      );
+      return;
+    }
+
+    if (!data) {
+      setPeople([]);
+      return;
+    }
+
+    setPeople(
+      data.map((member: any) => ({
+        id: member.id,
+        name:
+          member.name ||
+          member.username ||
+          member.display_name ||
+          "Teilnehmer",
+        points: Number(
+          member.points || 0
+        ),
+        drinks: Number(
+          member.drinks_count || 0
+        ),
+        liters: Number(
+          member.liters || 0
+        ),
+      }))
     );
   }
 
-  async function loadDrinks(id: string) {
-    const { data } = await supabase
+  async function loadDrinks() {
+    if (!eventId) return;
+
+    const { data, error } = await supabase
       .from("drinks")
       .select("*")
-      .eq("event_id", id)
+      .eq("event_id", eventId)
       .order("created_at", {
         ascending: false,
       });
 
-    if (data) setDrinks(data);
-  }
-
-  function loadPeople(id: string) {
-    const saved = localStorage.getItem(
-      "guesten-people-" + id
-    );
-
-    if (!saved) {
-      setPeople([]);
+    if (error) {
+      setMessage(
+        "❌ Getränke konnten nicht geladen werden."
+      );
       return;
     }
 
-    try {
-      setPeople(JSON.parse(saved));
-    } catch {
-      setPeople([]);
-    }
+    setDrinks(data || []);
   }
 
-  function loadPayments(id: string) {
-    const saved = localStorage.getItem(
-      "guesten-payments-" + id
-    );
+  async function addPerson() {
+    setMessage("");
 
-    if (!saved) {
-      setPayments([]);
+    const name = personName.trim();
+
+    if (!name) {
+      setMessage(
+        "❌ Bitte einen Namen eingeben."
+      );
       return;
     }
 
-    try {
-      setPayments(JSON.parse(saved));
-    } catch {
-      setPayments([]);
+    if (!eventId) {
+      setMessage(
+        "❌ Bitte zuerst ein Event auswählen."
+      );
+      return;
     }
+
+    const existing = people.some(
+      (person) =>
+        person.name.toLowerCase() ===
+        name.toLowerCase()
+    );
+
+    if (existing) {
+      setMessage(
+        "❌ Diese Person ist bereits dabei."
+      );
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("event_members")
+      .insert([
+        {
+          event_id: eventId,
+          name: name,
+          points: 0,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      setMessage(
+        "❌ Teilnehmer konnte nicht gespeichert werden: " +
+          error.message
+      );
+      return;
+    }
+
+    setPersonName("");
+
+    setMessage(
+      "✅ Teilnehmer gespeichert."
+    );
+
+    await loadPeople();
+  }
+
+  async function removePerson(
+    personId: string
+  ) {
+    const { error } = await supabase
+      .from("event_members")
+      .delete()
+      .eq("id", personId);
+
+    if (error) {
+      setMessage(
+        "❌ Teilnehmer konnte nicht gelöscht werden: " +
+          error.message
+      );
+      return;
+    }
+
+    await loadPeople();
+
+    setMessage(
+      "✅ Teilnehmer entfernt."
+    );
   }
 
   async function saveDrink() {
     setMessage("");
 
     if (!eventId) {
-      setMessage("❌ Kein Event ausgewählt.");
+      setMessage(
+        "❌ Bitte zuerst ein Event auswählen."
+      );
       return;
     }
 
     if (!drinkName.trim()) {
-      setMessage("❌ Bitte Getränk eingeben.");
+      setMessage(
+        "❌ Bitte ein Getränk eingeben."
+      );
       return;
     }
 
@@ -172,7 +255,10 @@ export default function Home() {
       ]);
 
     if (error) {
-      setMessage("❌ " + error.message);
+      setMessage(
+        "❌ Getränk konnte nicht gespeichert werden: " +
+          error.message
+      );
       return;
     }
 
@@ -181,71 +267,28 @@ export default function Home() {
     setAlcohol("5");
     setPrice("0");
 
-    await loadDrinks(eventId);
-
-    setMessage("✅ Getränk gespeichert.");
-  }
-
-  function addPerson() {
-    const name = personName.trim();
-
-    if (!name) return;
-
-    if (
-      people.some(
-        (p) =>
-          p.name.toLowerCase() ===
-          name.toLowerCase()
-      )
-    ) {
-      setMessage(
-        "❌ Teilnehmer bereits vorhanden."
-      );
-      return;
-    }
-
-    setPeople([
-      ...people,
-      {
-        id: Date.now(),
-        name,
-        drinks: 0,
-        liters: 0,
-        points: 0,
-      },
-    ]);
-
-    setPersonName("");
+    await loadDrinks();
 
     setMessage(
-      "✅ Teilnehmer hinzugefügt."
+      "✅ Getränk gespeichert."
     );
   }
 
-  function removePerson(id: number) {
-    setPeople(
-      people.filter(
-        (person) => person.id !== id
-      )
-    );
-
-    setPayments(
-      payments.filter(
-        (payment) =>
-          payment.personId !== id
-      )
-    );
-  }
-
-  function assignDrink(
-    personId: number,
+  async function assignDrink(
+    personId: string,
     drinkId: string
   ) {
     const drink = drinks.find(
-      (d) => d.id === drinkId
+      (item) => item.id === drinkId
     );
 
     if (!drink) return;
+
+    const person = people.find(
+      (item) => item.id === personId
+    );
+
+    if (!person) return;
 
     const litersValue = Number(
       drink.liters ??
@@ -253,80 +296,39 @@ export default function Home() {
         0
     );
 
-    setPeople(
-      people.map((person) => {
-        if (person.id !== personId) {
-          return person;
-        }
+    const newPoints =
+      Number(person.points || 0) + 10;
 
-        return {
-          ...person,
-          drinks: person.drinks + 1,
-          liters:
-            person.liters +
-            litersValue,
-          points:
-            person.points + 10,
-        };
+    const newDrinks =
+      Number(person.drinks || 0) + 1;
+
+    const newLiters =
+      Number(person.liters || 0) +
+      litersValue;
+
+    const { error } = await supabase
+      .from("event_members")
+      .update({
+        points: newPoints,
+        drinks_count: newDrinks,
+        liters: newLiters,
       })
-    );
+      .eq("id", personId);
+
+    if (error) {
+      setMessage(
+        "❌ Zuordnung fehlgeschlagen: " +
+          error.message
+      );
+      return;
+    }
+
+    await loadPeople();
 
     setMessage(
       "🍺 Getränk zugeordnet! +10 Punkte"
     );
   }
-
-  function addPayment() {
-    if (!paymentPerson) {
-      setMessage(
-        "❌ Bitte Person auswählen."
-      );
-      return;
-    }
-
-    const amount =
-      Number(paymentAmount);
-
-    if (!amount || amount <= 0) {
-      setMessage(
-        "❌ Bitte Betrag eingeben."
-      );
-      return;
-    }
-
-    setPayments([
-      ...payments,
-      {
-        id: Date.now(),
-        personId:
-          Number(paymentPerson),
-        amount,
-      },
-    ]);
-
-    setPaymentPerson("");
-    setPaymentAmount("");
-
-    setMessage(
-      "✅ Zahlung gespeichert."
-    );
-  }
-
-  function removePayment(id: number) {
-    setPayments(
-      payments.filter(
-        (payment) =>
-          payment.id !== id
-      )
-    );
-  }
-
-  const totalCost = drinks.reduce(
-    (sum, drink) =>
-      sum +
-      Number(drink.preis ?? 0),
-    0
-  );
 
   const totalLiters = drinks.reduce(
     (sum, drink) =>
@@ -339,44 +341,21 @@ export default function Home() {
     0
   );
 
-  const totalPaid = payments.reduce(
-    (sum, payment) =>
-      sum + payment.amount,
+  const totalCost = drinks.reduce(
+    (sum, drink) =>
+      sum +
+      Number(drink.preis ?? 0),
     0
   );
-
-  const costPerPerson =
-    people.length > 0
-      ? totalCost / people.length
-      : 0;
 
   const ranking = [...people].sort(
     (a, b) => b.points - a.points
   );
 
-  const getPaid = (personId: number) =>
-    payments
-      .filter(
-        (payment) =>
-          payment.personId === personId
-      )
-      .reduce(
-        (sum, payment) =>
-          sum + payment.amount,
-        0
-      );
-
-  const balances = people.map(
-    (person) => {
-      const paid = getPaid(person.id);
-
-      return {
-        ...person,
-        paid,
-        balance:
-          paid - costPerPerson,
-      };
-    }
+  const totalPoints = people.reduce(
+    (sum, person) =>
+      sum + Number(person.points || 0),
+    0
   );
 
   return (
@@ -466,7 +445,7 @@ export default function Home() {
           <div className="addRow">
 
             <input
-              placeholder="Name"
+              placeholder="Name eingeben"
               value={personName}
               onChange={(e) =>
                 setPersonName(
@@ -483,45 +462,62 @@ export default function Home() {
 
           </div>
 
-          {people.map((person) => (
-            <div
-              className="person"
-              key={person.id}
-            >
+          {people.length === 0 ? (
+            <div className="empty">
+              👥
+              <b>
+                Noch keine Teilnehmer
+              </b>
 
-              <div className="avatar">
-                {person.name
-                  .charAt(0)
-                  .toUpperCase()}
-              </div>
-
-              <div>
-                <b>{person.name}</b>
-
-                <small>
-                  🍺 {person.drinks}
-                  {" · "}
-                  💧{" "}
-                  {person.liters.toFixed(1)}
-                  L
-                  {" · "}
-                  🏆 {person.points}
-                </small>
-              </div>
-
-              <button
-                className="delete"
-                onClick={() =>
-                  removePerson(
-                    person.id
-                  )
-                }
-              >
-                ×
-              </button>
-
+              <p>
+                Füge die Personen deines
+                Events hinzu.
+              </p>
             </div>
-          ))}
+          ) : (
+            people.map((person) => (
+              <div
+                className="person"
+                key={person.id}
+              >
+
+                <div className="avatar">
+                  {person.name
+                    .charAt(0)
+                    .toUpperCase()}
+                </div>
+
+                <div>
+                  <b>
+                    {person.name}
+                  </b>
+
+                  <small>
+                    🍺 {person.drinks}
+                    {" · "}
+                    💧{" "}
+                    {person.liters.toFixed(
+                      1
+                    )} L
+                    {" · "}
+                    🏆 {person.points}
+                  </small>
+                </div>
+
+                <button
+                  className="delete"
+                  onClick={() =>
+                    removePerson(
+                      person.id
+                    )
+                  }
+                >
+                  ×
+                </button>
+
+              </div>
+            ))
+          )}
 
         </section>
 
@@ -600,6 +596,11 @@ export default function Home() {
               👥 Zuerst Teilnehmer
               hinzufügen.
             </p>
+          ) : drinks.length === 0 ? (
+            <p>
+              🍺 Zuerst ein Getränk
+              speichern.
+            </p>
           ) : (
             people.map((person) => (
               <div
@@ -608,7 +609,7 @@ export default function Home() {
               >
 
                 <b>
-                  {person.name}
+                  👤 {person.name}
                 </b>
 
                 <select
@@ -639,7 +640,8 @@ export default function Home() {
                         value={drink.id}
                       >
                         {drink.getraenk ||
-                          drink.drink_name}
+                          drink.drink_name ||
+                          "Getränk"}
                         {" · "}
                         {Number(
                           drink.liters ??
@@ -671,12 +673,15 @@ export default function Home() {
               key={drink.id}
             >
 
-              <span>🍺</span>
+              <span>
+                🍺
+              </span>
 
               <div>
                 <b>
                   {drink.getraenk ||
-                    drink.drink_name}
+                    drink.drink_name ||
+                    "Getränk"}
                 </b>
 
                 <small>
@@ -707,101 +712,6 @@ export default function Home() {
 
         </section>
 
-        <section className="card payment">
-
-          <h2>
-            💳 Wer hat bezahlt?
-          </h2>
-
-          <div className="three">
-
-            <select
-              value={paymentPerson}
-              onChange={(e) =>
-                setPaymentPerson(
-                  e.target.value
-                )
-              }
-            >
-              <option value="">
-                Person auswählen
-              </option>
-
-              {people.map(
-                (person) => (
-                  <option
-                    key={person.id}
-                    value={person.id}
-                  >
-                    {person.name}
-                  </option>
-                )
-              )}
-            </select>
-
-            <input
-              type="number"
-              step="0.01"
-              placeholder="Betrag €"
-              value={paymentAmount}
-              onChange={(e) =>
-                setPaymentAmount(
-                  e.target.value
-                )
-              }
-            />
-
-            <button
-              onClick={addPayment}
-            >
-              💶 Zahlung speichern
-            </button>
-
-          </div>
-
-          {payments.map(
-            (payment) => {
-              const person =
-                people.find(
-                  (p) =>
-                    p.id ===
-                    payment.personId
-                );
-
-              return (
-                <div
-                  className="paymentRow"
-                  key={payment.id}
-                >
-                  <span>
-                    💳{" "}
-                    {person?.name ||
-                      "Unbekannt"}
-                  </span>
-
-                  <b>
-                    {payment.amount.toFixed(
-                      2
-                    )} €
-                  </b>
-
-                  <button
-                    className="delete"
-                    onClick={() =>
-                      removePayment(
-                        payment.id
-                      )
-                    }
-                  >
-                    ×
-                  </button>
-                </div>
-              );
-            }
-          )}
-
-        </section>
-
         <section className="card">
 
           <h2>
@@ -813,7 +723,7 @@ export default function Home() {
           </div>
 
           <p className="center">
-            Gesamtkosten
+            Gesamtkosten des Events
           </p>
 
           <div className="costRow">
@@ -828,68 +738,29 @@ export default function Home() {
 
           <div className="costRow">
             <span>
-              💶 Anteil pro Person
+              💶 Pro Person
             </span>
 
             <b>
-              {costPerPerson.toFixed(
-                2
-              )} €
+              {people.length
+                ? (
+                    totalCost /
+                    people.length
+                  ).toFixed(2)
+                : "0.00"}{" "}
+              €
             </b>
           </div>
 
           <div className="costRow">
             <span>
-              💳 Bereits bezahlt
+              🏆 Gesamtpunkte
             </span>
 
             <b>
-              {totalPaid.toFixed(2)} €
+              {totalPoints}
             </b>
           </div>
-
-          <h3>
-            📊 Abrechnung
-          </h3>
-
-          {balances.map(
-            (person) => (
-              <div
-                className="balance"
-                key={person.id}
-              >
-
-                <div>
-                  <b>
-                    {person.name}
-                  </b>
-
-                  <small>
-                    Bezahlt:{" "}
-                    {person.paid.toFixed(
-                      2
-                    )} €
-                  </small>
-                </div>
-
-                <strong
-                  className={
-                    person.balance >= 0
-                      ? "plus"
-                      : "minus"
-                  }
-                >
-                  {person.balance >= 0
-                    ? "+"
-                    : ""}
-                  {person.balance.toFixed(
-                    2
-                  )} €
-                </strong>
-
-              </div>
-            )
-          )}
 
         </section>
 
@@ -899,46 +770,53 @@ export default function Home() {
             🏆 Ranking
           </h2>
 
-          {ranking.map(
-            (person, index) => (
-              <div
-                className="ranking"
-                key={person.id}
-              >
+          {ranking.length === 0 ? (
+            <div className="empty">
+              🏆 Noch keine Teilnehmer.
+            </div>
+          ) : (
+            ranking.map(
+              (person, index) => (
+                <div
+                  className="ranking"
+                  key={person.id}
+                >
 
-                <span>
-                  {index === 0
-                    ? "🥇"
-                    : index === 1
-                    ? "🥈"
-                    : index === 2
-                    ? "🥉"
-                    : index + 1}
-                </span>
+                  <span>
+                    {index === 0
+                      ? "🥇"
+                      : index === 1
+                      ? "🥈"
+                      : index === 2
+                      ? "🥉"
+                      : index + 1}
+                  </span>
 
-                <div>
-                  <b>
-                    {person.name}
-                  </b>
+                  <div>
+                    <b>
+                      {person.name}
+                    </b>
 
-                  <small>
-                    🍺 {person.drinks}
-                    {" · "}
-                    💧{" "}
-                    {person.liters.toFixed(
-                      1
-                    )} L
-                  </small>
+                    <small>
+                      🍺{" "}
+                      {person.drinks}
+                      {" · "}
+                      💧{" "}
+                      {person.liters.toFixed(
+                        1
+                      )} L
+                    </small>
+                  </div>
+
+                  <strong>
+                    {person.points}
+                    <small>
+                      Punkte
+                    </small>
+                  </strong>
+
                 </div>
-
-                <strong>
-                  {person.points}
-                  <small>
-                    Punkte
-                  </small>
-                </strong>
-
-              </div>
+              )
             )
           )}
 
@@ -1026,7 +904,7 @@ export default function Home() {
         .stats {
           display: grid;
           grid-template-columns:
-            repeat(4,1fr);
+            repeat(4, 1fr);
           gap: 10px;
           margin-bottom: 15px;
         }
@@ -1058,6 +936,7 @@ export default function Home() {
           border: 1px solid #344252;
           border-radius: 12px;
           margin-bottom: 10px;
+          font-size: 15px;
         }
 
         button {
@@ -1112,14 +991,6 @@ export default function Home() {
           font-weight: bold;
         }
 
-        .person small,
-        .drink small,
-        .ranking small,
-        .balance small {
-          display: block;
-          margin-top: 4px;
-        }
-
         .delete {
           background: #303b48;
           color: white;
@@ -1149,22 +1020,10 @@ export default function Home() {
           margin-left: auto;
         }
 
-        .payment {
-          border-color:
-            rgba(245,158,11,.25);
-        }
-
-        .paymentRow {
-          display: grid;
-          grid-template-columns:
-            1fr auto auto;
-          gap: 10px;
-          align-items: center;
-          padding: 10px;
-          background:
-            rgba(255,255,255,.05);
-          border-radius: 12px;
-          margin-top: 8px;
+        .empty {
+          text-align: center;
+          padding: 20px;
+          color: #94a3b8;
         }
 
         .money {
@@ -1188,25 +1047,6 @@ export default function Home() {
           border-radius: 12px;
         }
 
-        .balance {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 13px;
-          margin-top: 8px;
-          background:
-            rgba(255,255,255,.05);
-          border-radius: 12px;
-        }
-
-        .plus {
-          color: #4ade80;
-        }
-
-        .minus {
-          color: #fb7185;
-        }
-
         .ranking {
           display: grid;
           grid-template-columns:
@@ -1222,10 +1062,6 @@ export default function Home() {
 
         .ranking > span {
           font-size: 24px;
-        }
-
-        .ranking > strong {
-          text-align: right;
         }
 
         .message {
