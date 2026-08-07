@@ -11,11 +11,14 @@ type EventItem = {
 type DrinkItem = {
   id: string;
   event_id: string;
-  drink_name: string;
-  liters: number;
-  alcohol_percent: number;
-  price: number;
-  quantity: number;
+  drink_name: string | null;
+  getraenk: string | null;
+  liters: number | null;
+  menge: number | null;
+  alcohol_percent: number | null;
+  alkohol: number | null;
+  preis: number | null;
+  quantity: number | null;
 };
 
 export default function Home() {
@@ -34,6 +37,7 @@ export default function Home() {
 
   async function loadData() {
     setLoading(true);
+    setMessage("");
 
     const { data: eventData, error: eventError } = await supabase
       .from("events")
@@ -56,7 +60,7 @@ export default function Home() {
     const { data: drinkData, error: drinkError } = await supabase
       .from("drinks")
       .select(
-        "id, event_id, drink_name, liters, alcohol_percent, price, quantity"
+        "id, event_id, drink_name, getraenk, liters, menge, alcohol_percent, alkohol, preis, quantity"
       )
       .order("created_at", { ascending: false });
 
@@ -89,9 +93,12 @@ export default function Home() {
       {
         event_id: eventId,
         drink_name: drinkName.trim(),
+        getraenk: drinkName.trim(),
         liters: Number(liters) || 0,
+        menge: Number(liters) || 0,
         alcohol_percent: Number(alcohol) || 0,
-        price: Number(price) || 0,
+        alkohol: Number(alcohol) || 0,
+        preis: Number(price) || 0,
         quantity: 1,
       },
     ]);
@@ -123,28 +130,36 @@ export default function Home() {
 
   const totalCost = selectedDrinks.reduce(
     (sum, drink) =>
-      sum + Number(drink.price || 0) * Number(drink.quantity || 1),
+      sum +
+      Number(drink.preis || 0) *
+        Number(drink.quantity || 1),
     0
   );
 
   const totalLiters = selectedDrinks.reduce(
     (sum, drink) =>
-      sum + Number(drink.liters || 0) * Number(drink.quantity || 1),
+      sum +
+      Number(drink.liters ?? drink.menge ?? 0) *
+        Number(drink.quantity || 1),
     0
   );
 
   return (
     <main className="page">
       <div className="container">
+
         <header className="hero">
           <div className="logo">🍻</div>
+
           <div>
             <h1>Güstener Zapfhahn Zentrale</h1>
             <p>Events · Getränke · Kosten · Rankings</p>
           </div>
         </header>
 
+
         <section className="card">
+
           <div className="sectionTitle">
             <span>📅</span>
             <h2>Aktuelles Event</h2>
@@ -154,23 +169,27 @@ export default function Home() {
             value={eventId}
             onChange={(e) => setEventId(e.target.value)}
           >
-            <option value="">Event auswählen</option>
+
+            <option value="">
+              Event auswählen
+            </option>
 
             {events.map((event) => (
-              <option key={event.id} value={event.id}>
+              <option
+                key={event.id}
+                value={event.id}
+              >
                 {event.title}
               </option>
             ))}
+
           </select>
 
-          {events.length === 0 && !loading && (
-            <p className="hint">
-              Noch kein Event vorhanden.
-            </p>
-          )}
         </section>
 
+
         <section className="stats">
+
           <div className="statCard">
             <span>🍺</span>
             <strong>{selectedDrinks.length}</strong>
@@ -194,141 +213,250 @@ export default function Home() {
             <strong>0</strong>
             <small>Teilnehmer</small>
           </div>
+
         </section>
 
+
         <section className="card">
+
           <div className="sectionTitle">
             <span>🍺</span>
             <h2>Getränk hinzufügen</h2>
           </div>
 
+
           <div className="form">
+
             <label>
               Getränk
+
               <input
                 value={drinkName}
-                onChange={(e) => setDrinkName(e.target.value)}
+                onChange={(e) =>
+                  setDrinkName(e.target.value)
+                }
                 placeholder="z. B. Pils"
               />
             </label>
 
+
             <div className="row">
+
               <label>
                 Liter
+
                 <input
                   type="number"
                   step="0.1"
                   value={liters}
-                  onChange={(e) => setLiters(e.target.value)}
+                  onChange={(e) =>
+                    setLiters(e.target.value)
+                  }
                 />
               </label>
 
+
               <label>
                 Alkohol %
+
                 <input
                   type="number"
                   step="0.1"
                   value={alcohol}
-                  onChange={(e) => setAlcohol(e.target.value)}
+                  onChange={(e) =>
+                    setAlcohol(e.target.value)
+                  }
                 />
               </label>
+
             </div>
+
 
             <label>
               Preis
+
               <input
                 type="number"
                 step="0.01"
                 value={price}
-                onChange={(e) => setPrice(e.target.value)}
+                onChange={(e) =>
+                  setPrice(e.target.value)
+                }
               />
             </label>
+
 
             <button
               className="primary"
               onClick={saveDrink}
               disabled={saving}
             >
-              {saving ? "⏳ Speichert..." : "🍻 Getränk speichern"}
+
+              {saving
+                ? "⏳ Speichert..."
+                : "🍻 Getränk speichern"}
+
             </button>
 
-            {message && <div className="message">{message}</div>}
+
+            {message && (
+              <div className="message">
+                {message}
+              </div>
+            )}
+
           </div>
+
         </section>
 
+
         <section className="card">
+
           <div className="sectionTitle">
             <span>🍺</span>
             <h2>Getränke</h2>
           </div>
 
-          {loading && <p>⏳ Lade Daten...</p>}
 
-          {!loading && selectedDrinks.length === 0 && (
-            <div className="empty">
-              <span>🍻</span>
-              <p>Noch keine Getränke bei diesem Event.</p>
-            </div>
+          {loading && (
+            <p>⏳ Lade Daten...</p>
           )}
 
-          <div className="drinkList">
-            {selectedDrinks.map((drink) => (
-              <div className="drink" key={drink.id}>
-                <div className="drinkIcon">🍺</div>
 
-                <div className="drinkInfo">
-                  <strong>{drink.drink_name}</strong>
-                  <span>
-                    {Number(drink.liters).toFixed(1)} Liter ·{" "}
-                    {Number(drink.alcohol_percent).toFixed(1)} %
-                  </span>
+          {!loading &&
+            selectedDrinks.length === 0 && (
+              <div className="empty">
+
+                <span>🍻</span>
+
+                <p>
+                  Noch keine Getränke bei diesem Event.
+                </p>
+
+              </div>
+            )}
+
+
+          <div className="drinkList">
+
+            {selectedDrinks.map((drink) => {
+
+              const name =
+                drink.drink_name ||
+                drink.getraenk ||
+                "Getränk";
+
+              const liter =
+                drink.liters ??
+                drink.menge ??
+                0;
+
+              const alcoholValue =
+                drink.alcohol_percent ??
+                drink.alkohol ??
+                0;
+
+              const drinkPrice =
+                drink.preis ?? 0;
+
+              return (
+
+                <div
+                  className="drink"
+                  key={drink.id}
+                >
+
+                  <div className="drinkIcon">
+                    🍺
+                  </div>
+
+
+                  <div className="drinkInfo">
+
+                    <strong>
+                      {name}
+                    </strong>
+
+                    <span>
+                      {Number(liter).toFixed(1)}
+                      {" "}Liter ·{" "}
+                      {Number(alcoholValue).toFixed(1)}
+                      {" "}%
+                    </span>
+
+                  </div>
+
+
+                  <strong>
+                    {Number(drinkPrice).toFixed(2)} €
+                  </strong>
+
                 </div>
 
-                <strong>
-                  {Number(drink.price || 0).toFixed(2)} €
-                </strong>
-              </div>
-            ))}
+              );
+
+            })}
+
           </div>
+
         </section>
 
+
         <section className="card coming">
+
           <div className="sectionTitle">
             <span>🚀</span>
             <h2>Als Nächstes</h2>
           </div>
 
+
           <div className="featureGrid">
+
             <div>👥 Teilnehmer</div>
+
             <div>💶 Kostenaufteilung</div>
+
             <div>🏆 Ranking</div>
+
             <div>🎯 Punkte</div>
+
             <div>📸 Getränkefoto</div>
+
             <div>🤖 KI-Erkennung</div>
+
           </div>
+
         </section>
+
 
         <footer>
           🍻 Güstener Zapfhahn Zentrale
         </footer>
+
       </div>
 
+
       <style jsx>{`
+
         * {
           box-sizing: border-box;
-        }
-
-        body {
-          margin: 0;
         }
 
         .page {
           min-height: 100vh;
           background:
-            radial-gradient(circle at top, #26364a 0%, #10151d 45%, #080b10 100%);
+            radial-gradient(
+              circle at top,
+              #26364a 0%,
+              #10151d 45%,
+              #080b10 100%
+            );
           color: white;
           padding: 20px 12px 50px;
-          font-family: Arial, Helvetica, sans-serif;
+          font-family:
+            Arial,
+            Helvetica,
+            sans-serif;
         }
 
         .container {
@@ -350,7 +478,8 @@ export default function Home() {
           display: flex;
           align-items: center;
           justify-content: center;
-          background: rgba(255,255,255,0.1);
+          background:
+            rgba(255,255,255,0.1);
           border-radius: 20px;
           font-size: 34px;
         }
@@ -366,8 +495,10 @@ export default function Home() {
         }
 
         .card {
-          background: rgba(255,255,255,0.08);
-          border: 1px solid rgba(255,255,255,0.1);
+          background:
+            rgba(255,255,255,0.08);
+          border:
+            1px solid rgba(255,255,255,0.1);
           border-radius: 22px;
           padding: 20px;
           margin-bottom: 16px;
@@ -397,7 +528,8 @@ export default function Home() {
           outline: none;
           border-radius: 13px;
           padding: 14px;
-          background: rgba(255,255,255,0.12);
+          background:
+            rgba(255,255,255,0.12);
           color: white;
           font-size: 16px;
         }
@@ -446,19 +578,22 @@ export default function Home() {
         .message {
           padding: 12px;
           border-radius: 12px;
-          background: rgba(255,255,255,0.08);
+          background:
+            rgba(255,255,255,0.08);
         }
 
         .stats {
           display: grid;
-          grid-template-columns: repeat(4, 1fr);
+          grid-template-columns:
+            repeat(4, 1fr);
           gap: 12px;
           margin-bottom: 16px;
         }
 
         .statCard {
           text-align: center;
-          background: rgba(255,255,255,0.08);
+          background:
+            rgba(255,255,255,0.08);
           border-radius: 18px;
           padding: 16px 8px;
         }
@@ -488,7 +623,8 @@ export default function Home() {
           display: flex;
           align-items: center;
           gap: 12px;
-          background: rgba(255,255,255,0.06);
+          background:
+            rgba(255,255,255,0.06);
           border-radius: 15px;
           padding: 13px;
         }
@@ -524,18 +660,16 @@ export default function Home() {
 
         .featureGrid {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns:
+            1fr 1fr;
           gap: 10px;
         }
 
         .featureGrid div {
           padding: 13px;
           border-radius: 13px;
-          background: rgba(255,255,255,0.06);
-        }
-
-        .hint {
-          color: #aeb8c5;
+          background:
+            rgba(255,255,255,0.06);
         }
 
         footer {
@@ -545,8 +679,12 @@ export default function Home() {
         }
 
         @media (max-width: 600px) {
+
           .page {
-            padding: 10px 10px 40px;
+            padding:
+              10px
+              10px
+              40px;
           }
 
           h1 {
@@ -558,14 +696,18 @@ export default function Home() {
           }
 
           .stats {
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns:
+              1fr 1fr;
           }
 
           .row {
-            grid-template-columns: 1fr;
+            grid-template-columns:
+              1fr;
           }
         }
+
       `}</style>
+
     </main>
   );
 }
