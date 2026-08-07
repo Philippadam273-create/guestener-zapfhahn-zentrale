@@ -40,14 +40,16 @@ export default function Home() {
   const [drinkName, setDrinkName] = useState("");
   const [liters, setLiters] = useState("0.5");
   const [alcohol, setAlcohol] = useState("5");
-  const [price, setPrice] = useState("1.20");
+  const [price, setPrice] = useState("0");
 
   const [personName, setPersonName] = useState("");
-
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  /*
+   * EVENTS UND GETRÄNKE LADEN
+   */
   async function loadData() {
     setLoading(true);
 
@@ -61,8 +63,10 @@ export default function Home() {
 
     if (eventError) {
       setMessage(
-        "❌ Events: " + eventError.message
+        "❌ Events konnten nicht geladen werden: " +
+          eventError.message
       );
+
       setLoading(false);
       return;
     }
@@ -71,7 +75,10 @@ export default function Home() {
 
     setEvents(loadedEvents);
 
-    if (!eventId && loadedEvents.length > 0) {
+    if (
+      !eventId &&
+      loadedEvents.length > 0
+    ) {
       setEventId(loadedEvents[0].id);
     }
 
@@ -87,9 +94,10 @@ export default function Home() {
 
     if (drinkError) {
       setMessage(
-        "❌ Getränke: " +
+        "❌ Getränke konnten nicht geladen werden: " +
           drinkError.message
       );
+
       setLoading(false);
       return;
     }
@@ -98,6 +106,60 @@ export default function Home() {
     setLoading(false);
   }
 
+  /*
+   * TEILNEHMER AUS DEM BROWSER LADEN
+   */
+  useEffect(() => {
+    if (!eventId) return;
+
+    const storageKey =
+      "guester-zapfhahn-people-" +
+      eventId;
+
+    const saved =
+      localStorage.getItem(
+        storageKey
+      );
+
+    if (saved) {
+      try {
+        setPeople(
+          JSON.parse(saved)
+        );
+      } catch {
+        setPeople([]);
+      }
+    } else {
+      setPeople([]);
+    }
+  }, [eventId]);
+
+  /*
+   * TEILNEHMER SPEICHERN
+   */
+  useEffect(() => {
+    if (!eventId) return;
+
+    const storageKey =
+      "guester-zapfhahn-people-" +
+      eventId;
+
+    localStorage.setItem(
+      storageKey,
+      JSON.stringify(people)
+    );
+  }, [people, eventId]);
+
+  /*
+   * START
+   */
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  /*
+   * GETRÄNK SPEICHERN
+   */
   async function saveDrink() {
     setMessage("");
 
@@ -117,28 +179,35 @@ export default function Home() {
 
     setSaving(true);
 
-    const { error } = await supabase
-      .from("drinks")
-      .insert([
-        {
-          event_id: eventId,
-          drink_name: drinkName.trim(),
-          getraenk: drinkName.trim(),
-          liters: Number(liters) || 0,
-          menge: Number(liters) || 0,
-          alcohol_percent:
-            Number(alcohol) || 0,
-          alkohol: Number(alcohol) || 0,
-          preis: Number(price) || 0,
-          quantity: 1,
-        },
-      ]);
+    const { error } =
+      await supabase
+        .from("drinks")
+        .insert([
+          {
+            event_id: eventId,
+            drink_name:
+              drinkName.trim(),
+            getraenk:
+              drinkName.trim(),
+            liters:
+              Number(liters) || 0,
+            menge:
+              Number(liters) || 0,
+            alcohol_percent:
+              Number(alcohol) || 0,
+            alkohol:
+              Number(alcohol) || 0,
+            preis:
+              Number(price) || 0,
+            quantity: 1,
+          },
+        ]);
 
     setSaving(false);
 
     if (error) {
       setMessage(
-        "❌ Speichern fehlgeschlagen: " +
+        "❌ Getränk konnte nicht gespeichert werden: " +
           error.message
       );
       return;
@@ -151,66 +220,83 @@ export default function Home() {
     setDrinkName("");
     setLiters("0.5");
     setAlcohol("5");
-    setPrice("1.20");
+    setPrice("0");
 
     await loadData();
   }
 
+  /*
+   * TEILNEHMER HINZUFÜGEN
+   */
   function addPerson() {
-    const cleanName =
+    const name =
       personName.trim();
 
-    if (!cleanName) {
+    if (!name) {
       setMessage(
         "❗ Bitte einen Namen eingeben."
       );
       return;
     }
 
-    const alreadyExists =
+    const exists =
       people.some(
         (person) =>
           person.name.toLowerCase() ===
-          cleanName.toLowerCase()
+          name.toLowerCase()
       );
 
-    if (alreadyExists) {
+    if (exists) {
       setMessage(
         "❗ Dieser Teilnehmer ist bereits vorhanden."
       );
       return;
     }
 
+    const newPerson: Person = {
+      id: Date.now(),
+      name,
+      drinks: 0,
+      liters: 0,
+      cost: 0,
+      points: 0,
+    };
+
     setPeople((current) => [
       ...current,
-      {
-        id: Date.now(),
-        name: cleanName,
-        drinks: 0,
-        liters: 0,
-        cost: 0,
-        points: 0,
-      },
+      newPerson,
     ]);
 
     setPersonName("");
 
     setMessage(
-      "👤 Teilnehmer hinzugefügt!"
+      "✅ " +
+        name +
+        " wurde hinzugefügt!"
     );
   }
 
+  /*
+   * TEILNEHMER LÖSCHEN
+   */
   function removePerson(
-    personId: number
+    id: number
   ) {
     setPeople((current) =>
       current.filter(
         (person) =>
-          person.id !== personId
+          person.id !== id
       )
+    );
+
+    setMessage(
+      "👤 Teilnehmer entfernt."
     );
   }
 
+  /*
+   * GETRÄNK EINER PERSON GUTSCHREIBEN
+   */
   function assignDrink(
     personId: number,
     drinkId: string
@@ -221,20 +307,18 @@ export default function Home() {
           item.id === drinkId
       );
 
-    if (!drink) {
-      return;
-    }
+    if (!drink) return;
 
-    const drinkLiters =
+    const litersValue =
       Number(
         drink.liters ??
           drink.menge ??
           0
       );
 
-    const drinkPrice =
+    const priceValue =
       Number(
-        drink.preis || 0
+        drink.preis ?? 0
       );
 
     setPeople((current) =>
@@ -251,10 +335,10 @@ export default function Home() {
             person.drinks + 1,
           liters:
             person.liters +
-            drinkLiters,
+            litersValue,
           cost:
             person.cost +
-            drinkPrice,
+            priceValue,
           points:
             person.points + 10,
         };
@@ -262,20 +346,23 @@ export default function Home() {
     );
 
     setMessage(
-      "🍺 Getränk zugeordnet!"
+      "🍺 Getränk wurde " +
+        "zugeordnet! +10 Punkte"
     );
   }
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
+  /*
+   * AKTUELLE GETRÄNKE
+   */
   const selectedDrinks =
     drinks.filter(
       (drink) =>
         drink.event_id === eventId
     );
 
+  /*
+   * GESAMTKOSTEN
+   */
   const totalCost =
     selectedDrinks.reduce(
       (sum, drink) =>
@@ -289,6 +376,9 @@ export default function Home() {
       0
     );
 
+  /*
+   * GESAMTLITER
+   */
   const totalLiters =
     selectedDrinks.reduce(
       (sum, drink) =>
@@ -304,24 +394,42 @@ export default function Home() {
       0
     );
 
-  const assignedDrinks =
-    people.reduce(
-      (sum, person) =>
-        sum + person.drinks,
-      0
-    );
-
-  const sortedPeople = [
+  /*
+   * SORTIERTES RANKING
+   */
+  const ranking = [
     ...people,
   ].sort(
     (a, b) =>
       b.points - a.points
   );
 
+  /*
+   * GESAMTPUNKTE
+   */
+  const totalPoints =
+    people.reduce(
+      (sum, person) =>
+        sum + person.points,
+      0
+    );
+
+  /*
+   * ZUORDNUNGEN
+   */
+  const assignments =
+    people.reduce(
+      (sum, person) =>
+        sum + person.drinks,
+      0
+    );
+
   return (
     <main className="page">
 
       <div className="container">
+
+        {/* HEADER */}
 
         <header className="hero">
 
@@ -335,20 +443,20 @@ export default function Home() {
             </h1>
 
             <p>
-              Deine Zentrale für
-              Events, Getränke,
-              Kosten & Rankings
+              Events · Getränke · Kosten · Rankings
             </p>
           </div>
 
         </header>
 
 
-        <section className="card eventCard">
+        {/* EVENT */}
+
+        <section className="card">
 
           <div className="sectionHeader">
 
-            <div className="iconBox">
+            <div className="icon">
               📅
             </div>
 
@@ -363,7 +471,6 @@ export default function Home() {
             </div>
 
           </div>
-
 
           <select
             value={eventId}
@@ -380,14 +487,12 @@ export default function Home() {
 
             {events.map(
               (event) => (
-
                 <option
                   key={event.id}
                   value={event.id}
                 >
                   {event.title}
                 </option>
-
               )
             )}
 
@@ -396,87 +501,60 @@ export default function Home() {
         </section>
 
 
+        {/* STATISTIK */}
+
         <section className="stats">
 
-          <div className="statCard">
-
-            <div className="statIcon">
-              🍺
-            </div>
-
+          <div className="stat">
+            <span>🍺</span>
             <strong>
               {selectedDrinks.length}
             </strong>
-
-            <span>
+            <small>
               Getränke
-            </span>
-
+            </small>
           </div>
 
-
-          <div className="statCard">
-
-            <div className="statIcon">
-              💧
-            </div>
-
+          <div className="stat">
+            <span>💧</span>
             <strong>
-              {totalLiters.toFixed(
-                1
-              )}
+              {totalLiters.toFixed(1)}
             </strong>
-
-            <span>
+            <small>
               Liter
-            </span>
-
+            </small>
           </div>
 
-
-          <div className="statCard">
-
-            <div className="statIcon">
-              💶
-            </div>
-
+          <div className="stat">
+            <span>💶</span>
             <strong>
-              {totalCost.toFixed(
-                2
-              )} €
+              {totalCost.toFixed(2)} €
             </strong>
-
-            <span>
+            <small>
               Kosten
-            </span>
-
+            </small>
           </div>
 
-
-          <div className="statCard">
-
-            <div className="statIcon">
-              👥
-            </div>
-
+          <div className="stat">
+            <span>👥</span>
             <strong>
               {people.length}
             </strong>
-
-            <span>
+            <small>
               Teilnehmer
-            </span>
-
+            </small>
           </div>
 
         </section>
 
 
+        {/* TEILNEHMER */}
+
         <section className="card">
 
           <div className="sectionHeader">
 
-            <div className="iconBox">
+            <div className="icon">
               👥
             </div>
 
@@ -493,7 +571,7 @@ export default function Home() {
           </div>
 
 
-          <div className="addPerson">
+          <div className="addRow">
 
             <input
               value={personName}
@@ -513,10 +591,8 @@ export default function Home() {
             />
 
             <button
-              className="primaryButton"
-              onClick={
-                addPerson
-              }
+              onClick={addPerson}
+              className="primary"
             >
               ➕ Hinzufügen
             </button>
@@ -524,8 +600,7 @@ export default function Home() {
           </div>
 
 
-          {people.length ===
-            0 && (
+          {people.length === 0 ? (
 
             <div className="empty">
 
@@ -544,83 +619,80 @@ export default function Home() {
 
             </div>
 
-          )}
+          ) : (
 
+            <div className="people">
 
-          <div className="peopleList">
+              {people.map(
+                (person) => (
 
-            {people.map(
-              (person) => (
-
-                <div
-                  className="personCard"
-                  key={person.id}
-                >
-
-                  <div className="avatar">
-                    {person.name
-                      .charAt(0)
-                      .toUpperCase()}
-                  </div>
-
-
-                  <div className="personDetails">
-
-                    <strong>
-                      {person.name}
-                    </strong>
-
-                    <span>
-                      🍺{" "}
-                      {person.drinks}
-                      {" · "}
-                      💧{" "}
-                      {person.liters.toFixed(
-                        1
-                      )} L
-                      {" · "}
-                      💶{" "}
-                      {person.cost.toFixed(
-                        2
-                      )} €
-                    </span>
-
-                  </div>
-
-
-                  <div className="personPoints">
-                    🏆{" "}
-                    {person.points}
-                  </div>
-
-
-                  <button
-                    className="deleteButton"
-                    onClick={() =>
-                      removePerson(
-                        person.id
-                      )
-                    }
-                    title="Teilnehmer entfernen"
+                  <div
+                    className="person"
+                    key={person.id}
                   >
-                    ×
-                  </button>
 
-                </div>
+                    <div className="avatar">
+                      {person.name
+                        .charAt(0)
+                        .toUpperCase()}
+                    </div>
 
-              )
-            )}
+                    <div className="personInfo">
 
-          </div>
+                      <strong>
+                        {person.name}
+                      </strong>
+
+                      <span>
+                        🍺 {person.drinks}
+                        {" · "}
+                        💧{" "}
+                        {person.liters.toFixed(
+                          1
+                        )} L
+                        {" · "}
+                        💶{" "}
+                        {person.cost.toFixed(
+                          2
+                        )} €
+                      </span>
+
+                    </div>
+
+                    <div className="pointsSmall">
+                      🏆 {person.points}
+                    </div>
+
+                    <button
+                      className="delete"
+                      onClick={() =>
+                        removePerson(
+                          person.id
+                        )
+                      }
+                    >
+                      ×
+                    </button>
+
+                  </div>
+
+                )
+              )}
+
+            </div>
+
+          )}
 
         </section>
 
+
+        {/* GETRÄNK ERSTELLEN */}
 
         <section className="card">
 
           <div className="sectionHeader">
 
-            <div className="iconBox">
+            <div className="icon">
               🍺
             </div>
 
@@ -630,8 +702,7 @@ export default function Home() {
               </h2>
 
               <p>
-                Getränk für das Event
-                erfassen
+                Getränk für das Event erfassen
               </p>
             </div>
 
@@ -650,12 +721,13 @@ export default function Home() {
                     e.target.value
                   )
                 }
-                placeholder="z. B. Pils, Radler, Cola..."
+                placeholder="z. B. Pils"
               />
+
             </label>
 
 
-            <div className="formRow">
+            <div className="three">
 
               <label>
                 Liter
@@ -671,6 +743,7 @@ export default function Home() {
                     )
                   }
                 />
+
               </label>
 
 
@@ -688,6 +761,7 @@ export default function Home() {
                     )
                   }
                 />
+
               </label>
 
 
@@ -705,21 +779,20 @@ export default function Home() {
                     )
                   }
                 />
+
               </label>
 
             </div>
 
 
             <button
-              className="saveButton"
-              onClick={
-                saveDrink
-              }
+              className="save"
+              onClick={saveDrink}
               disabled={saving}
             >
 
               {saving
-                ? "⏳ Wird gespeichert..."
+                ? "⏳ Speichert..."
                 : "🍻 Getränk speichern"}
 
             </button>
@@ -729,11 +802,13 @@ export default function Home() {
         </section>
 
 
+        {/* ZUORDNEN */}
+
         <section className="card">
 
           <div className="sectionHeader">
 
-            <div className="iconBox">
+            <div className="icon">
               🔗
             </div>
 
@@ -743,16 +818,14 @@ export default function Home() {
               </h2>
 
               <p>
-                Getränk einem Teilnehmer
-                gutschreiben
+                Getränk einem Teilnehmer gutschreiben
               </p>
             </div>
 
           </div>
 
 
-          {people.length ===
-            0 ? (
+          {people.length === 0 ? (
 
             <div className="notice">
               👥 Zuerst Teilnehmer
@@ -769,7 +842,7 @@ export default function Home() {
 
           ) : (
 
-            <div className="assignmentList">
+            <div className="assignments">
 
               {people.map(
                 (person) => (
@@ -785,11 +858,9 @@ export default function Home() {
                         .toUpperCase()}
                     </div>
 
-
                     <strong>
                       {person.name}
                     </strong>
-
 
                     <select
                       defaultValue=""
@@ -830,9 +901,8 @@ export default function Home() {
                             {Number(
                               drink.preis ||
                                 0
-                            ).toFixed(
-                              2
-                            )} €
+                            ).toFixed(2)}
+                            €
                           </option>
 
                         )
@@ -852,11 +922,13 @@ export default function Home() {
         </section>
 
 
+        {/* GETRÄNKE */}
+
         <section className="card">
 
           <div className="sectionHeader">
 
-            <div className="iconBox">
+            <div className="icon">
               🍺
             </div>
 
@@ -873,120 +945,117 @@ export default function Home() {
           </div>
 
 
-          {loading && (
-            <div className="loading">
+          {loading ? (
+
+            <div className="notice">
               ⏳ Daten werden geladen...
             </div>
-          )}
 
+          ) : selectedDrinks.length ===
+            0 ? (
 
-          {!loading &&
-            selectedDrinks.length ===
-              0 && (
+            <div className="empty">
 
-              <div className="empty">
-
-                <div>
-                  🍻
-                </div>
-
-                <strong>
-                  Noch keine Getränke
-                </strong>
-
-                <span>
-                  Füge oben das erste
-                  Getränk hinzu.
-                </span>
-
+              <div>
+                🍻
               </div>
 
-            )}
+              <strong>
+                Noch keine Getränke
+              </strong>
 
+              <span>
+                Füge oben ein Getränk hinzu.
+              </span>
 
-          <div className="drinkList">
+            </div>
 
-            {selectedDrinks.map(
-              (drink) => {
+          ) : (
 
-                const name =
-                  drink.drink_name ||
-                  drink.getraenk ||
-                  "Getränk";
+            <div className="drinkList">
 
-                const drinkLiters =
-                  Number(
-                    drink.liters ??
-                      drink.menge ??
-                      0
-                  );
+              {selectedDrinks.map(
+                (drink) => {
 
-                const drinkAlcohol =
-                  Number(
-                    drink.alcohol_percent ??
-                      drink.alkohol ??
-                      0
-                  );
+                  const name =
+                    drink.drink_name ||
+                    drink.getraenk ||
+                    "Getränk";
 
-                const drinkPrice =
-                  Number(
-                    drink.preis || 0
-                  );
+                  const drinkLiters =
+                    Number(
+                      drink.liters ??
+                        drink.menge ??
+                        0
+                    );
 
-                return (
+                  const drinkAlcohol =
+                    Number(
+                      drink.alcohol_percent ??
+                        drink.alkohol ??
+                        0
+                    );
 
-                  <div
-                    className="drinkCard"
-                    key={drink.id}
-                  >
+                  const drinkPrice =
+                    Number(
+                      drink.preis || 0
+                    );
 
-                    <div className="drinkBigIcon">
-                      🍺
+                  return (
+
+                    <div
+                      className="drink"
+                      key={drink.id}
+                    >
+
+                      <div className="drinkIcon">
+                        🍺
+                      </div>
+
+                      <div className="drinkInfo">
+
+                        <strong>
+                          {name}
+                        </strong>
+
+                        <span>
+                          {drinkLiters.toFixed(
+                            1
+                          )} Liter
+                          {" · "}
+                          {drinkAlcohol.toFixed(
+                            1
+                          )} %
+                        </span>
+
+                      </div>
+
+                      <b>
+                        {drinkPrice.toFixed(
+                          2
+                        )} €
+                      </b>
+
                     </div>
 
+                  );
+                }
+              )}
 
-                    <div className="drinkDetails">
+            </div>
 
-                      <strong>
-                        {name}
-                      </strong>
-
-                      <span>
-                        {drinkLiters.toFixed(
-                          1
-                        )} Liter
-                        {" · "}
-                        {drinkAlcohol.toFixed(
-                          1
-                        )} %
-                      </span>
-
-                    </div>
-
-
-                    <div className="drinkPrice">
-                      {drinkPrice.toFixed(
-                        2
-                      )} €
-                    </div>
-
-                  </div>
-
-                );
-
-              }
-            )}
-
-          </div>
+          )}
 
         </section>
 
 
-        <section className="card rankingCard">
+        {/* RANKING */}
+
+        <section className="card">
 
           <div className="sectionHeader">
 
-            <div className="iconBox">
+            <div className="icon">
               🏆
             </div>
 
@@ -1003,8 +1072,7 @@ export default function Home() {
           </div>
 
 
-          {sortedPeople.length ===
-            0 ? (
+          {ranking.length === 0 ? (
 
             <div className="empty">
 
@@ -1017,18 +1085,17 @@ export default function Home() {
               </strong>
 
               <span>
-                Sobald Teilnehmer
-                Getränke bekommen,
-                geht es los.
+                Sobald Teilnehmer Getränke
+                bekommen, geht es los.
               </span>
 
             </div>
 
           ) : (
 
-            <div className="rankingList">
+            <div className="ranking">
 
-              {sortedPeople.map(
+              {ranking.map(
                 (
                   person,
                   index
@@ -1036,15 +1103,15 @@ export default function Home() {
 
                   <div
                     className={
-                      "rankingRow " +
+                      "rank " +
                       (index === 0
-                        ? "first"
+                        ? "winner"
                         : "")
                     }
                     key={person.id}
                   >
 
-                    <div className="rankPlace">
+                    <div className="place">
 
                       {index === 0
                         ? "🥇"
@@ -1056,34 +1123,30 @@ export default function Home() {
 
                     </div>
 
-
                     <div className="rankAvatar">
                       {person.name
                         .charAt(0)
                         .toUpperCase()}
                     </div>
 
-
-                    <div className="rankPerson">
+                    <div className="rankInfo">
 
                       <strong>
                         {person.name}
                       </strong>
 
                       <span>
-                        🍺{" "}
-                        {person.drinks}
+                        🍺 {person.drinks}
                         {" · "}
-                        💶{" "}
-                        {person.cost.toFixed(
-                          2
-                        )} €
+                        💧{" "}
+                        {person.liters.toFixed(
+                          1
+                        )} L
                       </span>
 
                     </div>
 
-
-                    <div className="points">
+                    <div className="rankPoints">
                       {person.points}
                       <small>
                         Punkte
@@ -1102,11 +1165,13 @@ export default function Home() {
         </section>
 
 
-        <section className="card summaryCard">
+        {/* ÜBERSICHT */}
+
+        <section className="card">
 
           <div className="sectionHeader">
 
-            <div className="iconBox">
+            <div className="icon">
               📊
             </div>
 
@@ -1123,53 +1188,45 @@ export default function Home() {
           </div>
 
 
-          <div className="summaryGrid">
+          <div className="summary">
 
             <div>
+              👥
               <span>
-                👥 Teilnehmer
+                Teilnehmer
               </span>
-
               <strong>
                 {people.length}
               </strong>
             </div>
 
-
             <div>
+              🍺
               <span>
-                🍺 Getränke
+                Getränke
               </span>
-
               <strong>
                 {selectedDrinks.length}
               </strong>
             </div>
 
-
             <div>
+              🔗
               <span>
-                🔗 Zuordnungen
+                Zuordnungen
               </span>
-
               <strong>
-                {assignedDrinks}
+                {assignments}
               </strong>
             </div>
 
-
             <div>
+              🏆
               <span>
-                🏆 Gesamtpunkte
+                Gesamtpunkte
               </span>
-
               <strong>
-                {people.reduce(
-                  (sum, person) =>
-                    sum +
-                    person.points,
-                  0
-                )}
+                {totalPoints}
               </strong>
             </div>
 
@@ -1177,6 +1234,8 @@ export default function Home() {
 
         </section>
 
+
+        {/* MELDUNG */}
 
         {message && (
 
@@ -1189,7 +1248,6 @@ export default function Home() {
 
         <footer>
           🍻 Güstener Zapfhahn Zentrale
-          <br />
           <small>
             Dein Event. Deine Getränke.
             Deine Runde.
@@ -1209,13 +1267,13 @@ export default function Home() {
           min-height: 100vh;
           background:
             radial-gradient(
-              circle at 10% 0%,
-              #273b50 0%,
-              #111923 35%,
-              #070a0f 100%
+              circle at top left,
+              #263a4f,
+              #0c1118 42%,
+              #05070a
             );
-          color: #fff;
-          padding: 15px 12px 60px;
+          color: white;
+          padding: 15px 10px 50px;
           font-family:
             Arial,
             Helvetica,
@@ -1223,7 +1281,6 @@ export default function Home() {
         }
 
         .container {
-          width: 100%;
           max-width: 900px;
           margin: auto;
         }
@@ -1231,84 +1288,74 @@ export default function Home() {
         .hero {
           display: flex;
           align-items: center;
-          gap: 16px;
-          padding: 24px 4px 28px;
+          gap: 15px;
+          padding: 20px 5px 25px;
         }
 
         .logo {
-          width: 66px;
-          height: 66px;
-          border-radius: 22px;
+          width: 62px;
+          height: 62px;
+          border-radius: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 34px;
           background:
             linear-gradient(
-              145deg,
-              rgba(245,158,11,.25),
-              rgba(255,255,255,.08)
+              135deg,
+              rgba(245,158,11,.28),
+              rgba(255,255,255,.06)
             );
           border:
             1px solid
             rgba(255,255,255,.12);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 35px;
-          box-shadow:
-            0 12px 30px
-            rgba(0,0,0,.25);
         }
 
         h1 {
           margin: 0;
-          font-size: 28px;
-          letter-spacing: -.5px;
+          font-size: 27px;
         }
 
         .hero p {
-          margin: 7px 0 0;
-          color: #aeb9c7;
-          font-size: 14px;
+          margin: 5px 0 0;
+          color: #91a0b0;
+          font-size: 13px;
         }
 
         .card {
           background:
-            rgba(255,255,255,.065);
+            rgba(255,255,255,.055);
           border:
             1px solid
-            rgba(255,255,255,.09);
-          border-radius: 24px;
-          padding: 21px;
-          margin-bottom: 15px;
+            rgba(255,255,255,.08);
+          border-radius: 23px;
+          padding: 20px;
+          margin-bottom: 14px;
+          backdrop-filter: blur(12px);
           box-shadow:
-            0 12px 35px
-            rgba(0,0,0,.16);
-          backdrop-filter:
-            blur(14px);
-        }
-
-        .eventCard {
-          border-color:
-            rgba(245,158,11,.18);
+            0 10px 30px
+            rgba(0,0,0,.18);
         }
 
         .sectionHeader {
           display: flex;
           align-items: center;
           gap: 12px;
-          margin-bottom: 18px;
+          margin-bottom: 17px;
         }
 
         .sectionHeader h2 {
           margin: 0;
-          font-size: 20px;
+          font-size: 19px;
         }
 
         .sectionHeader p {
           margin: 4px 0 0;
-          color: #8794a3;
-          font-size: 13px;
+          color: #7f8d9c;
+          font-size: 12px;
         }
 
-        .iconBox {
+        .icon {
           width: 45px;
           height: 45px;
           border-radius: 14px;
@@ -1316,163 +1363,158 @@ export default function Home() {
           align-items: center;
           justify-content: center;
           background:
-            rgba(245,158,11,.13);
-          font-size: 23px;
-          flex-shrink: 0;
+            rgba(245,158,11,.12);
+          font-size: 22px;
         }
 
-        select,
-        input {
+        input,
+        select {
           width: 100%;
-          min-height: 50px;
-          border: 1px solid
+          min-height: 49px;
+          border-radius: 13px;
+          border:
+            1px solid
             rgba(255,255,255,.08);
-          outline: none;
-          border-radius: 14px;
-          padding: 13px 14px;
           background:
-            rgba(255,255,255,.075);
-          color: #fff;
-          font-size: 15px;
-          transition: .2s;
+            rgba(255,255,255,.065);
+          color: white;
+          padding: 12px;
+          outline: none;
+          font-size: 14px;
         }
 
         input:focus,
         select:focus {
           border-color:
-            rgba(245,158,11,.6);
-          background:
-            rgba(255,255,255,.1);
+            rgba(245,158,11,.55);
         }
 
         select option {
-          color: #111;
-        }
-
-        label {
-          color: #aeb9c7;
-          font-size: 12px;
-          font-weight: 600;
-        }
-
-        label input {
-          margin-top: 7px;
+          color: black;
         }
 
         .stats {
           display: grid;
           grid-template-columns:
             repeat(4, 1fr);
-          gap: 11px;
-          margin-bottom: 15px;
+          gap: 10px;
+          margin-bottom: 14px;
         }
 
-        .statCard {
-          padding: 17px 8px;
+        .stat {
           text-align: center;
-          border-radius: 20px;
+          padding: 15px 5px;
+          border-radius: 18px;
           background:
-            rgba(255,255,255,.065);
+            rgba(255,255,255,.055);
           border:
             1px solid
             rgba(255,255,255,.07);
         }
 
-        .statIcon {
-          font-size: 23px;
-          margin-bottom: 6px;
-        }
-
-        .statCard strong {
+        .stat span {
           display: block;
-          font-size: 21px;
+          font-size: 22px;
         }
 
-        .statCard span {
+        .stat strong {
           display: block;
-          color: #8491a0;
-          font-size: 12px;
-          margin-top: 4px;
+          margin-top: 5px;
+          font-size: 20px;
         }
 
-        .addPerson {
+        .stat small {
+          display: block;
+          color: #84909f;
+          margin-top: 3px;
+        }
+
+        .addRow {
           display: grid;
           grid-template-columns:
             1fr auto;
-          gap: 10px;
-          margin-bottom: 15px;
+          gap: 9px;
+          margin-bottom: 14px;
         }
 
-        .primaryButton,
-        .saveButton {
-          border: 0;
-          border-radius: 14px;
-          padding: 0 18px;
-          min-height: 50px;
+        button {
+          cursor: pointer;
+        }
+
+        .primary,
+        .save {
+          border: none;
+          border-radius: 13px;
           background:
             linear-gradient(
               135deg,
               #f59e0b,
               #d97706
             );
-          color: #151515;
+          color: #111;
           font-weight: 800;
-          font-size: 14px;
-          cursor: pointer;
-          box-shadow:
-            0 8px 20px
-            rgba(245,158,11,.18);
+          padding: 0 18px;
+          min-height: 49px;
         }
 
-        .saveButton {
+        .save {
           width: 100%;
           margin-top: 4px;
-          padding: 15px;
-        }
-
-        .primaryButton:disabled,
-        .saveButton:disabled {
-          opacity: .6;
-          cursor: default;
         }
 
         .form {
           display: flex;
           flex-direction: column;
-          gap: 15px;
+          gap: 13px;
         }
 
-        .formRow {
+        label {
+          color: #aab5c1;
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        label input {
+          margin-top: 6px;
+        }
+
+        .three {
           display: grid;
           grid-template-columns:
-            1fr 1fr 1fr;
-          gap: 11px;
+            repeat(3, 1fr);
+          gap: 10px;
         }
 
-        .peopleList {
+        .people,
+        .drinkList,
+        .ranking,
+        .assignments {
           display: flex;
           flex-direction: column;
-          gap: 9px;
+          gap: 8px;
         }
 
-        .personCard {
+        .person,
+        .drink,
+        .rank,
+        .assignment {
           display: flex;
           align-items: center;
           gap: 11px;
-          padding: 12px;
-          border-radius: 17px;
+          padding: 11px;
+          border-radius: 16px;
           background:
-            rgba(255,255,255,.055);
+            rgba(255,255,255,.045);
         }
 
         .avatar,
-        .miniAvatar,
-        .rankAvatar {
+        .rankAvatar,
+        .miniAvatar {
           display: flex;
           align-items: center;
           justify-content: center;
+          flex-shrink: 0;
           border-radius: 50%;
-          font-weight: 800;
           background:
             linear-gradient(
               135deg,
@@ -1480,153 +1522,88 @@ export default function Home() {
               #b45309
             );
           color: #111;
+          font-weight: 900;
         }
 
         .avatar {
-          width: 45px;
-          height: 45px;
+          width: 44px;
+          height: 44px;
         }
 
-        .personDetails {
+        .miniAvatar {
+          width: 38px;
+          height: 38px;
+        }
+
+        .personInfo,
+        .drinkInfo,
+        .rankInfo {
           flex: 1;
-          min-width: 0;
         }
 
-        .personDetails strong {
+        .personInfo strong,
+        .drinkInfo strong,
+        .rankInfo strong {
           display: block;
-          font-size: 15px;
         }
 
-        .personDetails span {
+        .personInfo span,
+        .drinkInfo span,
+        .rankInfo span {
           display: block;
           margin-top: 4px;
-          color: #8d9aaa;
+          color: #8592a1;
+          font-size: 11px;
+        }
+
+        .pointsSmall {
           font-size: 12px;
+          font-weight: 800;
         }
 
-        .personPoints {
-          font-size: 13px;
-          font-weight: 700;
-        }
-
-        .deleteButton {
-          width: 31px;
-          height: 31px;
-          border: 0;
-          border-radius: 10px;
+        .delete {
+          width: 30px;
+          height: 30px;
+          border: none;
+          border-radius: 9px;
           background:
             rgba(255,255,255,.06);
-          color: #9ca8b6;
-          font-size: 21px;
-          cursor: pointer;
+          color: #aab4bf;
+          font-size: 20px;
         }
 
-        .assignmentList {
+        .drinkIcon {
+          width: 47px;
+          height: 47px;
+          border-radius: 14px;
           display: flex;
-          flex-direction: column;
-          gap: 9px;
+          align-items: center;
+          justify-content: center;
+          background:
+            rgba(245,158,11,.1);
+          font-size: 24px;
         }
 
         .assignment {
           display: grid;
           grid-template-columns:
             auto 1fr 1.4fr;
-          align-items: center;
-          gap: 10px;
-          padding: 10px;
-          border-radius: 16px;
-          background:
-            rgba(255,255,255,.045);
         }
 
-        .miniAvatar {
-          width: 38px;
-          height: 38px;
-          font-size: 13px;
-        }
-
-        .assignment strong {
-          font-size: 14px;
-        }
-
-        .drinkList {
-          display: flex;
-          flex-direction: column;
-          gap: 9px;
-        }
-
-        .drinkCard {
-          display: flex;
-          align-items: center;
-          gap: 13px;
-          padding: 13px;
-          border-radius: 17px;
-          background:
-            rgba(255,255,255,.055);
-        }
-
-        .drinkBigIcon {
-          width: 48px;
-          height: 48px;
-          border-radius: 15px;
-          background:
-            rgba(245,158,11,.12);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 25px;
-        }
-
-        .drinkDetails {
-          flex: 1;
-        }
-
-        .drinkDetails strong {
-          display: block;
-          font-size: 15px;
-        }
-
-        .drinkDetails span {
-          display: block;
-          color: #8996a5;
-          font-size: 12px;
-          margin-top: 4px;
-        }
-
-        .drinkPrice {
-          font-weight: 800;
-        }
-
-        .rankingList {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .rankingRow {
-          display: flex;
-          align-items: center;
-          gap: 11px;
-          padding: 13px;
-          border-radius: 18px;
-          background:
-            rgba(255,255,255,.045);
-        }
-
-        .rankingRow.first {
+        .rank.winner {
           background:
             linear-gradient(
               90deg,
               rgba(245,158,11,.16),
-              rgba(255,255,255,.045)
+              rgba(255,255,255,.04)
             );
           border:
             1px solid
             rgba(245,158,11,.18);
         }
 
-        .rankPlace {
-          width: 35px;
+        .place {
+          width: 32px;
           text-align: center;
           font-size: 20px;
         }
@@ -1636,92 +1613,75 @@ export default function Home() {
           height: 42px;
         }
 
-        .rankPerson {
-          flex: 1;
-        }
-
-        .rankPerson strong {
-          display: block;
-        }
-
-        .rankPerson span {
-          display: block;
-          color: #8996a5;
-          font-size: 12px;
-          margin-top: 4px;
-        }
-
-        .points {
-          font-weight: 800;
+        .rankPoints {
+          font-size: 17px;
+          font-weight: 900;
           text-align: right;
         }
 
-        .points small {
+        .rankPoints small {
           display: block;
-          color: #8996a5;
-          font-size: 10px;
+          color: #82909e;
+          font-size: 9px;
           font-weight: 400;
         }
 
-        .summaryGrid {
+        .summary {
           display: grid;
           grid-template-columns:
             repeat(4, 1fr);
-          gap: 10px;
+          gap: 9px;
         }
 
-        .summaryGrid div {
+        .summary div {
           padding: 14px;
-          border-radius: 16px;
+          border-radius: 15px;
           background:
             rgba(255,255,255,.045);
         }
 
-        .summaryGrid span {
+        .summary span {
           display: block;
-          color: #8c99a8;
+          color: #8592a1;
           font-size: 11px;
+          margin-top: 5px;
         }
 
-        .summaryGrid strong {
+        .summary strong {
           display: block;
-          margin-top: 6px;
-          font-size: 21px;
+          font-size: 20px;
+          margin-top: 5px;
         }
 
         .empty {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
           text-align: center;
-          padding: 25px 15px;
-          color: #7f8c9a;
+          padding: 25px 10px;
+          color: #84909e;
         }
 
         .empty div {
-          font-size: 38px;
-          margin-bottom: 8px;
+          font-size: 35px;
+          margin-bottom: 7px;
         }
 
         .empty strong {
+          display: block;
           color: #c0c9d3;
-          font-size: 14px;
         }
 
         .empty span {
+          display: block;
           margin-top: 5px;
           font-size: 12px;
         }
 
         .notice,
-        .loading,
         .message {
-          padding: 14px;
-          border-radius: 14px;
+          padding: 13px;
+          border-radius: 13px;
           background:
-            rgba(255,255,255,.055);
-          color: #aeb9c7;
+            rgba(255,255,255,.045);
+          color: #aab5c1;
         }
 
         .message {
@@ -1731,15 +1691,15 @@ export default function Home() {
 
         footer {
           text-align: center;
-          color: #687585;
-          padding: 20px;
+          padding: 22px;
+          color: #657281;
           font-size: 13px;
         }
 
         footer small {
           display: block;
           margin-top: 5px;
-          color: #4f5c6b;
+          color: #4c5865;
         }
 
         @media(max-width:700px) {
@@ -1747,23 +1707,16 @@ export default function Home() {
           .page {
             padding:
               8px
-              8px
-              45px;
-          }
-
-          .hero {
-            padding:
-              18px
-              3px
-              23px;
+              7px
+              40px;
           }
 
           h1 {
-            font-size: 22px;
+            font-size: 21px;
           }
 
           .hero p {
-            font-size: 12px;
+            font-size: 11px;
           }
 
           .stats {
@@ -1771,18 +1724,18 @@ export default function Home() {
               1fr 1fr;
           }
 
-          .formRow {
+          .addRow {
             grid-template-columns:
               1fr;
           }
 
-          .addPerson {
-            grid-template-columns:
-              1fr;
-          }
-
-          .primaryButton {
+          .primary {
             width: 100%;
+          }
+
+          .three {
+            grid-template-columns:
+              1fr;
           }
 
           .assignment {
@@ -1795,17 +1748,9 @@ export default function Home() {
               1 / -1;
           }
 
-          .summaryGrid {
+          .summary {
             grid-template-columns:
               1fr 1fr;
-          }
-
-          .personCard {
-            flex-wrap: wrap;
-          }
-
-          .personDetails {
-            min-width: 120px;
           }
 
         }
