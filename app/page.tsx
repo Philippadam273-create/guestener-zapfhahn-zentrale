@@ -11,11 +11,10 @@ export default function Home() {
 
   async function loadData() {
 
-    const { data: eventData, error: eventError } =
-      await supabase
-        .from("events")
-        .select("*")
-        .order("created_at", { ascending: false });
+    const { data: eventData, error: eventError } = await supabase
+      .from("events")
+      .select("*")
+      .order("created_at", { ascending: false });
 
 
     if (eventError) {
@@ -28,11 +27,10 @@ export default function Home() {
 
 
 
-    const { data: drinkData, error: drinkError } =
-      await supabase
-        .from("drinks")
-        .select("*")
-        .order("created_at", { ascending: false });
+    const { data: drinkData, error: drinkError } = await supabase
+      .from("drinks")
+      .select("*")
+      .order("created_at", { ascending: false });
 
 
     if (drinkError) {
@@ -57,7 +55,7 @@ export default function Home() {
 
   return (
 
-    <main style={{padding:"20px"}}>
+    <main style={{ padding: "20px" }}>
 
       <h1>
         🍻 Güstener Zapfhahn Zentrale
@@ -75,7 +73,7 @@ export default function Home() {
       </h2>
 
 
-      {events.map((event)=>(
+      {events.map((event) => (
 
         <p key={event.id}>
           🍻 {event.title}
@@ -90,7 +88,7 @@ export default function Home() {
       </h2>
 
 
-      {drinks.map((drink)=>(
+      {drinks.map((drink) => (
 
         <p key={drink.id}>
           🍺 {drink.drink_name} - {drink.liters} Liter
