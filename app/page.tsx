@@ -1,87 +1,94 @@
 "use client";
 
 import { useEffect, useState } from "react";
-imporimport { supabase } from "@/lib/supabase";
+import { supabase } from "../lib/supabase";
 
 export default function Home() {
 
-  const [showForm, setShowForm] = useState(false);
-  const [name, setName] = useState("");
-  const [message, setMessage] = useState("");
   const [events, setEvents] = useState<any[]>([]);
+  const [drinks, setDrinks] = useState<any[]>([]);
+
+  const [eventId, setEventId] = useState("");
+  const [drinkName, setDrinkName] = useState("");
+  const [liters, setLiters] = useState("0.5");
+  const [alcohol, setAlcohol] = useState("5");
+  const [price, setPrice] = useState("0");
 
 
-  async function loadEvents() {
 
-    const { data, error } = await supabase
+  async function loadData() {
+
+    const { data: eventData } = await supabase
       .from("events")
+      .select("*");
+
+    setEvents(eventData || []);
+
+
+    const { data: drinkData } = await supabase
+      .from("drinks")
       .select("*")
       .order("created_at", { ascending: false });
 
 
-    if (error) {
-      console.log(error);
-      return;
-    }
+    setDrinks(drinkData || []);
 
-
-    setEvents(data || []);
   }
 
 
 
-  async function saveEvent() {
-
-    if (!name.trim()) {
-      setMessage("❗ Bitte einen Eventnamen eingeben.");
-      return;
-    }
+  async function addDrink() {
 
 
     const { error } = await supabase
-      .from("events")
+      .from("drinks")
       .insert([
+
         {
-          title: name
+          event_id: eventId,
+          drink_name: drinkName,
+          liters: Number(liters),
+          alcohol_percent: Number(alcohol),
+          price: Number(price),
+          quantity: 1
         }
+
       ]);
 
 
-    if (error) {
+
+    if(error){
+
+      alert("Fehler beim Speichern");
 
       console.log(error);
-      setMessage("❌ Fehler beim Speichern");
 
       return;
+
     }
 
 
-    setMessage("🍻 Event wurde erstellt: " + name);
+    setDrinkName("");
+    setPrice("0");
 
-    setName("");
-
-    setShowForm(false);
-
-    loadEvents();
+    loadData();
 
   }
 
 
 
+  useEffect(()=>{
 
-  useEffect(() => {
+    loadData();
 
-    loadEvents();
-
-  }, []);
-
+  },[]);
 
 
 
 
   return (
 
-    <main style={{ padding: "20px" }}>
+    <main style={{padding:20}}>
 
 
       <h1>
@@ -96,112 +103,98 @@ export default function Home() {
 
 
       <h2>
-        📅 Aktuelles Event
+        📅 Event auswählen
       </h2>
 
 
+      <select
+        value={eventId}
+        onChange={(e)=>setEventId(e.target.value)}
+      >
 
-      {!showForm && (
-
-        <button onClick={() => setShowForm(true)}>
-
-          ➕ Neues Event erstellen
-
-        </button>
-
-      )}
+        <option>
+          Event wählen
+        </option>
 
 
+        {events.map(event=>(
+
+          <option key={event.id} value={event.id}>
+            {event.title}
+          </option>
+
+        ))}
 
 
-
-      {showForm && (
-
-        <div>
-
-          <h2>
-            Neues Event
-          </h2>
-
-
-          <input
-
-            value={name}
-
-            onChange={(e) => setName(e.target.value)}
-
-            placeholder="Name des Events"
-
-          />
+      </select>
 
 
 
-          <br />
-          <br />
+      <h2>
+        🍺 Getränk hinzufügen
+      </h2>
 
 
-
-          <button onClick={saveEvent}>
-
-            💾 Event speichern
-
-          </button>
-
+      <input
+        placeholder="Getränk"
+        value={drinkName}
+        onChange={(e)=>setDrinkName(e.target.value)}
+      />
 
 
-        </div>
-
-      )}
+      <br/><br/>
 
 
+      <input
+        placeholder="Liter"
+        value={liters}
+        onChange={(e)=>setLiters(e.target.value)}
+      />
 
 
-
-      {message && (
-
-        <p>
-          {message}
-        </p>
-
-      )}
+      <br/><br/>
 
 
+      <input
+        placeholder="Alkohol %"
+        value={alcohol}
+        onChange={(e)=>setAlcohol(e.target.value)}
+      />
+
+
+      <br/><br/>
+
+
+      <input
+        placeholder="Preis"
+        value={price}
+        onChange={(e)=>setPrice(e.target.value)}
+      />
+
+
+      <br/><br/>
+
+
+      <button onClick={addDrink}>
+        🍻 Getränk speichern
+      </button>
 
 
 
 
       <h2>
-        🍻 Gespeicherte Events
+        🍺 Getränke
       </h2>
 
 
 
+      {drinks.map(drink=>(
 
-      {events.length === 0 && (
-
-        <p>
-          Noch keine Events vorhanden.
+        <p key={drink.id}>
+          🍺 {drink.drink_name} - {drink.liters} Liter
         </p>
 
-      )}
-
-
-
-
-
-
-      {events.map((event) => (
-
-        <div key={event.id}>
-
-          🍻 {event.title}
-
-        </div>
-
       ))}
-
-
-
 
 
 
@@ -211,19 +204,8 @@ export default function Home() {
 
 
       <p>
-        🍺 Getränke: 0
+        🍺 Getränke: {drinks.length}
       </p>
-
-
-      <p>
-        👥 Teilnehmer: 0
-      </p>
-
-
-      <p>
-        💶 Kosten: 0 €
-      </p>
-
 
 
     </main>
