@@ -15,3 +15,4 @@
     "@types/node": "latest"
   }
 }
+"@supabase/supabase-js": "latest"
