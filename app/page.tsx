@@ -20,18 +20,14 @@ export default function Home() {
 
   async function loadData() {
 
-    const { data: eventData, error: eventError } =
-      await supabase
-        .from("events")
-        .select("*")
-        .order("created_at", { ascending: false });
+    const { data: eventData, error: eventError } = await supabase
+      .from("events")
+      .select("*")
+      .order("created_at", { ascending: false });
 
 
     if (eventError) {
-
-      console.log(eventError);
-      setMessage("❌ Events konnten nicht geladen werden");
-
+      setMessage("❌ Fehler Events: " + eventError.message);
       return;
     }
 
@@ -40,20 +36,14 @@ export default function Home() {
 
 
 
-
-    const { data: drinkData, error: drinkError } =
-      await supabase
-        .from("drinks")
-        .select("*")
-        .order("created_at", { ascending: false });
-
+    const { data: drinkData, error: drinkError } = await supabase
+      .from("drinks")
+      .select("*")
+      .order("created_at", { ascending: false });
 
 
     if (drinkError) {
-
-      console.log(drinkError);
-      setMessage("❌ Getränke konnten nicht geladen werden");
-
+      setMessage("❌ Fehler Getränke: " + drinkError.message);
       return;
     }
 
@@ -65,21 +55,19 @@ export default function Home() {
 
 
 
-
-
   async function saveDrink() {
 
 
     if (!eventId) {
 
-      setMessage("❗ Bitte zuerst ein Event auswählen");
+      setMessage("❗ Bitte Event auswählen");
 
       return;
 
     }
 
 
-    if (!drinkName) {
+    if (!drinkName.trim()) {
 
       setMessage("❗ Bitte Getränkenamen eingeben");
 
@@ -89,11 +77,9 @@ export default function Home() {
 
 
 
-
     const { error } = await supabase
       .from("drinks")
       .insert([
-
         {
           event_id: eventId,
           drink_name: drinkName,
@@ -102,19 +88,13 @@ export default function Home() {
           price: Number(price),
           quantity: 1
         }
-
       ]);
-
 
 
 
     if (error) {
 
-      console.log(error);
-
-      setMessage(
-        "❌ Fehler: " + error.message
-      );
+      setMessage("❌ Speichern fehlgeschlagen: " + error.message);
 
       return;
 
@@ -134,8 +114,6 @@ export default function Home() {
 
 
 
-
-
   useEffect(() => {
 
     loadData();
@@ -147,10 +125,9 @@ export default function Home() {
 
 
 
-
   return (
 
-    <main style={{ padding: "20px" }}>
+    <main style={{padding:"20px"}}>
 
 
       <h1>
@@ -165,18 +142,14 @@ export default function Home() {
 
 
 
-
       <h2>
         📅 Event auswählen
       </h2>
 
 
       <select
-
         value={eventId}
-
-        onChange={(e) => setEventId(e.target.value)}
-
+        onChange={(e)=>setEventId(e.target.value)}
       >
 
         <option value="">
@@ -184,14 +157,11 @@ export default function Home() {
         </option>
 
 
-        {events.map((event) => (
+        {events.map((event)=>(
 
           <option
-
             key={event.id}
-
             value={event.id}
-
           >
 
             {event.title}
@@ -207,7 +177,6 @@ export default function Home() {
 
 
 
-
       <h2>
         🍺 Getränk hinzufügen
       </h2>
@@ -215,79 +184,44 @@ export default function Home() {
 
 
       <input
-
         placeholder="Getränk Name"
-
         value={drinkName}
-
         onChange={(e)=>setDrinkName(e.target.value)}
-
       />
-
-
 
       <br/><br/>
 
 
-
-
       <input
-
         placeholder="Liter"
-
         value={liters}
-
         onChange={(e)=>setLiters(e.target.value)}
-
       />
-
-
 
       <br/><br/>
 
 
-
-
       <input
-
         placeholder="Alkohol %"
-
         value={alcohol}
-
         onChange={(e)=>setAlcohol(e.target.value)}
-
       />
 
-
-
       <br/><br/>
-
-
 
 
       <input
-
         placeholder="Preis"
-
         value={price}
-
         onChange={(e)=>setPrice(e.target.value)}
-
       />
 
-
-
       <br/><br/>
-
-
 
 
       <button onClick={saveDrink}>
-
         🍻 Getränk speichern
-
       </button>
-
 
 
 
@@ -299,24 +233,18 @@ export default function Home() {
 
 
 
-
       <h2>
         🍺 Getränke
       </h2>
 
 
-
-
       {drinks.map((drink)=>(
 
         <p key={drink.id}>
-
           🍺 {drink.drink_name} - {drink.liters} Liter
-
         </p>
 
       ))}
-
 
 
 
@@ -327,11 +255,9 @@ export default function Home() {
       </h2>
 
 
-
       <p>
         🍺 Getränke: {drinks.length}
       </p>
-
 
 
 
