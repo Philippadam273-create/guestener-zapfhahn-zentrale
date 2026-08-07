@@ -1,27 +1,33 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "../lib/supabase";
 
 export default function Home() {
+
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
   const [events, setEvents] = useState<any[]>([]);
 
+
   async function loadEvents() {
+
     const { data, error } = await supabase
       .from("events")
       .select("*")
       .order("created_at", { ascending: false });
+
 
     if (error) {
       console.log(error);
       return;
     }
 
+
     setEvents(data || []);
   }
+
 
 
   async function saveEvent() {
@@ -42,8 +48,10 @@ export default function Home() {
 
 
     if (error) {
+
       console.log(error);
       setMessage("❌ Fehler beim Speichern");
+
       return;
     }
 
@@ -55,17 +63,26 @@ export default function Home() {
     setShowForm(false);
 
     loadEvents();
+
   }
 
 
+
+
   useEffect(() => {
+
     loadEvents();
+
   }, []);
 
 
 
+
+
   return (
-    <main style={{padding:"20px"}}>
+
+    <main style={{ padding: "20px" }}>
+
 
       <h1>
         🍻 Güstener Zapfhahn Zentrale
@@ -83,11 +100,18 @@ export default function Home() {
       </h2>
 
 
+
       {!showForm && (
+
         <button onClick={() => setShowForm(true)}>
+
           ➕ Neues Event erstellen
+
         </button>
+
       )}
+
+
 
 
 
@@ -101,18 +125,28 @@ export default function Home() {
 
 
           <input
+
             value={name}
-            onChange={(e)=>setName(e.target.value)}
+
+            onChange={(e) => setName(e.target.value)}
+
             placeholder="Name des Events"
+
           />
 
 
-          <br/><br/>
+
+          <br />
+          <br />
+
 
 
           <button onClick={saveEvent}>
+
             💾 Event speichern
+
           </button>
+
 
 
         </div>
@@ -121,9 +155,17 @@ export default function Home() {
 
 
 
+
+
       {message && (
-        <p>{message}</p>
+
+        <p>
+          {message}
+        </p>
+
       )}
+
+
 
 
 
@@ -133,17 +175,31 @@ export default function Home() {
       </h2>
 
 
+
+
       {events.length === 0 && (
-        <p>Noch keine Events vorhanden.</p>
+
+        <p>
+          Noch keine Events vorhanden.
+        </p>
+
       )}
 
 
 
-      {events.map((event)=>(
+
+
+
+      {events.map((event) => (
+
         <div key={event.id}>
+
           🍻 {event.title}
+
         </div>
+
       ))}
+
 
 
 
@@ -158,9 +214,11 @@ export default function Home() {
         🍺 Getränke: 0
       </p>
 
+
       <p>
         👥 Teilnehmer: 0
       </p>
+
 
       <p>
         💶 Kosten: 0 €
@@ -169,5 +227,7 @@ export default function Home() {
 
 
     </main>
+
   );
+
 }
