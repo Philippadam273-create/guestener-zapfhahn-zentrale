@@ -27,31 +27,63 @@ export default function Home() {
   const [message, setMessage] = useState("");
 
   async function loadEvents() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("events")
       .select("id,title")
-      .order("created_at", { ascending: false });
+      .order("start_date", { ascending: false });
 
-    if (data) {
+    if (error) {
+      setMessage("❌ Events konnten nicht geladen werden.");
+      return;
+    }
+
+    if (data && data.length > 0) {
       setEvents(data);
 
-      if (!eventId && data.length > 0) {
+      const savedEvent =
+        localStorage.getItem("guesten-active-event");
+
+      const exists = data.some(
+        (event) => event.id === savedEvent
+      );
+
+      if (savedEvent && exists) {
+        setEventId(savedEvent);
+      } else {
         setEventId(data[0].id);
       }
     }
   }
 
-  async function loadDrinks() {
-    if (!eventId) return;
+  async function loadDrinks(id: string) {
+    if (!id) return;
 
     const { data } = await supabase
       .from("drinks")
       .select("*")
-      .eq("event_id", eventId)
-      .order("created_at", { ascending: false });
+      .eq("event_id", id)
+      .order("created_at", {
+        ascending: false,
+      });
 
     if (data) {
       setDrinks(data);
+    }
+  }
+
+  function loadPeople(id: string) {
+    const saved = localStorage.getItem(
+      "guesten-people-" + id
+    );
+
+    if (saved) {
+      try {
+        setPeople(JSON.parse(saved));
+      } catch {
+        setPeople([]);
+      }
+    } else {
+      setPeople([]);
     }
   }
 
@@ -60,26 +92,22 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    loadDrinks();
-
     if (!eventId) return;
 
-    const saved = localStorage.getItem(
-      "guester-people-" + eventId
+    localStorage.setItem(
+      "guesten-active-event",
+      eventId
     );
 
-    if (saved) {
-      setPeople(JSON.parse(saved));
-    } else {
-      setPeople([]);
-    }
+    loadDrinks(eventId);
+    loadPeople(eventId);
   }, [eventId]);
 
   useEffect(() => {
     if (!eventId) return;
 
     localStorage.setItem(
-      "guester-people-" + eventId,
+      "guesten-people-" + eventId,
       JSON.stringify(people)
     );
   }, [people, eventId]);
@@ -102,8 +130,8 @@ export default function Home() {
       .insert([
         {
           event_id: eventId,
-          getraenk: drinkName,
-          drink_name: drinkName,
+          getraenk: drinkName.trim(),
+          drink_name: drinkName.trim(),
           menge: Number(liters),
           liters: Number(liters),
           alkohol: Number(alcohol),
@@ -114,51 +142,60 @@ export default function Home() {
       ]);
 
     if (error) {
-      setMessage("❌ " + error.message);
+      setMessage(
+        "❌ Getränk konnte nicht gespeichert werden: " +
+          error.message
+      );
       return;
     }
 
-    setMessage("✅ Getränk gespeichert.");
+    setMessage("✅ Getränk gespeichert!");
 
     setDrinkName("");
     setLiters("0.5");
     setAlcohol("5");
     setPrice("0");
 
-    await loadDrinks();
+    await loadDrinks(eventId);
   }
 
   function addPerson() {
-    if (!personName.trim()) {
-      setMessage("❌ Bitte einen Namen eingeben.");
+    const name = personName.trim();
+
+    if (!name) {
+      setMessage("❌ Bitte Namen eingeben.");
       return;
     }
 
-    if (
-      people.some(
-        (p) =>
-          p.name.toLowerCase() ===
-          personName.trim().toLowerCase()
-      )
-    ) {
-      setMessage("❌ Teilnehmer bereits vorhanden.");
+    const alreadyExists = people.some(
+      (person) =>
+        person.name.toLowerCase() ===
+        name.toLowerCase()
+    );
+
+    if (alreadyExists) {
+      setMessage("❌ Diese Person ist bereits dabei.");
       return;
     }
 
-    setPeople([
-      ...people,
-      {
-        id: Date.now(),
-        name: personName.trim(),
-        drinks: 0,
-        liters: 0,
-        cost: 0,
-        points: 0,
-      },
-    ]);
+    const newPerson: Person = {
+      id: Date.now(),
+      name,
+      drinks: 0,
+      liters: 0,
+      cost: 0,
+      points: 0,
+    };
 
+    setPeople([...people, newPerson]);
     setPersonName("");
-    setMessage("✅ Teilnehmer hinzugefügt.");
+    setMessage("✅ Teilnehmer hinzugefügt!");
+  }
+
+  function removePerson(id: number) {
+    setPeople(
+      people.filter((person) => person.id !== id)
+    );
   }
 
   function assignDrink(
@@ -166,16 +203,16 @@ export default function Home() {
     drinkId: string
   ) {
     const drink = drinks.find(
-      (d) => d.id === drinkId
+      (item) => item.id === drinkId
     );
 
     if (!drink) return;
 
-    const drinkLiters = Number(
+    const litersValue = Number(
       drink.liters ?? drink.menge ?? 0
     );
 
-    const drinkPrice = Number(
+    const priceValue = Number(
       drink.preis ?? 0
     );
 
@@ -189,9 +226,9 @@ export default function Home() {
           ...person,
           drinks: person.drinks + 1,
           liters:
-            person.liters + drinkLiters,
+            person.liters + litersValue,
           cost:
-            person.cost + drinkPrice,
+            person.cost + priceValue,
           points:
             person.points + 10,
         };
@@ -203,21 +240,6 @@ export default function Home() {
     );
   }
 
-  function removePerson(id: number) {
-    setPeople(
-      people.filter(
-        (person) => person.id !== id
-      )
-    );
-  }
-
-  const totalCost = drinks.reduce(
-    (sum, drink) =>
-      sum +
-      Number(drink.preis || 0),
-    0
-  );
-
   const totalLiters = drinks.reduce(
     (sum, drink) =>
       sum +
@@ -226,6 +248,13 @@ export default function Home() {
           drink.menge ??
           0
       ),
+    0
+  );
+
+  const totalCost = drinks.reduce(
+    (sum, drink) =>
+      sum +
+      Number(drink.preis ?? 0),
     0
   );
 
@@ -244,14 +273,22 @@ export default function Home() {
     (a, b) => b.points - a.points
   );
 
+  const activeEvent = events.find(
+    (event) => event.id === eventId
+  );
+
   return (
     <main className="page">
       <div className="container">
 
         <header>
           <div className="logo">🍻</div>
+
           <div>
-            <h1>Güstener Zapfhahn Zentrale</h1>
+            <h1>
+              Güstener Zapfhahn Zentrale
+            </h1>
+
             <p>
               Events · Getränke · Kosten · Rankings
             </p>
@@ -268,7 +305,7 @@ export default function Home() {
             }
           >
             <option value="">
-              Event auswählen
+              Wähle dein Event
             </option>
 
             {events.map((event) => (
@@ -280,21 +317,53 @@ export default function Home() {
               </option>
             ))}
           </select>
+
+          {activeEvent && (
+            <div className="activeEvent">
+              🍻 {activeEvent.title}
+            </div>
+          )}
         </section>
 
         <div className="stats">
-          <div>🍺<b>{drinks.length}</b><small>Getränke</small></div>
-          <div>💧<b>{totalLiters.toFixed(1)}</b><small>Liter</small></div>
-          <div>💶<b>{totalCost.toFixed(2)} €</b><small>Kosten</small></div>
-          <div>👥<b>{people.length}</b><small>Teilnehmer</small></div>
+
+          <div className="stat">
+            <span>🍺</span>
+            <b>{drinks.length}</b>
+            <small>Getränke</small>
+          </div>
+
+          <div className="stat">
+            <span>💧</span>
+            <b>
+              {totalLiters.toFixed(1)}
+            </b>
+            <small>Liter</small>
+          </div>
+
+          <div className="stat">
+            <span>💶</span>
+            <b>
+              {totalCost.toFixed(2)} €
+            </b>
+            <small>Kosten</small>
+          </div>
+
+          <div className="stat">
+            <span>👥</span>
+            <b>{people.length}</b>
+            <small>Teilnehmer</small>
+          </div>
+
         </div>
 
         <section className="card">
           <h2>👥 Teilnehmer</h2>
 
-          <div className="row">
+          <div className="addRow">
+
             <input
-              placeholder="Name"
+              placeholder="Name eingeben"
               value={personName}
               onChange={(e) =>
                 setPersonName(e.target.value)
@@ -304,34 +373,60 @@ export default function Home() {
             <button onClick={addPerson}>
               ➕ Hinzufügen
             </button>
+
           </div>
 
-          {people.map((person) => (
-            <div className="item" key={person.id}>
-              <div>
-                <b>👤 {person.name}</b>
-                <small>
-                  🍺 {person.drinks}
-                  {" · "}
-                  💧 {person.liters.toFixed(1)} L
-                  {" · "}
-                  🏆 {person.points}
-                </small>
-              </div>
-
-              <button
-                className="delete"
-                onClick={() =>
-                  removePerson(person.id)
-                }
-              >
-                ×
-              </button>
+          {people.length === 0 ? (
+            <div className="empty">
+              <div>👥</div>
+              <b>Noch keine Teilnehmer</b>
+              <p>
+                Füge die Personen deines Events hinzu.
+              </p>
             </div>
-          ))}
+          ) : (
+            people.map((person) => (
+              <div
+                className="person"
+                key={person.id}
+              >
+                <div className="personIcon">
+                  {person.name
+                    .charAt(0)
+                    .toUpperCase()}
+                </div>
+
+                <div className="personInfo">
+                  <b>{person.name}</b>
+
+                  <small>
+                    🍺 {person.drinks}
+                    {" · "}
+                    💧 {person.liters.toFixed(1)} L
+                    {" · "}
+                    💶 {person.cost.toFixed(2)} €
+                  </small>
+                </div>
+
+                <strong>
+                  🏆 {person.points}
+                </strong>
+
+                <button
+                  className="remove"
+                  onClick={() =>
+                    removePerson(person.id)
+                  }
+                >
+                  ×
+                </button>
+              </div>
+            ))
+          )}
         </section>
 
         <section className="card">
+
           <h2>🍺 Getränk hinzufügen</h2>
 
           <input
@@ -342,33 +437,38 @@ export default function Home() {
             }
           />
 
-          <div className="three">
+          <div className="inputs">
+
             <input
               type="number"
+              step="0.1"
+              placeholder="Liter"
               value={liters}
               onChange={(e) =>
                 setLiters(e.target.value)
               }
-              placeholder="Liter"
             />
 
             <input
               type="number"
+              step="0.1"
+              placeholder="Alkohol %"
               value={alcohol}
               onChange={(e) =>
                 setAlcohol(e.target.value)
               }
-              placeholder="Alkohol %"
             />
 
             <input
               type="number"
+              step="0.01"
+              placeholder="Preis €"
               value={price}
               onChange={(e) =>
                 setPrice(e.target.value)
               }
-              placeholder="Preis €"
             />
+
           </div>
 
           <button
@@ -377,20 +477,30 @@ export default function Home() {
           >
             🍻 Getränk speichern
           </button>
+
         </section>
 
         <section className="card">
+
           <h2>🔗 Getränk zuordnen</h2>
 
           {people.length === 0 ? (
-            <p>👥 Zuerst Teilnehmer hinzufügen.</p>
+            <div className="empty">
+              👥 Zuerst Teilnehmer hinzufügen.
+            </div>
+          ) : drinks.length === 0 ? (
+            <div className="empty">
+              🍺 Zuerst ein Getränk speichern.
+            </div>
           ) : (
             people.map((person) => (
               <div
                 className="assignment"
                 key={person.id}
               >
-                <b>{person.name}</b>
+                <b>
+                  👤 {person.name}
+                </b>
 
                 <select
                   defaultValue=""
@@ -419,126 +529,146 @@ export default function Home() {
                         "Getränk"}
                       {" · "}
                       {Number(
-                        drink.preis || 0
-                      ).toFixed(2)}
-                      €
+                        drink.liters ??
+                          drink.menge ??
+                          0
+                      ).toFixed(1)}{" "}
+                      L
                     </option>
                   ))}
                 </select>
               </div>
             ))
           )}
+
         </section>
 
         <section className="card">
+
           <h2>🍺 Getränke</h2>
 
-          {drinks.map((drink) => (
-            <div
-              className="item"
-              key={drink.id}
-            >
-              <div>
-                <b>
-                  🍺{" "}
-                  {drink.getraenk ||
-                    drink.drink_name}
-                </b>
-
-                <small>
-                  {Number(
-                    drink.liters ??
-                      drink.menge ??
-                      0
-                  ).toFixed(1)}{" "}
-                  Liter ·{" "}
-                  {Number(
-                    drink.alcohol_percent ??
-                      drink.alkohol ??
-                      0
-                  ).toFixed(1)} %
-                </small>
-              </div>
-
-              <b>
-                {Number(
-                  drink.preis || 0
-                ).toFixed(2)} €
-              </b>
+          {drinks.length === 0 ? (
+            <div className="empty">
+              🍺 Noch keine Getränke.
             </div>
-          ))}
+          ) : (
+            drinks.map((drink) => (
+              <div
+                className="drink"
+                key={drink.id}
+              >
+                <div className="drinkIcon">
+                  🍺
+                </div>
+
+                <div>
+                  <b>
+                    {drink.getraenk ||
+                      drink.drink_name ||
+                      "Getränk"}
+                  </b>
+
+                  <small>
+                    {Number(
+                      drink.liters ??
+                        drink.menge ??
+                        0
+                    ).toFixed(1)}{" "}
+                    Liter ·{" "}
+                    {Number(
+                      drink.alcohol_percent ??
+                        drink.alkohol ??
+                        0
+                    ).toFixed(1)} %
+                  </small>
+                </div>
+
+                <strong>
+                  {Number(
+                    drink.preis ?? 0
+                  ).toFixed(2)} €
+                </strong>
+              </div>
+            ))
+          )}
+
         </section>
 
-        <section className="card cost">
+        <section className="card">
+
           <h2>💶 Kostenaufteilung</h2>
 
-          <div className="costBig">
+          <div className="bigMoney">
             {totalCost.toFixed(2)} €
           </div>
 
-          <p>
+          <p className="center">
             Gesamtkosten des Events
           </p>
 
-          <div className="costLine">
+          <div className="costRow">
             <span>👥 Teilnehmer</span>
             <b>{people.length}</b>
           </div>
 
-          <div className="costLine">
+          <div className="costRow">
             <span>💶 Pro Person</span>
             <b>
               {costPerPerson.toFixed(2)} €
             </b>
           </div>
 
-          <div className="costLine">
+          <div className="costRow">
             <span>🏆 Gesamtpunkte</span>
             <b>{totalPoints}</b>
           </div>
 
-          <p className="hint">
-            Die Kosten werden automatisch
-            gleichmäßig auf alle Teilnehmer
-            verteilt.
-          </p>
         </section>
 
         <section className="card">
+
           <h2>🏆 Ranking</h2>
 
           {ranking.length === 0 ? (
-            <p>
-              Noch keine Teilnehmer.
-            </p>
+            <div className="empty">
+              🏆 Noch keine Teilnehmer.
+            </div>
           ) : (
             ranking.map(
               (person, index) => (
                 <div
-                  className="rank"
+                  className="ranking"
                   key={person.id}
                 >
-                  <strong>
+                  <div className="place">
                     {index === 0
                       ? "🥇"
                       : index === 1
                       ? "🥈"
                       : index === 2
                       ? "🥉"
-                      : `${index + 1}.`}
+                      : index + 1}
+                  </div>
+
+                  <div>
+                    <b>{person.name}</b>
+
+                    <small>
+                      🍺 {person.drinks}
+                      {" · "}
+                      💧 {person.liters.toFixed(1)} L
+                    </small>
+                  </div>
+
+                  <strong>
+                    {person.points}
+                    <small>Punkte</small>
                   </strong>
-
-                  <span>
-                    {person.name}
-                  </span>
-
-                  <b>
-                    {person.points} Punkte
-                  </b>
                 </div>
               )
             )
           )}
+
         </section>
 
         {message && (
@@ -558,6 +688,7 @@ export default function Home() {
       </div>
 
       <style jsx>{`
+
         * {
           box-sizing: border-box;
         }
@@ -567,12 +698,15 @@ export default function Home() {
           background:
             radial-gradient(
               circle at top,
-              #26384b,
-              #080c11 55%
+              #263b50,
+              #080c12 60%
             );
           color: white;
-          padding: 15px;
-          font-family: Arial, sans-serif;
+          padding: 16px;
+          font-family:
+            Arial,
+            Helvetica,
+            sans-serif;
         }
 
         .container {
@@ -582,66 +716,80 @@ export default function Home() {
 
         header {
           display: flex;
+          gap: 15px;
           align-items: center;
-          gap: 14px;
-          padding: 15px 5px 25px;
+          padding: 10px 4px 25px;
         }
 
         .logo {
           font-size: 38px;
-          background: #1d2935;
-          border-radius: 18px;
+          background: #1b2734;
           padding: 12px;
+          border-radius: 18px;
         }
 
         h1 {
-          font-size: 25px;
           margin: 0;
+          font-size: 25px;
         }
 
         h2 {
           margin-top: 0;
+          font-size: 20px;
         }
 
         p {
-          color: #9ca8b5;
+          color: #98a6b5;
         }
 
         .card {
-          background: rgba(255,255,255,.06);
-          border: 1px solid rgba(255,255,255,.08);
+          background: rgba(255,255,255,.065);
+          border: 1px solid rgba(255,255,255,.09);
           border-radius: 20px;
           padding: 18px;
-          margin-bottom: 14px;
+          margin-bottom: 15px;
+          box-shadow:
+            0 10px 30px
+            rgba(0,0,0,.15);
+        }
+
+        .activeEvent {
+          margin-top: 5px;
+          background: #172535;
+          padding: 12px;
+          border-radius: 12px;
+          color: #fbbf24;
+          font-weight: bold;
         }
 
         .stats {
           display: grid;
-          grid-template-columns: repeat(4,1fr);
+          grid-template-columns:
+            repeat(4, 1fr);
           gap: 10px;
-          margin-bottom: 14px;
+          margin-bottom: 15px;
         }
 
-        .stats div {
-          background: rgba(255,255,255,.06);
-          border-radius: 16px;
-          padding: 14px;
+        .stat {
           text-align: center;
-          font-size: 22px;
+          background: rgba(255,255,255,.06);
+          border-radius: 17px;
+          padding: 14px 5px;
         }
 
-        .stats b,
-        .stats small {
+        .stat span {
+          font-size: 22px;
           display: block;
         }
 
-        .stats b {
+        .stat b {
+          display: block;
           font-size: 20px;
           margin: 5px 0;
         }
 
-        .stats small {
-          color: #8995a3;
+        .stat small {
+          color: #8997a6;
           font-size: 11px;
         }
 
@@ -650,59 +798,76 @@ export default function Home() {
           width: 100%;
           padding: 13px;
           border-radius: 12px;
-          border: 1px solid #303b47;
-          background: #151d26;
+          border: 1px solid #344252;
+          background: #131b24;
           color: white;
           margin-bottom: 10px;
+          font-size: 15px;
         }
 
         button {
-          border: none;
+          border: 0;
           border-radius: 12px;
-          padding: 13px 17px;
+          padding: 13px 16px;
           background: #f59e0b;
           color: #111;
           font-weight: bold;
           cursor: pointer;
         }
 
-        .row {
+        .addRow {
           display: grid;
           grid-template-columns: 1fr auto;
           gap: 8px;
         }
 
-        .three {
+        .inputs {
           display: grid;
-          grid-template-columns: repeat(3,1fr);
+          grid-template-columns:
+            repeat(3, 1fr);
           gap: 8px;
         }
 
         .save {
           width: 100%;
-          margin-top: 4px;
         }
 
-        .item {
-          display: flex;
-          justify-content: space-between;
+        .person {
+          display: grid;
+          grid-template-columns:
+            42px 1fr auto auto;
+          gap: 10px;
           align-items: center;
           background: rgba(255,255,255,.05);
-          padding: 12px;
+          padding: 10px;
           border-radius: 14px;
           margin-top: 8px;
         }
 
-        .item small {
+        .personIcon {
+          width: 38px;
+          height: 38px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #334155;
+          font-weight: bold;
+          font-size: 18px;
+        }
+
+        .personInfo small,
+        .drink small,
+        .ranking small {
           display: block;
-          color: #8995a3;
+          color: #8d9aaa;
           margin-top: 4px;
         }
 
-        .delete {
-          background: #303944;
+        .remove {
+          background: #303b48;
           color: white;
-          padding: 7px 12px;
+          padding: 6px 11px;
         }
 
         .assignment {
@@ -710,24 +875,48 @@ export default function Home() {
           grid-template-columns: 1fr 1.5fr;
           gap: 10px;
           align-items: center;
-          margin-bottom: 8px;
         }
 
-        .assignment select {
-          margin: 0;
+        .drink {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          background: rgba(255,255,255,.05);
+          padding: 12px;
+          border-radius: 14px;
+          margin-top: 8px;
         }
 
-        .cost {
+        .drinkIcon {
+          font-size: 25px;
+        }
+
+        .drink > strong {
+          margin-left: auto;
+        }
+
+        .empty {
           text-align: center;
+          padding: 20px;
+          color: #8d9aaa;
         }
 
-        .costBig {
-          font-size: 38px;
+        .empty div {
+          font-size: 28px;
+        }
+
+        .bigMoney {
+          text-align: center;
+          font-size: 40px;
           font-weight: bold;
           color: #fbbf24;
         }
 
-        .costLine {
+        .center {
+          text-align: center;
+        }
+
+        .costRow {
           display: flex;
           justify-content: space-between;
           background: rgba(255,255,255,.05);
@@ -736,34 +925,40 @@ export default function Home() {
           margin-top: 8px;
         }
 
-        .hint {
-          font-size: 12px;
-        }
-
-        .rank {
+        .ranking {
           display: grid;
-          grid-template-columns: 45px 1fr auto;
+          grid-template-columns:
+            45px 1fr auto;
           gap: 10px;
           align-items: center;
           background: rgba(255,255,255,.05);
           padding: 13px;
-          border-radius: 13px;
+          border-radius: 14px;
           margin-top: 8px;
         }
 
+        .place {
+          font-size: 24px;
+          text-align: center;
+        }
+
+        .ranking > strong {
+          text-align: right;
+        }
+
         .message {
-          background: #172230;
-          border: 1px solid #344454;
-          border-radius: 12px;
-          padding: 13px;
-          margin-bottom: 15px;
+          padding: 14px;
+          border-radius: 13px;
+          background: #172535;
           color: #fbbf24;
+          margin-bottom: 15px;
+          text-align: center;
         }
 
         footer {
           text-align: center;
-          color: #687686;
           padding: 25px;
+          color: #667586;
         }
 
         footer small {
@@ -772,23 +967,28 @@ export default function Home() {
         }
 
         @media(max-width:650px) {
+
           .stats {
-            grid-template-columns: repeat(2,1fr);
+            grid-template-columns:
+              repeat(2, 1fr);
           }
 
-          .three {
+          .inputs {
             grid-template-columns: 1fr;
           }
 
-          .row {
+          .addRow {
             grid-template-columns: 1fr;
           }
 
           .assignment {
             grid-template-columns: 1fr;
           }
+
         }
+
       `}</style>
+
     </main>
   );
 }
