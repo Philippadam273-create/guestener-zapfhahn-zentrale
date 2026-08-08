@@ -30,10 +30,10 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!eventId) return;
-
-    loadPeople();
-    loadDrinks();
+    if (eventId) {
+      loadPeople();
+      loadDrinks();
+    }
   }, [eventId]);
 
   async function loadEvents() {
@@ -45,29 +45,25 @@ export default function Home() {
       });
 
     if (error) {
-      setMessage(
-        "❌ Events konnten nicht geladen werden."
-      );
+      setMessage("❌ " + error.message);
       return;
     }
 
     if (!data || data.length === 0) {
-      setMessage("❌ Keine Events vorhanden.");
+      setMessage("❌ Kein Event vorhanden.");
       return;
     }
 
     setEvents(data);
 
-    const saved =
-      localStorage.getItem(
-        "guesten-active-event"
-      );
-
-    const exists = data.some(
-      (event) => event.id === saved
+    const saved = localStorage.getItem(
+      "guesten-event"
     );
 
-    if (saved && exists) {
+    if (
+      saved &&
+      data.some((event) => event.id === saved)
+    ) {
       setEventId(saved);
     } else {
       setEventId(data[0].id);
@@ -75,7 +71,10 @@ export default function Home() {
   }
 
   async function loadPeople() {
-    if (!eventId) return;
+    /*
+      Wir benutzen event_members nur zum Lesen,
+      versuchen aber mehrere mögliche Spaltennamen.
+    */
 
     const { data, error } = await supabase
       .from("event_members")
@@ -83,9 +82,9 @@ export default function Home() {
       .eq("event_id", eventId);
 
     if (error) {
+      setPeople([]);
       setMessage(
-        "❌ Teilnehmer konnten nicht geladen werden: " +
-          error.message
+        "ℹ️ Teilnehmer müssen noch einmal angelegt werden."
       );
       return;
     }
@@ -95,30 +94,28 @@ export default function Home() {
       return;
     }
 
-    setPeople(
-      data.map((member: any) => ({
-        id: member.id,
+    const formatted: Person[] = data.map(
+      (row: any) => ({
+        id: row.id,
         name:
-          member.name ||
-          member.username ||
-          member.display_name ||
+          row.name ||
+          row.username ||
+          row.display_name ||
           "Teilnehmer",
-        points: Number(
-          member.points || 0
-        ),
+        points: Number(row.points || 0),
         drinks: Number(
-          member.drinks_count || 0
+          row.drinks_count || 0
         ),
         liters: Number(
-          member.liters || 0
+          row.liters || 0
         ),
-      }))
+      })
     );
+
+    setPeople(formatted);
   }
 
   async function loadDrinks() {
-    if (!eventId) return;
-
     const { data, error } = await supabase
       .from("drinks")
       .select("*")
@@ -129,7 +126,7 @@ export default function Home() {
 
     if (error) {
       setMessage(
-        "❌ Getränke konnten nicht geladen werden."
+        "❌ Getränke: " + error.message
       );
       return;
     }
@@ -144,47 +141,58 @@ export default function Home() {
 
     if (!name) {
       setMessage(
-        "❌ Bitte einen Namen eingeben."
+        "❌ Bitte Namen eingeben."
       );
       return;
     }
 
     if (!eventId) {
       setMessage(
-        "❌ Bitte zuerst ein Event auswählen."
+        "❌ Kein Event ausgewählt."
       );
       return;
     }
 
-    const existing = people.some(
-      (person) =>
-        person.name.toLowerCase() ===
-        name.toLowerCase()
-    );
-
-    if (existing) {
+    if (
+      people.some(
+        (person) =>
+          person.name.toLowerCase() ===
+          name.toLowerCase()
+      )
+    ) {
       setMessage(
-        "❌ Diese Person ist bereits dabei."
+        "❌ Teilnehmer bereits vorhanden."
       );
       return;
     }
+
+    /*
+      WICHTIG:
+      Wir schreiben nur die Spalten,
+      die für event_members zwingend
+      benötigt werden.
+    */
 
     const { data, error } = await supabase
       .from("event_members")
-      .insert([
-        {
-          event_id: eventId,
-          name: name,
-          points: 0,
-        },
-      ])
+      .insert({
+        event_id: eventId,
+        name: name,
+      })
       .select()
       .single();
 
     if (error) {
       setMessage(
-        "❌ Teilnehmer konnte nicht gespeichert werden: " +
+        "❌ Speichern fehlgeschlagen: " +
           error.message
+      );
+      return;
+    }
+
+    if (!data) {
+      setMessage(
+        "❌ Teilnehmer wurde nicht zurückgegeben."
       );
       return;
     }
@@ -192,13 +200,13 @@ export default function Home() {
     setPersonName("");
 
     setMessage(
-      "✅ Teilnehmer gespeichert."
+      "✅ " + name + " wurde hinzugefügt."
     );
 
     await loadPeople();
   }
 
-  async function removePerson(
+  async function deletePerson(
     personId: string
   ) {
     const { error } = await supabase
@@ -208,7 +216,7 @@ export default function Home() {
 
     if (error) {
       setMessage(
-        "❌ Teilnehmer konnte nicht gelöscht werden: " +
+        "❌ Löschen fehlgeschlagen: " +
           error.message
       );
       return;
@@ -226,33 +234,31 @@ export default function Home() {
 
     if (!eventId) {
       setMessage(
-        "❌ Bitte zuerst ein Event auswählen."
+        "❌ Kein Event ausgewählt."
       );
       return;
     }
 
     if (!drinkName.trim()) {
       setMessage(
-        "❌ Bitte ein Getränk eingeben."
+        "❌ Bitte Getränk eingeben."
       );
       return;
     }
 
     const { error } = await supabase
       .from("drinks")
-      .insert([
-        {
-          event_id: eventId,
-          getraenk: drinkName.trim(),
-          drink_name: drinkName.trim(),
-          menge: Number(liters),
-          liters: Number(liters),
-          alkohol: Number(alcohol),
-          alcohol_percent: Number(alcohol),
-          preis: Number(price),
-          quantity: 1,
-        },
-      ]);
+      .insert({
+        event_id: eventId,
+        getraenk: drinkName.trim(),
+        drink_name: drinkName.trim(),
+        menge: Number(liters),
+        liters: Number(liters),
+        alkohol: Number(alcohol),
+        alcohol_percent: Number(alcohol),
+        preis: Number(price),
+        quantity: 1,
+      });
 
     if (error) {
       setMessage(
@@ -296,22 +302,16 @@ export default function Home() {
         0
     );
 
-    const newPoints =
-      Number(person.points || 0) + 10;
-
-    const newDrinks =
-      Number(person.drinks || 0) + 1;
-
-    const newLiters =
-      Number(person.liters || 0) +
-      litersValue;
-
     const { error } = await supabase
       .from("event_members")
       .update({
-        points: newPoints,
-        drinks_count: newDrinks,
-        liters: newLiters,
+        points:
+          Number(person.points) + 10,
+        drinks_count:
+          Number(person.drinks) + 1,
+        liters:
+          Number(person.liters) +
+          litersValue,
       })
       .eq("id", personId);
 
@@ -348,14 +348,14 @@ export default function Home() {
     0
   );
 
-  const ranking = [...people].sort(
-    (a, b) => b.points - a.points
-  );
-
   const totalPoints = people.reduce(
     (sum, person) =>
-      sum + Number(person.points || 0),
+      sum + person.points,
     0
+  );
+
+  const ranking = [...people].sort(
+    (a, b) => b.points - a.points
   );
 
   return (
@@ -379,16 +379,25 @@ export default function Home() {
         </header>
 
         <section className="card">
+
           <h2>
             📅 Aktuelles Event
           </h2>
 
           <select
             value={eventId}
-            onChange={(e) =>
-              setEventId(e.target.value)
-            }
+            onChange={(e) => {
+              setEventId(
+                e.target.value
+              );
+
+              localStorage.setItem(
+                "guesten-event",
+                e.target.value
+              );
+            }}
           >
+
             <option value="">
               Event auswählen
             </option>
@@ -401,19 +410,21 @@ export default function Home() {
                 {event.title}
               </option>
             ))}
+
           </select>
+
         </section>
 
         <div className="stats">
 
           <div>
-            🍺
+            <span>🍺</span>
             <b>{drinks.length}</b>
             <small>Getränke</small>
           </div>
 
           <div>
-            💧
+            <span>💧</span>
             <b>
               {totalLiters.toFixed(1)}
             </b>
@@ -421,7 +432,7 @@ export default function Home() {
           </div>
 
           <div>
-            💶
+            <span>💶</span>
             <b>
               {totalCost.toFixed(2)} €
             </b>
@@ -429,7 +440,7 @@ export default function Home() {
           </div>
 
           <div>
-            👥
+            <span>👥</span>
             <b>{people.length}</b>
             <small>Teilnehmer</small>
           </div>
@@ -442,16 +453,23 @@ export default function Home() {
             👥 Teilnehmer
           </h2>
 
-          <div className="addRow">
+          <div className="add">
 
             <input
-              placeholder="Name eingeben"
               value={personName}
+              placeholder="Name"
               onChange={(e) =>
                 setPersonName(
                   e.target.value
                 )
               }
+              onKeyDown={(e) => {
+                if (
+                  e.key === "Enter"
+                ) {
+                  addPerson();
+                }
+              }}
             />
 
             <button
@@ -463,19 +481,22 @@ export default function Home() {
           </div>
 
           {people.length === 0 ? (
+
             <div className="empty">
-              👥
+              <div>👥</div>
               <b>
                 Noch keine Teilnehmer
               </b>
-
               <p>
                 Füge die Personen deines
                 Events hinzu.
               </p>
             </div>
+
           ) : (
+
             people.map((person) => (
+
               <div
                 className="person"
                 key={person.id}
@@ -487,7 +508,8 @@ export default function Home() {
                     .toUpperCase()}
                 </div>
 
-                <div>
+                <div className="personInfo">
+
                   <b>
                     {person.name}
                   </b>
@@ -502,12 +524,13 @@ export default function Home() {
                     {" · "}
                     🏆 {person.points}
                   </small>
+
                 </div>
 
                 <button
-                  className="delete"
+                  className="remove"
                   onClick={() =>
-                    removePerson(
+                    deletePerson(
                       person.id
                     )
                   }
@@ -516,7 +539,9 @@ export default function Home() {
                 </button>
 
               </div>
+
             ))
+
           )}
 
         </section>
@@ -537,7 +562,7 @@ export default function Home() {
             }
           />
 
-          <div className="three">
+          <div className="fields">
 
             <input
               type="number"
@@ -592,17 +617,22 @@ export default function Home() {
           </h2>
 
           {people.length === 0 ? (
+
             <p>
               👥 Zuerst Teilnehmer
               hinzufügen.
             </p>
+
           ) : drinks.length === 0 ? (
+
             <p>
-              🍺 Zuerst ein Getränk
-              speichern.
+              🍺 Zuerst Getränk speichern.
             </p>
+
           ) : (
+
             people.map((person) => (
+
               <div
                 className="assign"
                 key={person.id}
@@ -615,17 +645,20 @@ export default function Home() {
                 <select
                   defaultValue=""
                   onChange={(e) => {
-                    if (
-                      e.target.value
-                    ) {
-                      assignDrink(
-                        person.id,
-                        e.target.value
-                      );
 
-                      e.target.value =
-                        "";
-                    }
+                    const value =
+                      e.target.value;
+
+                    if (!value) return;
+
+                    assignDrink(
+                      person.id,
+                      value
+                    );
+
+                    e.target.value =
+                      "";
+
                   }}
                 >
 
@@ -635,28 +668,37 @@ export default function Home() {
 
                   {drinks.map(
                     (drink) => (
+
                       <option
                         key={drink.id}
                         value={drink.id}
                       >
+
                         {drink.getraenk ||
                           drink.drink_name ||
                           "Getränk"}
+
                         {" · "}
+
                         {Number(
                           drink.liters ??
                             drink.menge ??
                             0
                         ).toFixed(1)}
+
                         L
+
                       </option>
+
                     )
                   )}
 
                 </select>
 
               </div>
+
             ))
+
           )}
 
         </section>
@@ -668,16 +710,18 @@ export default function Home() {
           </h2>
 
           {drinks.map((drink) => (
+
             <div
               className="drink"
               key={drink.id}
             >
 
-              <span>
+              <span className="drinkIcon">
                 🍺
               </span>
 
               <div>
+
                 <b>
                   {drink.getraenk ||
                     drink.drink_name ||
@@ -698,6 +742,7 @@ export default function Home() {
                   ).toFixed(1)}
                   %
                 </small>
+
               </div>
 
               <strong>
@@ -708,6 +753,7 @@ export default function Home() {
               </strong>
 
             </div>
+
           ))}
 
         </section>
@@ -718,7 +764,7 @@ export default function Home() {
             💶 Kostenaufteilung
           </h2>
 
-          <div className="money">
+          <div className="total">
             {totalCost.toFixed(2)} €
           </div>
 
@@ -726,21 +772,19 @@ export default function Home() {
             Gesamtkosten des Events
           </p>
 
-          <div className="costRow">
+          <div className="row">
             <span>
               👥 Teilnehmer
             </span>
-
             <b>
               {people.length}
             </b>
           </div>
 
-          <div className="costRow">
+          <div className="row">
             <span>
               💶 Pro Person
             </span>
-
             <b>
               {people.length
                 ? (
@@ -752,11 +796,10 @@ export default function Home() {
             </b>
           </div>
 
-          <div className="costRow">
+          <div className="row">
             <span>
               🏆 Gesamtpunkte
             </span>
-
             <b>
               {totalPoints}
             </b>
@@ -771,12 +814,16 @@ export default function Home() {
           </h2>
 
           {ranking.length === 0 ? (
+
             <div className="empty">
               🏆 Noch keine Teilnehmer.
             </div>
+
           ) : (
+
             ranking.map(
               (person, index) => (
+
                 <div
                   className="ranking"
                   key={person.id}
@@ -816,8 +863,10 @@ export default function Home() {
                   </strong>
 
                 </div>
+
               )
             )
+
           )}
 
         </section>
@@ -846,34 +895,40 @@ export default function Home() {
 
         .page {
           min-height: 100vh;
+          padding: 15px;
+          color: white;
+          font-family:
+            Arial,
+            sans-serif;
+
           background:
             radial-gradient(
               circle at top,
-              #263b50,
-              #080c12 60%
+              #263b50 0%,
+              #080c12 65%
             );
-          color: white;
-          padding: 15px;
-          font-family: Arial, sans-serif;
         }
 
         .container {
+          width: 100%;
           max-width: 850px;
           margin: auto;
         }
 
         header {
           display: flex;
-          gap: 14px;
           align-items: center;
-          padding: 10px 5px 25px;
+          gap: 14px;
+          padding:
+            10px 5px 25px;
         }
 
         .logo {
-          font-size: 38px;
-          background: #1d2935;
+          font-size: 35px;
           padding: 12px;
           border-radius: 18px;
+          background:
+            rgba(255,255,255,.07);
         }
 
         h1 {
@@ -883,80 +938,99 @@ export default function Home() {
 
         h2 {
           margin-top: 0;
+          font-size: 20px;
         }
 
-        p,
-        small {
+        p {
           color: #94a3b8;
         }
 
+        small {
+          display: block;
+          color: #94a3b8;
+          margin-top: 5px;
+        }
+
         .card {
+          padding: 18px;
+          margin-bottom: 15px;
+          border-radius: 20px;
+
           background:
             rgba(255,255,255,.06);
+
           border:
             1px solid
             rgba(255,255,255,.08);
-          border-radius: 20px;
-          padding: 18px;
-          margin-bottom: 15px;
         }
 
         .stats {
           display: grid;
           grid-template-columns:
-            repeat(4, 1fr);
+            repeat(4,1fr);
           gap: 10px;
           margin-bottom: 15px;
         }
 
-        .stats > div {
+        .stats div {
+          padding: 15px 5px;
           text-align: center;
-          padding: 14px 5px;
           border-radius: 16px;
+
           background:
             rgba(255,255,255,.06);
         }
 
-        .stats b,
-        .stats small {
+        .stats span {
           display: block;
+          font-size: 22px;
         }
 
         .stats b {
+          display: block;
+          margin-top: 5px;
           font-size: 20px;
-          margin: 5px;
         }
 
         input,
         select {
           width: 100%;
           padding: 13px;
+          margin-bottom: 10px;
+
+          border:
+            1px solid #344252;
+
+          border-radius: 12px;
+
           background: #121a23;
           color: white;
-          border: 1px solid #344252;
-          border-radius: 12px;
-          margin-bottom: 10px;
+
           font-size: 15px;
         }
 
         button {
+          padding:
+            13px 17px;
+
           border: 0;
           border-radius: 12px;
-          padding: 13px 16px;
+
           background: #f59e0b;
           color: #111;
+
           font-weight: bold;
           cursor: pointer;
         }
 
-        .addRow {
+        .add {
           display: grid;
           grid-template-columns:
             1fr auto;
           gap: 8px;
         }
 
-        .three {
+        .fields {
           display: grid;
           grid-template-columns:
             repeat(3,1fr);
@@ -971,65 +1045,91 @@ export default function Home() {
           display: grid;
           grid-template-columns:
             40px 1fr auto;
-          gap: 10px;
+
           align-items: center;
+
+          gap: 10px;
+
+          padding: 11px;
+          margin-top: 8px;
+
+          border-radius: 14px;
+
           background:
             rgba(255,255,255,.05);
-          padding: 11px;
-          border-radius: 14px;
-          margin-top: 8px;
         }
 
         .avatar {
           width: 38px;
           height: 38px;
-          border-radius: 50%;
-          background: #334155;
+
           display: flex;
           align-items: center;
           justify-content: center;
+
+          border-radius: 50%;
+
+          background: #334155;
+
           font-weight: bold;
         }
 
-        .delete {
+        .remove {
+          padding: 6px 11px;
           background: #303b48;
           color: white;
-          padding: 6px 11px;
+        }
+
+        .empty {
+          padding: 22px;
+          text-align: center;
+          color: #94a3b8;
+        }
+
+        .empty div {
+          font-size: 30px;
+          margin-bottom: 7px;
         }
 
         .assign {
           display: grid;
           grid-template-columns:
             1fr 1.5fr;
-          gap: 10px;
+
           align-items: center;
+
+          gap: 10px;
         }
 
         .drink {
           display: flex;
-          gap: 12px;
           align-items: center;
+
+          gap: 12px;
+
+          padding: 12px;
+          margin-top: 8px;
+
+          border-radius: 14px;
+
           background:
             rgba(255,255,255,.05);
-          padding: 12px;
-          border-radius: 14px;
-          margin-top: 8px;
         }
 
-        .drink > strong {
+        .drinkIcon {
+          font-size: 25px;
+        }
+
+        .drink strong {
           margin-left: auto;
         }
 
-        .empty {
+        .total {
           text-align: center;
-          padding: 20px;
-          color: #94a3b8;
-        }
 
-        .money {
-          text-align: center;
           font-size: 40px;
           font-weight: bold;
+
           color: #fbbf24;
         }
 
@@ -1037,50 +1137,66 @@ export default function Home() {
           text-align: center;
         }
 
-        .costRow {
+        .row {
           display: flex;
           justify-content: space-between;
+
           padding: 13px;
           margin-top: 8px;
+
+          border-radius: 12px;
+
           background:
             rgba(255,255,255,.05);
-          border-radius: 12px;
         }
 
         .ranking {
           display: grid;
+
           grid-template-columns:
             45px 1fr auto;
-          gap: 10px;
+
           align-items: center;
+
+          gap: 10px;
+
           padding: 13px;
           margin-top: 8px;
+
+          border-radius: 14px;
+
           background:
             rgba(255,255,255,.05);
-          border-radius: 14px;
         }
 
         .ranking > span {
           font-size: 24px;
         }
 
+        .ranking > strong {
+          text-align: right;
+        }
+
         .message {
           padding: 14px;
+
+          text-align: center;
+
           border-radius: 13px;
+
           background: #172535;
           color: #fbbf24;
-          text-align: center;
+
           margin-bottom: 15px;
         }
 
         footer {
-          text-align: center;
           padding: 25px;
+          text-align: center;
           color: #667586;
         }
 
         footer small {
-          display: block;
           margin-top: 5px;
         }
 
@@ -1091,11 +1207,11 @@ export default function Home() {
               repeat(2,1fr);
           }
 
-          .three {
+          .fields {
             grid-template-columns: 1fr;
           }
 
-          .addRow {
+          .add {
             grid-template-columns: 1fr;
           }
 
