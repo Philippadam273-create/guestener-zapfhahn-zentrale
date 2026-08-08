@@ -3,37 +3,65 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
-type Person = {
+type Profile = {
   id: string;
-  name: string;
+  username: string | null;
+  points: number | null;
+  drinks_count: number | null;
+};
+
+type Member = {
+  id: string;
+  profile_id: string;
+  username: string;
   points: number;
   drinks: number;
   liters: number;
 };
 
+type Drink = {
+  id: string;
+  event_id: string;
+  drink_name: string | null;
+  getraenk: string | null;
+  liters: number | null;
+  menge: number | null;
+  alcohol_percent: number | null;
+  alkohol: number | null;
+  preis: number | null;
+};
+
 export default function Home() {
   const [events, setEvents] = useState<any[]>([]);
   const [eventId, setEventId] = useState("");
-  const [people, setPeople] = useState<Person[]>([]);
-  const [drinks, setDrinks] = useState<any[]>([]);
 
-  const [personName, setPersonName] = useState("");
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [drinks, setDrinks] = useState<Drink[]>([]);
+
   const [drinkName, setDrinkName] = useState("");
   const [liters, setLiters] = useState("0.5");
   const [alcohol, setAlcohol] = useState("5");
   const [price, setPrice] = useState("0");
 
+  const [selectedProfile, setSelectedProfile] = useState("");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     loadEvents();
+    loadProfiles();
   }, []);
 
   useEffect(() => {
-    if (eventId) {
-      loadPeople();
-      loadDrinks();
-    }
+    if (!eventId) return;
+
+    localStorage.setItem(
+      "guesten-active-event",
+      eventId
+    );
+
+    loadMembers();
+    loadDrinks();
   }, [eventId]);
 
   async function loadEvents() {
@@ -45,80 +73,121 @@ export default function Home() {
       });
 
     if (error) {
-      setMessage("❌ " + error.message);
+      setMessage(
+        "❌ Events konnten nicht geladen werden: " +
+          error.message
+      );
       return;
     }
+
+    setEvents(data || []);
 
     if (!data || data.length === 0) {
-      setMessage("❌ Kein Event vorhanden.");
       return;
     }
 
-    setEvents(data);
+    const saved =
+      localStorage.getItem(
+        "guesten-active-event"
+      );
 
-    const saved = localStorage.getItem(
-      "guesten-event"
+    const savedExists = data.some(
+      (event) => event.id === saved
     );
 
-    if (
-      saved &&
-      data.some((event) => event.id === saved)
-    ) {
+    if (saved && savedExists) {
       setEventId(saved);
     } else {
       setEventId(data[0].id);
     }
   }
 
-  async function loadPeople() {
-    /*
-      Wir benutzen event_members nur zum Lesen,
-      versuchen aber mehrere mögliche Spaltennamen.
-    */
-
+  async function loadProfiles() {
     const { data, error } = await supabase
-      .from("event_members")
-      .select("*")
-      .eq("event_id", eventId);
+      .from("profiles")
+      .select(
+        "id,username,points,drinks_count"
+      )
+      .order("username", {
+        ascending: true,
+      });
 
     if (error) {
-      setPeople([]);
       setMessage(
-        "ℹ️ Teilnehmer müssen noch einmal angelegt werden."
+        "❌ Profile konnten nicht geladen werden: " +
+          error.message
       );
       return;
     }
 
-    if (!data) {
-      setPeople([]);
+    setProfiles(data || []);
+  }
+
+  async function loadMembers() {
+    if (!eventId) return;
+
+    const { data, error } = await supabase
+      .from("event_members")
+      .select(
+        `
+          id,
+          event_id,
+          profile_id,
+          joined_at,
+          profiles (
+            id,
+            username,
+            points,
+            drinks_count
+          )
+        `
+      )
+      .eq("event_id", eventId);
+
+    if (error) {
+      setMessage(
+        "❌ Teilnehmer konnten nicht geladen werden: " +
+          error.message
+      );
       return;
     }
 
-    const formatted: Person[] = data.map(
-      (row: any) => ({
-        id: row.id,
-        name:
-          row.name ||
-          row.username ||
-          row.display_name ||
-          "Teilnehmer",
-        points: Number(row.points || 0),
-        drinks: Number(
-          row.drinks_count || 0
-        ),
-        liters: Number(
-          row.liters || 0
-        ),
-      })
+    const result: Member[] = (data || []).map(
+      (row: any) => {
+        const profile = Array.isArray(
+          row.profiles
+        )
+          ? row.profiles[0]
+          : row.profiles;
+
+        return {
+          id: row.id,
+          profile_id: row.profile_id,
+          username:
+            profile?.username ||
+            "Teilnehmer",
+          points: Number(
+            profile?.points || 0
+          ),
+          drinks: Number(
+            profile?.drinks_count || 0
+          ),
+          liters: 0,
+        };
+      }
     );
 
-    setPeople(formatted);
+    setMembers(result);
   }
 
   async function loadDrinks() {
+    if (!eventId) return;
+
     const { data, error } = await supabase
       .from("drinks")
-      .select("*")
+      .select(
+        "id,event_id,drink_name,getraenk,liters,menge,alcohol_percent,alkohol,preis"
+      )
       .eq("event_id", eventId)
       .order("created_at", {
         ascending: false,
@@ -126,7 +195,8 @@ export default function Home() {
 
     if (error) {
       setMessage(
-        "❌ Getränke: " + error.message
+        "❌ Getränke konnten nicht geladen werden: " +
+          error.message
       );
       return;
     }
@@ -134,95 +204,85 @@ export default function Home() {
     setDrinks(data || []);
   }
 
-  async function addPerson() {
+  async function addParticipant() {
     setMessage("");
-
-    const name = personName.trim();
-
-    if (!name) {
-      setMessage(
-        "❌ Bitte Namen eingeben."
-      );
-      return;
-    }
 
     if (!eventId) {
       setMessage(
-        "❌ Kein Event ausgewählt."
+        "❌ Bitte zuerst ein Event auswählen."
       );
       return;
     }
 
-    if (
-      people.some(
-        (person) =>
-          person.name.toLowerCase() ===
-          name.toLowerCase()
-      )
-    ) {
+    if (!selectedProfile) {
       setMessage(
-        "❌ Teilnehmer bereits vorhanden."
+        "❌ Bitte einen Teilnehmer auswählen."
       );
       return;
     }
 
-    /*
-      WICHTIG:
-      Wir schreiben nur die Spalten,
-      die für event_members zwingend
-      benötigt werden.
-    */
+    const alreadyMember = members.some(
+      (member) =>
+        member.profile_id ===
+        selectedProfile
+    );
 
-    const { data, error } = await supabase
+    if (alreadyMember) {
+      setMessage(
+        "❌ Dieser Teilnehmer ist bereits dabei."
+      );
+      return;
+    }
+
+    const { error } = await supabase
       .from("event_members")
       .insert({
         event_id: eventId,
-        name: name,
-      })
-      .select()
-      .single();
+        profile_id: selectedProfile,
+        joined_at: new Date().toISOString(),
+      });
 
     if (error) {
       setMessage(
-        "❌ Speichern fehlgeschlagen: " +
+        "❌ Teilnehmer konnte nicht hinzugefügt werden: " +
           error.message
       );
       return;
     }
 
-    if (!data) {
-      setMessage(
-        "❌ Teilnehmer wurde nicht zurückgegeben."
-      );
-      return;
-    }
-
-    setPersonName("");
-
-    setMessage(
-      "✅ " + name + " wurde hinzugefügt."
+    const profile = profiles.find(
+      (p) => p.id === selectedProfile
     );
 
-    await loadPeople();
+    setSelectedProfile("");
+
+    setMessage(
+      "✅ " +
+        (profile?.username ||
+          "Teilnehmer") +
+        " wurde hinzugefügt."
+    );
+
+    await loadMembers();
   }
 
-  async function deletePerson(
-    personId: string
+  async function removeParticipant(
+    memberId: string
   ) {
     const { error } = await supabase
       .from("event_members")
       .delete()
-      .eq("id", personId);
+      .eq("id", memberId);
 
     if (error) {
       setMessage(
-        "❌ Löschen fehlgeschlagen: " +
+        "❌ Teilnehmer konnte nicht entfernt werden: " +
           error.message
       );
       return;
     }
 
-    await loadPeople();
+    await loadMembers();
 
     setMessage(
       "✅ Teilnehmer entfernt."
@@ -234,14 +294,14 @@ export default function Home() {
 
     if (!eventId) {
       setMessage(
-        "❌ Kein Event ausgewählt."
+        "❌ Bitte zuerst ein Event auswählen."
       );
       return;
     }
 
     if (!drinkName.trim()) {
       setMessage(
-        "❌ Bitte Getränk eingeben."
+        "❌ Bitte ein Getränk eingeben."
       );
       return;
     }
@@ -250,12 +310,12 @@ export default function Home() {
       .from("drinks")
       .insert({
         event_id: eventId,
-        getraenk: drinkName.trim(),
         drink_name: drinkName.trim(),
-        menge: Number(liters),
+        getraenk: drinkName.trim(),
         liters: Number(liters),
-        alkohol: Number(alcohol),
+        menge: Number(liters),
         alcohol_percent: Number(alcohol),
+        alkohol: Number(alcohol),
         preis: Number(price),
         quantity: 1,
       });
@@ -281,7 +341,7 @@ export default function Home() {
   }
 
   async function assignDrink(
-    personId: string,
+    profileId: string,
     drinkId: string
   ) {
     const drink = drinks.find(
@@ -290,40 +350,37 @@ export default function Home() {
 
     if (!drink) return;
 
-    const person = people.find(
-      (item) => item.id === personId
+    const member = members.find(
+      (item) =>
+        item.profile_id === profileId
     );
 
-    if (!person) return;
+    if (!member) return;
 
-    const litersValue = Number(
-      drink.liters ??
-        drink.menge ??
-        0
-    );
+    const newPoints =
+      Number(member.points) + 10;
+
+    const newDrinks =
+      Number(member.drinks) + 1;
 
     const { error } = await supabase
-      .from("event_members")
+      .from("profiles")
       .update({
-        points:
-          Number(person.points) + 10,
-        drinks_count:
-          Number(person.drinks) + 1,
-        liters:
-          Number(person.liters) +
-          litersValue,
+        points: newPoints,
+        drinks_count: newDrinks,
       })
-      .eq("id", personId);
+      .eq("id", profileId);
 
     if (error) {
       setMessage(
-        "❌ Zuordnung fehlgeschlagen: " +
+        "❌ Getränk konnte nicht zugeordnet werden: " +
           error.message
       );
       return;
     }
 
-    await loadPeople();
+    await loadProfiles();
+    await loadMembers();
 
     setMessage(
       "🍺 Getränk zugeordnet! +10 Punkte"
@@ -344,25 +401,37 @@ export default function Home() {
   const totalCost = drinks.reduce(
     (sum, drink) =>
       sum +
-      Number(drink.preis ?? 0),
+      Number(drink.preis || 0),
     0
   );
 
-  const totalPoints = people.reduce(
-    (sum, person) =>
-      sum + person.points,
+  const totalPoints = members.reduce(
+    (sum, member) =>
+      sum + Number(member.points || 0),
     0
   );
 
-  const ranking = [...people].sort(
-    (a, b) => b.points - a.points
+  const ranking = [...members].sort(
+    (a, b) =>
+      Number(b.points) -
+      Number(a.points)
   );
+
+  const availableProfiles =
+    profiles.filter(
+      (profile) =>
+        !members.some(
+          (member) =>
+            member.profile_id ===
+            profile.id
+        )
+    );
 
   return (
     <main className="page">
       <div className="container">
 
-        <header>
+        <header className="header">
           <div className="logo">
             🍻
           </div>
@@ -386,16 +455,11 @@ export default function Home() {
 
           <select
             value={eventId}
-            onChange={(e) => {
+            onChange={(e) =>
               setEventId(
                 e.target.value
-              );
-
-              localStorage.setItem(
-                "guesten-event",
-                e.target.value
-              );
-            }}
+              )
+            }
           >
 
             <option value="">
@@ -417,32 +481,44 @@ export default function Home() {
 
         <div className="stats">
 
-          <div>
+          <div className="stat">
             <span>🍺</span>
-            <b>{drinks.length}</b>
-            <small>Getränke</small>
+            <strong>
+              {drinks.length}
+            </strong>
+            <small>
+              Getränke
+            </small>
           </div>
 
-          <div>
+          <div className="stat">
             <span>💧</span>
-            <b>
+            <strong>
               {totalLiters.toFixed(1)}
-            </b>
-            <small>Liter</small>
+            </strong>
+            <small>
+              Liter
+            </small>
           </div>
 
-          <div>
+          <div className="stat">
             <span>💶</span>
-            <b>
+            <strong>
               {totalCost.toFixed(2)} €
-            </b>
-            <small>Kosten</small>
+            </strong>
+            <small>
+              Kosten
+            </small>
           </div>
 
-          <div>
+          <div className="stat">
             <span>👥</span>
-            <b>{people.length}</b>
-            <small>Teilnehmer</small>
+            <strong>
+              {members.length}
+            </strong>
+            <small>
+              Teilnehmer
+            </small>
           </div>
 
         </div>
@@ -453,96 +529,129 @@ export default function Home() {
             👥 Teilnehmer
           </h2>
 
-          <div className="add">
+          <p>
+            Wer ist beim Event dabei?
+          </p>
 
-            <input
-              value={personName}
-              placeholder="Name"
-              onChange={(e) =>
-                setPersonName(
-                  e.target.value
-                )
-              }
-              onKeyDown={(e) => {
-                if (
-                  e.key === "Enter"
-                ) {
-                  addPerson();
-                }
-              }}
-            />
-
-            <button
-              onClick={addPerson}
-            >
-              ➕ Hinzufügen
-            </button>
-
-          </div>
-
-          {people.length === 0 ? (
+          {availableProfiles.length ===
+          0 ? (
 
             <div className="empty">
-              <div>👥</div>
-              <b>
-                Noch keine Teilnehmer
-              </b>
-              <p>
-                Füge die Personen deines
-                Events hinzu.
-              </p>
+              {profiles.length === 0
+                ? "👤 Noch keine Profile vorhanden."
+                : "✅ Alle vorhandenen Profile sind bereits dabei."}
             </div>
 
           ) : (
 
-            people.map((person) => (
+            <div className="addParticipant">
 
-              <div
-                className="person"
-                key={person.id}
+              <select
+                value={selectedProfile}
+                onChange={(e) =>
+                  setSelectedProfile(
+                    e.target.value
+                  )
+                }
               >
 
-                <div className="avatar">
-                  {person.name
-                    .charAt(0)
-                    .toUpperCase()}
-                </div>
+                <option value="">
+                  Teilnehmer auswählen
+                </option>
 
-                <div className="personInfo">
+                {availableProfiles.map(
+                  (profile) => (
+                    <option
+                      key={profile.id}
+                      value={profile.id}
+                    >
+                      {profile.username ||
+                        "Unbenannt"}
+                    </option>
+                  )
+                )}
 
-                  <b>
-                    {person.name}
-                  </b>
+              </select>
 
-                  <small>
-                    🍺 {person.drinks}
-                    {" · "}
-                    💧{" "}
-                    {person.liters.toFixed(
-                      1
-                    )} L
-                    {" · "}
-                    🏆 {person.points}
-                  </small>
+              <button
+                onClick={
+                  addParticipant
+                }
+              >
+                ➕ Hinzufügen
+              </button>
 
-                </div>
-
-                <button
-                  className="remove"
-                  onClick={() =>
-                    deletePerson(
-                      person.id
-                    )
-                  }
-                >
-                  ×
-                </button>
-
-              </div>
-
-            ))
+            </div>
 
           )}
+
+          <div className="memberList">
+
+            {members.length === 0 ? (
+
+              <div className="empty">
+                <div className="big">
+                  👥
+                </div>
+
+                <b>
+                  Noch keine Teilnehmer
+                </b>
+
+                <p>
+                  Wähle oben einen Teilnehmer
+                  aus.
+                </p>
+              </div>
+
+            ) : (
+
+              members.map((member) => (
+
+                <div
+                  className="member"
+                  key={member.id}
+                >
+
+                  <div className="avatar">
+                    {member.username
+                      .charAt(0)
+                      .toUpperCase()}
+                  </div>
+
+                  <div className="memberInfo">
+
+                    <strong>
+                      {member.username}
+                    </strong>
+
+                    <small>
+                      🍺 {member.drinks}
+                      {" · "}
+                      🏆 {member.points}
+                      {" Punkte"}
+                    </small>
+
+                  </div>
+
+                  <button
+                    className="remove"
+                    onClick={() =>
+                      removeParticipant(
+                        member.id
+                      )
+                    }
+                  >
+                    ×
+                  </button>
+
+                </div>
+
+              ))
+
+            )}
+
+          </div>
 
         </section>
 
@@ -562,7 +671,7 @@ export default function Home() {
             }
           />
 
-          <div className="fields">
+          <div className="three">
 
             <input
               type="number"
@@ -616,7 +725,7 @@ export default function Home() {
             🔗 Getränk zuordnen
           </h2>
 
-          {people.length === 0 ? (
+          {members.length === 0 ? (
 
             <p>
               👥 Zuerst Teilnehmer
@@ -626,21 +735,22 @@ export default function Home() {
           ) : drinks.length === 0 ? (
 
             <p>
-              🍺 Zuerst Getränk speichern.
+              🍺 Zuerst ein Getränk
+              speichern.
             </p>
 
           ) : (
 
-            people.map((person) => (
+            members.map((member) => (
 
               <div
                 className="assign"
-                key={person.id}
+                key={member.id}
               >
 
-                <b>
-                  👤 {person.name}
-                </b>
+                <strong>
+                  👤 {member.username}
+                </strong>
 
                 <select
                   defaultValue=""
@@ -652,7 +762,7 @@ export default function Home() {
                     if (!value) return;
 
                     assignDrink(
-                      person.id,
+                      member.profile_id,
                       value
                     );
 
@@ -674,8 +784,8 @@ export default function Home() {
                         value={drink.id}
                       >
 
-                        {drink.getraenk ||
-                          drink.drink_name ||
+                        {drink.drink_name ||
+                          drink.getraenk ||
                           "Getränk"}
 
                         {" · "}
@@ -716,17 +826,17 @@ export default function Home() {
               key={drink.id}
             >
 
-              <span className="drinkIcon">
+              <div className="drinkIcon">
                 🍺
-              </span>
+              </div>
 
               <div>
 
-                <b>
-                  {drink.getraenk ||
-                    drink.drink_name ||
+                <strong>
+                  {drink.drink_name ||
+                    drink.getraenk ||
                     "Getränk"}
-                </b>
+                </strong>
 
                 <small>
                   {Number(
@@ -745,9 +855,9 @@ export default function Home() {
 
               </div>
 
-              <strong>
+              <strong className="price">
                 {Number(
-                  drink.preis ?? 0
+                  drink.preis || 0
                 ).toFixed(2)}
                 €
               </strong>
@@ -776,33 +886,36 @@ export default function Home() {
             <span>
               👥 Teilnehmer
             </span>
-            <b>
-              {people.length}
-            </b>
+
+            <strong>
+              {members.length}
+            </strong>
           </div>
 
           <div className="row">
             <span>
               💶 Pro Person
             </span>
-            <b>
-              {people.length
+
+            <strong>
+              {members.length
                 ? (
                     totalCost /
-                    people.length
+                    members.length
                   ).toFixed(2)
                 : "0.00"}{" "}
               €
-            </b>
+            </strong>
           </div>
 
           <div className="row">
             <span>
               🏆 Gesamtpunkte
             </span>
-            <b>
+
+            <strong>
               {totalPoints}
-            </b>
+            </strong>
           </div>
 
         </section>
@@ -822,14 +935,14 @@ export default function Home() {
           ) : (
 
             ranking.map(
-              (person, index) => (
+              (member, index) => (
 
                 <div
                   className="ranking"
-                  key={person.id}
+                  key={member.id}
                 >
 
-                  <span>
+                  <span className="rank">
                     {index === 0
                       ? "🥇"
                       : index === 1
@@ -840,27 +953,23 @@ export default function Home() {
                   </span>
 
                   <div>
-                    <b>
-                      {person.name}
-                    </b>
+
+                    <strong>
+                      {member.username}
+                    </strong>
 
                     <small>
-                      🍺{" "}
-                      {person.drinks}
-                      {" · "}
-                      💧{" "}
-                      {person.liters.toFixed(
-                        1
-                      )} L
+                      🍺 {member.drinks}
                     </small>
+
                   </div>
 
-                  <strong>
-                    {person.points}
+                  <div className="points">
+                    {member.points}
                     <small>
                       Punkte
                     </small>
-                  </strong>
+                  </div>
 
                 </div>
 
@@ -878,7 +987,10 @@ export default function Home() {
         )}
 
         <footer>
-          🍻 Güstener Zapfhahn Zentrale
+          <strong>
+            🍻 Güstener Zapfhahn Zentrale
+          </strong>
+
           <small>
             Dein Event. Deine Getränke.
             Deine Runde.
@@ -895,36 +1007,34 @@ export default function Home() {
 
         .page {
           min-height: 100vh;
-          padding: 15px;
+          padding: 16px;
           color: white;
           font-family:
             Arial,
+            Helvetica,
             sans-serif;
-
           background:
             radial-gradient(
               circle at top,
-              #263b50 0%,
-              #080c12 65%
+              #29445d 0%,
+              #0a0f16 62%
             );
         }
 
         .container {
-          width: 100%;
           max-width: 850px;
           margin: auto;
         }
 
-        header {
+        .header {
           display: flex;
           align-items: center;
           gap: 14px;
-          padding:
-            10px 5px 25px;
+          padding: 10px 4px 25px;
         }
 
         .logo {
-          font-size: 35px;
+          font-size: 38px;
           padding: 12px;
           border-radius: 18px;
           background:
@@ -937,7 +1047,7 @@ export default function Home() {
         }
 
         h2 {
-          margin-top: 0;
+          margin: 0 0 8px;
           font-size: 20px;
         }
 
@@ -955,10 +1065,8 @@ export default function Home() {
           padding: 18px;
           margin-bottom: 15px;
           border-radius: 20px;
-
           background:
             rgba(255,255,255,.06);
-
           border:
             1px solid
             rgba(255,255,255,.08);
@@ -972,24 +1080,23 @@ export default function Home() {
           margin-bottom: 15px;
         }
 
-        .stats div {
-          padding: 15px 5px;
+        .stat {
           text-align: center;
+          padding: 14px 5px;
           border-radius: 16px;
-
           background:
             rgba(255,255,255,.06);
         }
 
-        .stats span {
-          display: block;
+        .stat span {
           font-size: 22px;
+          display: block;
         }
 
-        .stats b {
+        .stat strong {
           display: block;
-          margin-top: 5px;
           font-size: 20px;
+          margin-top: 4px;
         }
 
         input,
@@ -997,40 +1104,62 @@ export default function Home() {
           width: 100%;
           padding: 13px;
           margin-bottom: 10px;
-
+          border-radius: 12px;
           border:
             1px solid #344252;
-
-          border-radius: 12px;
-
           background: #121a23;
           color: white;
-
           font-size: 15px;
         }
 
         button {
-          padding:
-            13px 17px;
-
+          padding: 13px 17px;
           border: 0;
           border-radius: 12px;
-
           background: #f59e0b;
           color: #111;
-
           font-weight: bold;
           cursor: pointer;
         }
 
-        .add {
+        .addParticipant {
           display: grid;
           grid-template-columns:
             1fr auto;
           gap: 8px;
         }
 
-        .fields {
+        .member {
+          display: grid;
+          grid-template-columns:
+            40px 1fr auto;
+          align-items: center;
+          gap: 10px;
+          padding: 11px;
+          margin-top: 8px;
+          border-radius: 14px;
+          background:
+            rgba(255,255,255,.05);
+        }
+
+        .avatar {
+          width: 38px;
+          height: 38px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #334155;
+          font-weight: bold;
+        }
+
+        .remove {
+          padding: 6px 11px;
+          background: #303b48;
+          color: white;
+        }
+
+        .three {
           display: grid;
           grid-template-columns:
             repeat(3,1fr);
@@ -1041,77 +1170,21 @@ export default function Home() {
           width: 100%;
         }
 
-        .person {
-          display: grid;
-          grid-template-columns:
-            40px 1fr auto;
-
-          align-items: center;
-
-          gap: 10px;
-
-          padding: 11px;
-          margin-top: 8px;
-
-          border-radius: 14px;
-
-          background:
-            rgba(255,255,255,.05);
-        }
-
-        .avatar {
-          width: 38px;
-          height: 38px;
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          border-radius: 50%;
-
-          background: #334155;
-
-          font-weight: bold;
-        }
-
-        .remove {
-          padding: 6px 11px;
-          background: #303b48;
-          color: white;
-        }
-
-        .empty {
-          padding: 22px;
-          text-align: center;
-          color: #94a3b8;
-        }
-
-        .empty div {
-          font-size: 30px;
-          margin-bottom: 7px;
-        }
-
         .assign {
           display: grid;
           grid-template-columns:
             1fr 1.5fr;
-
-          align-items: center;
-
           gap: 10px;
+          align-items: center;
         }
 
         .drink {
           display: flex;
           align-items: center;
-
           gap: 12px;
-
           padding: 12px;
           margin-top: 8px;
-
           border-radius: 14px;
-
           background:
             rgba(255,255,255,.05);
         }
@@ -1120,16 +1193,24 @@ export default function Home() {
           font-size: 25px;
         }
 
-        .drink strong {
+        .price {
           margin-left: auto;
+        }
+
+        .empty {
+          text-align: center;
+          padding: 20px;
+          color: #94a3b8;
+        }
+
+        .big {
+          font-size: 30px;
         }
 
         .total {
           text-align: center;
-
           font-size: 40px;
           font-weight: bold;
-
           color: #fbbf24;
         }
 
@@ -1140,64 +1221,54 @@ export default function Home() {
         .row {
           display: flex;
           justify-content: space-between;
-
           padding: 13px;
           margin-top: 8px;
-
           border-radius: 12px;
-
           background:
             rgba(255,255,255,.05);
         }
 
         .ranking {
           display: grid;
-
           grid-template-columns:
             45px 1fr auto;
-
           align-items: center;
-
           gap: 10px;
-
           padding: 13px;
           margin-top: 8px;
-
           border-radius: 14px;
-
           background:
             rgba(255,255,255,.05);
         }
 
-        .ranking > span {
+        .rank {
           font-size: 24px;
         }
 
-        .ranking > strong {
+        .points {
           text-align: right;
+          font-weight: bold;
+          font-size: 18px;
+        }
+
+        .points small {
+          font-size: 12px;
+          font-weight: normal;
         }
 
         .message {
           padding: 14px;
-
+          margin-bottom: 15px;
           text-align: center;
-
           border-radius: 13px;
-
           background: #172535;
           color: #fbbf24;
-
-          margin-bottom: 15px;
         }
 
         footer {
           padding: 25px;
           text-align: center;
-          color: #667586;
-        }
-
-        footer small {
-          margin-top: 5px;
+          color: #64748b;
         }
 
         @media(max-width:650px) {
@@ -1207,11 +1278,11 @@ export default function Home() {
               repeat(2,1fr);
           }
 
-          .fields {
+          .three {
             grid-template-columns: 1fr;
           }
 
-          .add {
+          .addParticipant {
             grid-template-columns: 1fr;
           }
 
