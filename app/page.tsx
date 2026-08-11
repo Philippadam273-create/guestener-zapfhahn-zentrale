@@ -16,7 +16,6 @@ type Member = {
   username: string;
   points: number;
   drinks: number;
-  liters: number;
 };
 
 type Drink = {
@@ -76,22 +75,17 @@ export default function Home() {
       });
 
     if (error) {
-      setMessage(
-        "❌ Events: " + error.message
-      );
+      setMessage("❌ Events: " + error.message);
       return;
     }
 
     setEvents(data || []);
 
-    if (!data || data.length === 0) {
-      return;
-    }
+    if (!data || data.length === 0) return;
 
-    const saved =
-      localStorage.getItem(
-        "guesten-active-event"
-      );
+    const saved = localStorage.getItem(
+      "guesten-active-event"
+    );
 
     const exists = data.some(
       (event) => event.id === saved
@@ -132,7 +126,6 @@ export default function Home() {
       .select(
         `
         id,
-        event_id,
         profile_id,
         profiles (
           id,
@@ -171,7 +164,6 @@ export default function Home() {
           drinks: Number(
             profile?.drinks_count || 0
           ),
-          liters: 0,
         };
       });
 
@@ -230,14 +222,13 @@ export default function Home() {
       return;
     }
 
-    const alreadyExists =
-      members.some(
-        (member) =>
-          member.profile_id ===
-          selectedProfile
-      );
+    const exists = members.some(
+      (member) =>
+        member.profile_id ===
+        selectedProfile
+    );
 
-    if (alreadyExists) {
+    if (exists) {
       setMessage(
         "❌ Teilnehmer ist bereits dabei."
       );
@@ -371,9 +362,12 @@ export default function Home() {
       return;
     }
 
-    /* --------------------------------
-       1. GETRÄNK DEM TEILNEHMER ZUORDNEN
-       -------------------------------- */
+    if (drink.profile_id) {
+      setMessage(
+        "❌ Dieses Getränk ist bereits zugeordnet."
+      );
+      return;
+    }
 
     const { error: drinkError } =
       await supabase
@@ -385,39 +379,26 @@ export default function Home() {
 
     if (drinkError) {
       setMessage(
-        "❌ Getränk konnte nicht zugeordnet werden: " +
+        "❌ Zuordnung fehlgeschlagen: " +
           drinkError.message
       );
       return;
     }
 
-    /* --------------------------------
-       2. PROFIL AKTUALISIEREN
-       -------------------------------- */
-
-    const newPoints =
-      Number(member.points || 0) + 10;
-
-    const newDrinkCount =
-      Number(member.drinks || 0) + 1;
-
-    const { error: profileError } =
-      await supabase
-        .from("profiles")
-        .update({
-          points: newPoints,
-          drinks_count:
-            newDrinkCount,
-        })
-        .eq("id", profileId);
-
-    if (profileError) {
-      setMessage(
-        "⚠️ Getränk wurde zugeordnet, aber Punkte konnten nicht aktualisiert werden: " +
-          profileError.message
+    const { data, error: syncError } =
+      await supabase.rpc(
+        "sync_profile_stats",
+        {
+          p_profile_id:
+            profileId,
+        }
       );
 
-      await loadDrinks();
+    if (syncError) {
+      setMessage(
+        "❌ Punkte konnten nicht berechnet werden: " +
+          syncError.message
+      );
       return;
     }
 
@@ -425,9 +406,23 @@ export default function Home() {
     await loadMembers();
     await loadDrinks();
 
+    const result =
+      Array.isArray(data)
+        ? data[0]
+        : data;
+
     setMessage(
-      "🍺 Getränk zugeordnet! +10 Punkte für " +
-        member.username
+      "🍺 Getränk zugeordnet! " +
+        member.username +
+        ": " +
+        Number(
+          result?.drinks_count || 0
+        ) +
+        " Getränke · " +
+        Number(
+          result?.points || 0
+        ) +
+        " Punkte"
     );
   }
 
@@ -459,11 +454,12 @@ export default function Home() {
       0
     );
 
-  const ranking = [...members].sort(
-    (a, b) =>
-      Number(b.points) -
-      Number(a.points)
-  );
+  const ranking =
+    [...members].sort(
+      (a, b) =>
+        Number(b.points) -
+        Number(a.points)
+    );
 
   const availableProfiles =
     profiles.filter(
@@ -584,8 +580,7 @@ export default function Home() {
             Wer ist beim Event dabei?
           </p>
 
-          {availableProfiles.length >
-          0 ? (
+          {availableProfiles.length > 0 ? (
 
             <div className="addParticipant">
 
@@ -797,17 +792,14 @@ export default function Home() {
                     const drinkId =
                       e.target.value;
 
-                    if (!drinkId) {
-                      return;
-                    }
+                    if (!drinkId) return;
 
                     assignDrink(
                       member.profile_id,
                       drinkId
                     );
 
-                    e.target.value =
-                      "";
+                    e.target.value = "";
 
                   }}
                 >
@@ -1033,6 +1025,7 @@ export default function Home() {
 
                   <div className="points">
                     {member.points}
+
                     <small>
                       Punkte
                     </small>
@@ -1076,11 +1069,7 @@ export default function Home() {
           min-height: 100vh;
           padding: 16px;
           color: white;
-          font-family:
-            Arial,
-            Helvetica,
-            sans-serif;
-
+          font-family: Arial, Helvetica, sans-serif;
           background:
             radial-gradient(
               circle at top,
@@ -1098,16 +1087,14 @@ export default function Home() {
           display: flex;
           align-items: center;
           gap: 14px;
-          padding:
-            10px 4px 25px;
+          padding: 10px 4px 25px;
         }
 
         .logo {
           font-size: 38px;
           padding: 12px;
           border-radius: 18px;
-          background:
-            rgba(255,255,255,.07);
+          background: rgba(255,255,255,.07);
         }
 
         h1 {
@@ -1134,19 +1121,13 @@ export default function Home() {
           padding: 18px;
           margin-bottom: 15px;
           border-radius: 20px;
-
-          background:
-            rgba(255,255,255,.06);
-
-          border:
-            1px solid
-            rgba(255,255,255,.08);
+          background: rgba(255,255,255,.06);
+          border: 1px solid rgba(255,255,255,.08);
         }
 
         .stats {
           display: grid;
-          grid-template-columns:
-            repeat(4,1fr);
+          grid-template-columns: repeat(4,1fr);
           gap: 10px;
           margin-bottom: 15px;
         }
@@ -1155,9 +1136,7 @@ export default function Home() {
           text-align: center;
           padding: 14px 5px;
           border-radius: 16px;
-
-          background:
-            rgba(255,255,255,.06);
+          background: rgba(255,255,255,.06);
         }
 
         .stat span {
@@ -1176,70 +1155,48 @@ export default function Home() {
           width: 100%;
           padding: 13px;
           margin-bottom: 10px;
-
           border-radius: 12px;
-
-          border:
-            1px solid #344252;
-
+          border: 1px solid #344252;
           background: #121a23;
           color: white;
-
           font-size: 15px;
         }
 
         button {
-          padding:
-            13px 17px;
-
+          padding: 13px 17px;
           border: 0;
           border-radius: 12px;
-
           background: #f59e0b;
           color: #111;
-
           font-weight: bold;
           cursor: pointer;
         }
 
         .addParticipant {
           display: grid;
-          grid-template-columns:
-            1fr auto;
-
+          grid-template-columns: 1fr auto;
           gap: 8px;
         }
 
         .member {
           display: grid;
-          grid-template-columns:
-            40px 1fr auto;
-
+          grid-template-columns: 40px 1fr auto;
           align-items: center;
-
           gap: 10px;
-
           padding: 11px;
           margin-top: 8px;
-
           border-radius: 14px;
-
-          background:
-            rgba(255,255,255,.05);
+          background: rgba(255,255,255,.05);
         }
 
         .avatar {
           width: 38px;
           height: 38px;
-
           border-radius: 50%;
-
           display: flex;
           align-items: center;
           justify-content: center;
-
           background: #334155;
-
           font-weight: bold;
         }
 
@@ -1251,9 +1208,7 @@ export default function Home() {
 
         .three {
           display: grid;
-          grid-template-columns:
-            repeat(3,1fr);
-
+          grid-template-columns: repeat(3,1fr);
           gap: 8px;
         }
 
@@ -1263,33 +1218,21 @@ export default function Home() {
 
         .assign {
           display: grid;
-          grid-template-columns:
-            1fr 1.5fr;
-
+          grid-template-columns: 1fr 1.5fr;
           gap: 12px;
-
           align-items: center;
-
           padding: 10px 0;
-
-          border-bottom:
-            1px solid
-            rgba(255,255,255,.07);
+          border-bottom: 1px solid rgba(255,255,255,.07);
         }
 
         .drink {
           display: flex;
           align-items: center;
-
           gap: 12px;
-
           padding: 12px;
           margin-top: 8px;
-
           border-radius: 14px;
-
-          background:
-            rgba(255,255,255,.05);
+          background: rgba(255,255,255,.05);
         }
 
         .drinkIcon {
@@ -1313,21 +1256,15 @@ export default function Home() {
         .successBox {
           padding: 12px;
           margin-bottom: 10px;
-
           border-radius: 12px;
-
-          background:
-            rgba(34,197,94,.10);
-
+          background: rgba(34,197,94,.10);
           color: #4ade80;
         }
 
         .total {
           text-align: center;
-
           font-size: 40px;
           font-weight: bold;
-
           color: #fbbf24;
         }
 
@@ -1338,33 +1275,21 @@ export default function Home() {
         .row {
           display: flex;
           justify-content: space-between;
-
           padding: 13px;
           margin-top: 8px;
-
           border-radius: 12px;
-
-          background:
-            rgba(255,255,255,.05);
+          background: rgba(255,255,255,.05);
         }
 
         .ranking {
           display: grid;
-
-          grid-template-columns:
-            45px 1fr auto;
-
+          grid-template-columns: 45px 1fr auto;
           align-items: center;
-
           gap: 10px;
-
           padding: 13px;
           margin-top: 8px;
-
           border-radius: 14px;
-
-          background:
-            rgba(255,255,255,.05);
+          background: rgba(255,255,255,.05);
         }
 
         .rank {
@@ -1385,11 +1310,8 @@ export default function Home() {
         .message {
           padding: 14px;
           margin-bottom: 15px;
-
           text-align: center;
-
           border-radius: 13px;
-
           background: #172535;
           color: #fbbf24;
         }
@@ -1403,8 +1325,7 @@ export default function Home() {
         @media(max-width:650px) {
 
           .stats {
-            grid-template-columns:
-              repeat(2,1fr);
+            grid-template-columns: repeat(2,1fr);
           }
 
           .three {
