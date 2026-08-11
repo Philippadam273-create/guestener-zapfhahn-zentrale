@@ -47,6 +47,10 @@ export default function Home() {
   const [selectedProfile, setSelectedProfile] = useState("");
   const [message, setMessage] = useState("");
 
+  const [paidMembers, setPaidMembers] = useState<
+    Record<string, boolean>
+  >({});
+
   useEffect(() => {
     loadEvents();
     loadProfiles();
@@ -62,6 +66,20 @@ export default function Home() {
 
     loadMembers();
     loadDrinks();
+
+    const savedPaid = localStorage.getItem(
+      `guesten-paid-${eventId}`
+    );
+
+    if (savedPaid) {
+      try {
+        setPaidMembers(JSON.parse(savedPaid));
+      } catch {
+        setPaidMembers({});
+      }
+    } else {
+      setPaidMembers({});
+    }
   }, [eventId]);
 
   async function loadEvents() {
@@ -256,6 +274,10 @@ export default function Home() {
   async function removeParticipant(
     memberId: string
   ) {
+    const member = members.find(
+      (item) => item.id === memberId
+    );
+
     const { error } = await supabase
       .from("event_members")
       .delete()
@@ -267,6 +289,16 @@ export default function Home() {
           error.message
       );
       return;
+    }
+
+    if (member) {
+      const copy = {
+        ...paidMembers,
+      };
+
+      delete copy[member.profile_id];
+
+      savePaidMembers(copy);
     }
 
     await loadMembers();
@@ -418,6 +450,37 @@ export default function Home() {
     );
   }
 
+  function savePaidMembers(
+    updated: Record<string, boolean>
+  ) {
+    setPaidMembers(updated);
+
+    if (!eventId) return;
+
+    localStorage.setItem(
+      `guesten-paid-${eventId}`,
+      JSON.stringify(updated)
+    );
+  }
+
+  function togglePaid(
+    profileId: string
+  ) {
+    const updated = {
+      ...paidMembers,
+      [profileId]:
+        !paidMembers[profileId],
+    };
+
+    savePaidMembers(updated);
+
+    setMessage(
+      updated[profileId]
+        ? "✅ Zahlung als bezahlt markiert."
+        : "↩️ Zahlung wieder auf offen gesetzt."
+    );
+  }
+
   const totalLiters =
     drinks.reduce(
       (sum, drink) =>
@@ -462,6 +525,21 @@ export default function Home() {
             profile.id
         )
     );
+
+  const amountPerPerson =
+    members.length > 0
+      ? totalCost / members.length
+      : 0;
+
+  const paidCount = members.filter(
+    (member) =>
+      paidMembers[
+        member.profile_id
+      ]
+  ).length;
+
+  const openCount =
+    members.length - paidCount;
 
   return (
     <main className="page">
@@ -950,80 +1028,103 @@ export default function Home() {
             </span>
 
             <strong>
-              {members.length
-                ? (
-                    totalCost /
-                    members.length
-                  ).toFixed(2)
-                : "0.00"}{" "}
-              €
+              {amountPerPerson.toFixed(2)} €
             </strong>
           </div>
 
-          <div className="row">
-            <span>
-              🏆 Gesamtpunkte
-            </span>
+          <div className="paymentSummary">
 
-            <strong>
-              {totalPoints}
-            </strong>
-          </div>
-
-          {members.length > 0 && (
-
-            <div className="costList">
-
-              <h3>
-                💶 Anteil pro Teilnehmer
-              </h3>
-
-              {members.map(
-                (member) => {
-
-                  const memberCost =
-                    drinks
-                      .filter(
-                        (drink) =>
-                          drink.profile_id ===
-                          member.profile_id
-                      )
-                      .reduce(
-                        (sum, drink) =>
-                          sum +
-                          Number(
-                            drink.preis || 0
-                          ),
-                        0
-                      );
-
-                  return (
-                    <div
-                      className="costPerson"
-                      key={member.id}
-                    >
-
-                      <div>
-                        <strong>
-                          {member.username}
-                        </strong>
-
-                        <small>
-                          Eigene Getränke
-                        </small>
-                      </div>
-
-                      <strong>
-                        {memberCost.toFixed(2)} €
-                      </strong>
-
-                    </div>
-                  );
-
-                }
-              )}
-
+            <div className="paymentBox paid">
+              <span>✅</span>
+              <strong>
+                {paidCount}
+              </strong>
+              <small>
+                Bezahlt
+              </small>
             </div>
+
+            <div className="paymentBox open">
+              <span>⏳</span>
+              <strong>
+                {openCount}
+              </strong>
+              <small>
+                Offen
+              </small>
+            </div>
+
+          </div>
+
+          <h3>
+            💶 Zahlungen
+          </h3>
+
+          {members.length === 0 ? (
+
+            <div className="empty">
+              Noch keine Teilnehmer.
+            </div>
+
+          ) : (
+
+            members.map((member) => {
+
+              const isPaid =
+                !!paidMembers[
+                  member.profile_id
+                ];
+
+              return (
+                <div
+                  className={
+                    isPaid
+                      ? "paymentPerson paidRow"
+                      : "paymentPerson"
+                  }
+                  key={member.id}
+                >
+
+                  <div className="paymentAvatar">
+                    {member.username
+                      .charAt(0)
+                      .toUpperCase()}
+                  </div>
+
+                  <div className="paymentInfo">
+
+                    <strong>
+                      {member.username}
+                    </strong>
+
+                    <small>
+                      Anteil:{" "}
+                      {amountPerPerson.toFixed(2)}
+                      {" €"}
+                    </small>
+
+                  </div>
+
+                  <button
+                    className={
+                      isPaid
+                        ? "paidButton"
+                        : "openButton"
+                    }
+                    onClick={() =>
+                      togglePaid(
+                        member.profile_id
+                      )
+                    }
+                  >
+                    {isPaid
+                      ? "✅ Bezahlt"
+                      : "⏳ Offen"}
+                  </button>
+
+                </div>
+              );
+            })
 
           )}
 
@@ -1241,7 +1342,8 @@ export default function Home() {
           background: rgba(255,255,255,.05);
         }
 
-        .avatar {
+        .avatar,
+        .paymentAvatar {
           width: 38px;
           height: 38px;
           border-radius: 50%;
@@ -1333,20 +1435,68 @@ export default function Home() {
           background: rgba(255,255,255,.05);
         }
 
-        .costList {
+        .paymentSummary {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
           margin-top: 15px;
-          padding-top: 5px;
-          border-top: 1px solid rgba(255,255,255,.08);
         }
 
-        .costPerson {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 13px;
-          margin-top: 8px;
-          border-radius: 14px;
+        .paymentBox {
+          text-align: center;
+          padding: 15px;
+          border-radius: 15px;
           background: rgba(255,255,255,.05);
+        }
+
+        .paymentBox span {
+          display: block;
+          font-size: 24px;
+        }
+
+        .paymentBox strong {
+          display: block;
+          font-size: 25px;
+          margin-top: 4px;
+        }
+
+        .paymentBox.paid {
+          border: 1px solid rgba(34,197,94,.35);
+        }
+
+        .paymentBox.open {
+          border: 1px solid rgba(245,158,11,.35);
+        }
+
+        .paymentPerson {
+          display: grid;
+          grid-template-columns: 40px 1fr auto;
+          align-items: center;
+          gap: 10px;
+          padding: 12px;
+          margin-top: 8px;
+          border-radius: 15px;
+          background: rgba(255,255,255,.05);
+          border: 1px solid transparent;
+        }
+
+        .paidRow {
+          border-color: rgba(34,197,94,.4);
+          background: rgba(34,197,94,.08);
+        }
+
+        .paymentInfo {
+          min-width: 0;
+        }
+
+        .paidButton {
+          background: #22c55e;
+          color: white;
+        }
+
+        .openButton {
+          background: #f59e0b;
+          color: #111;
         }
 
         .ranking {
@@ -1406,6 +1556,15 @@ export default function Home() {
 
           .assign {
             grid-template-columns: 1fr;
+          }
+
+          .paymentPerson {
+            grid-template-columns: 40px 1fr;
+          }
+
+          .paymentPerson button {
+            grid-column: 1 / -1;
+            width: 100%;
           }
 
         }
