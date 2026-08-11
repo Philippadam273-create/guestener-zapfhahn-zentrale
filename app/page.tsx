@@ -31,6 +31,15 @@ type Drink = {
   profile_id: string | null;
 };
 
+type Payment = {
+  id: string;
+  event_id: string;
+  profile_id: string | null;
+  bezahlt_von: string | null;
+  betrag: number | null;
+  status: "offen" | "bezahlt";
+};
+
 export default function Home() {
   const [events, setEvents] = useState<any[]>([]);
   const [eventId, setEventId] = useState("");
@@ -38,6 +47,7 @@ export default function Home() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [drinks, setDrinks] = useState<Drink[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
 
   const [drinkName, setDrinkName] = useState("");
   const [liters, setLiters] = useState("0.5");
@@ -46,10 +56,6 @@ export default function Home() {
 
   const [selectedProfile, setSelectedProfile] = useState("");
   const [message, setMessage] = useState("");
-
-  const [paidMembers, setPaidMembers] = useState<
-    Record<string, boolean>
-  >({});
 
   useEffect(() => {
     loadEvents();
@@ -66,20 +72,7 @@ export default function Home() {
 
     loadMembers();
     loadDrinks();
-
-    const savedPaid = localStorage.getItem(
-      `guesten-paid-${eventId}`
-    );
-
-    if (savedPaid) {
-      try {
-        setPaidMembers(JSON.parse(savedPaid));
-      } catch {
-        setPaidMembers({});
-      }
-    } else {
-      setPaidMembers({});
-    }
+    loadPayments();
   }, [eventId]);
 
   async function loadEvents() {
@@ -125,7 +118,10 @@ export default function Home() {
       });
 
     if (error) {
-      setMessage("❌ Profile: " + error.message);
+      setMessage(
+        "❌ Profile: " +
+          error.message
+      );
       return;
     }
 
@@ -215,6 +211,27 @@ export default function Home() {
     setDrinks(data || []);
   }
 
+  async function loadPayments() {
+    if (!eventId) return;
+
+    const { data, error } = await supabase
+      .from("payments")
+      .select(
+        "id,event_id,profile_id,bezahlt_von,betrag,status"
+      )
+      .eq("event_id", eventId);
+
+    if (error) {
+      setMessage(
+        "❌ Zahlungen: " +
+          error.message
+      );
+      return;
+    }
+
+    setPayments(data || []);
+  }
+
   async function addParticipant() {
     setMessage("");
 
@@ -274,10 +291,6 @@ export default function Home() {
   async function removeParticipant(
     memberId: string
   ) {
-    const member = members.find(
-      (item) => item.id === memberId
-    );
-
     const { error } = await supabase
       .from("event_members")
       .delete()
@@ -289,16 +302,6 @@ export default function Home() {
           error.message
       );
       return;
-    }
-
-    if (member) {
-      const copy = {
-        ...paidMembers,
-      };
-
-      delete copy[member.profile_id];
-
-      savePaidMembers(copy);
     }
 
     await loadMembers();
@@ -409,75 +412,95 @@ export default function Home() {
       return;
     }
 
-    const { data, error: syncError } =
-      await supabase.rpc(
-        "sync_profile_stats",
-        {
-          p_profile_id:
-            profileId,
-        }
-      );
-
-    if (syncError) {
-      setMessage(
-        "❌ Punkte konnten nicht berechnet werden: " +
-          syncError.message
-      );
-      return;
-    }
+    await supabase.rpc(
+      "sync_profile_stats",
+      {
+        p_profile_id:
+          profileId,
+      }
+    );
 
     await loadProfiles();
     await loadMembers();
     await loadDrinks();
 
-    const result =
-      Array.isArray(data)
-        ? data[0]
-        : data;
-
     setMessage(
       "🍺 Getränk zugeordnet! " +
-        member.username +
-        ": " +
-        Number(
-          result?.drinks_count || 0
-        ) +
-        " Getränke · " +
-        Number(
-          result?.points || 0
-        ) +
-        " Punkte"
+        member.username
     );
   }
 
-  function savePaidMembers(
-    updated: Record<string, boolean>
+  async function togglePayment(
+    member: Member
   ) {
-    setPaidMembers(updated);
-
-    if (!eventId) return;
-
-    localStorage.setItem(
-      `guesten-paid-${eventId}`,
-      JSON.stringify(updated)
+    setMessage(
+      "⏳ Zahlung wird gespeichert..."
     );
-  }
 
-  function togglePaid(
-    profileId: string
-  ) {
-    const updated = {
-      ...paidMembers,
-      [profileId]:
-        !paidMembers[profileId],
-    };
+    const existing =
+      payments.find(
+        (payment) =>
+          payment.profile_id ===
+            member.profile_id &&
+          payment.event_id ===
+            eventId
+      );
 
-    savePaidMembers(updated);
+    const newStatus =
+      existing?.status === "bezahlt"
+        ? "offen"
+        : "bezahlt";
+
+    if (existing) {
+      const { error } =
+        await supabase
+          .from("payments")
+          .update({
+            status: newStatus,
+            betrag:
+              amountPerPerson,
+            bezahlt_von:
+              member.username,
+          })
+          .eq("id", existing.id);
+
+      if (error) {
+        setMessage(
+          "❌ Zahlung: " +
+            error.message
+        );
+        return;
+      }
+    } else {
+      const { error } =
+        await supabase
+          .from("payments")
+          .insert({
+            event_id: eventId,
+            profile_id:
+              member.profile_id,
+            bezahlt_von:
+              member.username,
+            betrag:
+              amountPerPerson,
+            status: newStatus,
+          });
+
+      if (error) {
+        setMessage(
+          "❌ Zahlung: " +
+            error.message
+        );
+        return;
+      }
+    }
+
+    await loadPayments();
 
     setMessage(
-      updated[profileId]
-        ? "✅ Zahlung als bezahlt markiert."
-        : "↩️ Zahlung wieder auf offen gesetzt."
+      newStatus === "bezahlt"
+        ? `✅ ${member.username} hat bezahlt.`
+        : `↩️ ${member.username} ist wieder offen.`
     );
   }
 
@@ -509,12 +532,32 @@ export default function Home() {
       0
     );
 
+  const amountPerPerson =
+    members.length > 0
+      ? totalCost / members.length
+      : 0;
+
   const ranking =
     [...members].sort(
       (a, b) =>
         Number(b.points) -
         Number(a.points)
     );
+
+  const paidCount =
+    members.filter((member) =>
+      payments.some(
+        (payment) =>
+          payment.profile_id ===
+            member.profile_id &&
+          payment.status ===
+            "bezahlt"
+      )
+    ).length;
+
+  const openCount =
+    members.length -
+    paidCount;
 
   const availableProfiles =
     profiles.filter(
@@ -525,21 +568,6 @@ export default function Home() {
             profile.id
         )
     );
-
-  const amountPerPerson =
-    members.length > 0
-      ? totalCost / members.length
-      : 0;
-
-  const paidCount = members.filter(
-    (member) =>
-      paidMembers[
-        member.profile_id
-      ]
-  ).length;
-
-  const openCount =
-    members.length - paidCount;
 
   return (
     <main className="page">
@@ -830,12 +858,6 @@ export default function Home() {
               hinzufügen.
             </p>
 
-          ) : drinks.length === 0 ? (
-
-            <p>
-              🍺 Zuerst Getränk speichern.
-            </p>
-
           ) : (
 
             members.map((member) => (
@@ -881,7 +903,7 @@ export default function Home() {
                   {drinks.map(
                     (drink) => {
 
-                      const alreadyAssigned =
+                      const assigned =
                         drink.profile_id !==
                         null;
 
@@ -889,9 +911,7 @@ export default function Home() {
                         <option
                           key={drink.id}
                           value={drink.id}
-                          disabled={
-                            alreadyAssigned
-                          }
+                          disabled={assigned}
                         >
 
                           {drink.drink_name ||
@@ -908,8 +928,8 @@ export default function Home() {
 
                           L
 
-                          {alreadyAssigned
-                            ? " ✓ zugeordnet"
+                          {assigned
+                            ? " ✓"
                             : ""}
 
                         </option>
@@ -1036,9 +1056,11 @@ export default function Home() {
 
             <div className="paymentBox paid">
               <span>✅</span>
+
               <strong>
                 {paidCount}
               </strong>
+
               <small>
                 Bezahlt
               </small>
@@ -1046,9 +1068,11 @@ export default function Home() {
 
             <div className="paymentBox open">
               <span>⏳</span>
+
               <strong>
                 {openCount}
               </strong>
+
               <small>
                 Offen
               </small>
@@ -1070,10 +1094,18 @@ export default function Home() {
 
             members.map((member) => {
 
+              const payment =
+                payments.find(
+                  (item) =>
+                    item.profile_id ===
+                      member.profile_id &&
+                    item.event_id ===
+                      eventId
+                );
+
               const isPaid =
-                !!paidMembers[
-                  member.profile_id
-                ];
+                payment?.status ===
+                "bezahlt";
 
               return (
                 <div
@@ -1100,7 +1132,7 @@ export default function Home() {
                     <small>
                       Anteil:{" "}
                       {amountPerPerson.toFixed(2)}
-                      {" €"}
+                      €
                     </small>
 
                   </div>
@@ -1112,9 +1144,7 @@ export default function Home() {
                         : "openButton"
                     }
                     onClick={() =>
-                      togglePaid(
-                        member.profile_id
-                      )
+                      togglePayment(member)
                     }
                   >
                     {isPaid
@@ -1124,6 +1154,7 @@ export default function Home() {
 
                 </div>
               );
+
             })
 
           )}
