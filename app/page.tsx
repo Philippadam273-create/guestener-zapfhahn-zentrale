@@ -44,9 +44,7 @@ export default function Home() {
   const [alcohol, setAlcohol] = useState("5");
   const [price, setPrice] = useState("0");
 
-  const [selectedProfile, setSelectedProfile] =
-    useState("");
-
+  const [selectedProfile, setSelectedProfile] = useState("");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -109,9 +107,7 @@ export default function Home() {
       });
 
     if (error) {
-      setMessage(
-        "❌ Profile: " + error.message
-      );
+      setMessage("❌ Profile: " + error.message);
       return;
     }
 
@@ -123,8 +119,7 @@ export default function Home() {
 
     const { data, error } = await supabase
       .from("event_members")
-      .select(
-        `
+      .select(`
         id,
         profile_id,
         profiles (
@@ -133,8 +128,7 @@ export default function Home() {
           points,
           drinks_count
         )
-      `
-      )
+      `)
       .eq("event_id", eventId);
 
     if (error) {
@@ -175,8 +169,7 @@ export default function Home() {
 
     const { data, error } = await supabase
       .from("drinks")
-      .select(
-        `
+      .select(`
         id,
         event_id,
         drink_name,
@@ -187,8 +180,7 @@ export default function Home() {
         alkohol,
         preis,
         profile_id
-      `
-      )
+      `)
       .eq("event_id", eventId)
       .order("created_at", {
         ascending: false,
@@ -924,7 +916,6 @@ export default function Home() {
 
               </div>
             );
-
           })}
 
         </section>
@@ -978,6 +969,63 @@ export default function Home() {
               {totalPoints}
             </strong>
           </div>
+
+          {members.length > 0 && (
+
+            <div className="costList">
+
+              <h3>
+                💶 Anteil pro Teilnehmer
+              </h3>
+
+              {members.map(
+                (member) => {
+
+                  const memberCost =
+                    drinks
+                      .filter(
+                        (drink) =>
+                          drink.profile_id ===
+                          member.profile_id
+                      )
+                      .reduce(
+                        (sum, drink) =>
+                          sum +
+                          Number(
+                            drink.preis || 0
+                          ),
+                        0
+                      );
+
+                  return (
+                    <div
+                      className="costPerson"
+                      key={member.id}
+                    >
+
+                      <div>
+                        <strong>
+                          {member.username}
+                        </strong>
+
+                        <small>
+                          Eigene Getränke
+                        </small>
+                      </div>
+
+                      <strong>
+                        {memberCost.toFixed(2)} €
+                      </strong>
+
+                    </div>
+                  );
+
+                }
+              )}
+
+            </div>
+
+          )}
 
         </section>
 
@@ -1105,6 +1153,10 @@ export default function Home() {
         h2 {
           margin: 0 0 8px;
           font-size: 20px;
+        }
+
+        h3 {
+          margin: 20px 0 10px;
         }
 
         p {
@@ -1278,6 +1330,22 @@ export default function Home() {
           padding: 13px;
           margin-top: 8px;
           border-radius: 12px;
+          background: rgba(255,255,255,.05);
+        }
+
+        .costList {
+          margin-top: 15px;
+          padding-top: 5px;
+          border-top: 1px solid rgba(255,255,255,.08);
+        }
+
+        .costPerson {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 13px;
+          margin-top: 8px;
+          border-radius: 14px;
           background: rgba(255,255,255,.05);
         }
 
