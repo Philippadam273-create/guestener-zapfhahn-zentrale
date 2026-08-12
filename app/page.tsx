@@ -78,10 +78,17 @@ export default function Home() {
   const [currentProfileId, setCurrentProfileId] = useState("");
 
   const [message, setMessage] = useState("");
+
   const [inviteCode, setInviteCode] = useState("");
   const [joinCode, setJoinCode] = useState("");
 
   const [now, setNow] = useState(Date.now());
+
+  /*
+   * ============================================================
+   * START
+   * ============================================================
+   */
 
   useEffect(() => {
     loadEvents();
@@ -94,6 +101,17 @@ export default function Home() {
     if (savedProfile) {
       setCurrentProfileId(savedProfile);
     }
+  }, []);
+
+  /*
+   * Promille automatisch jede Minute aktualisieren.
+   */
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 30000);
+
+    return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -112,17 +130,10 @@ export default function Home() {
   }, [eventId]);
 
   /*
-   * Promille wird jede Minute neu berechnet.
-   * Zusätzlich sorgt der State dafür, dass React
-   * die komplette Anzeige aktualisiert.
+   * ============================================================
+   * DATEN LADEN
+   * ============================================================
    */
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setNow(Date.now());
-    }, 60000);
-
-    return () => clearInterval(timer);
-  }, []);
 
   async function loadEvents() {
     const { data, error } = await supabase
@@ -169,9 +180,7 @@ export default function Home() {
       });
 
     if (error) {
-      setMessage(
-        "❌ Profile: " + error.message
-      );
+      setMessage("❌ Profile: " + error.message);
       return;
     }
 
@@ -179,7 +188,7 @@ export default function Home() {
 
     setProfiles(result);
 
-    if (!currentProfileId && result.length > 0) {
+    if (result.length > 0) {
       const saved = localStorage.getItem(
         "guesten-current-profile"
       );
@@ -202,18 +211,6 @@ export default function Home() {
     }
   }
 
-  /*
-   * WICHTIG:
-   *
-   * drinks_count und points aus profiles werden
-   * NICHT mehr als Quelle für die Anzeige benutzt.
-   *
-   * Die tatsächlichen Trinkvorgänge in
-   * drink_consumptions sind die Wahrheit.
-   *
-   * Dadurch können "8 getrunken", "4 getrunken"
-   * und Ranking nicht mehr auseinanderlaufen.
-   */
   async function loadMembers() {
     if (!eventId) return;
 
@@ -225,6 +222,8 @@ export default function Home() {
         profiles (
           id,
           username,
+          points,
+          drinks_count,
           gewicht_kg,
           alter,
           geschlecht
@@ -234,17 +233,14 @@ export default function Home() {
 
     if (error) {
       setMessage(
-        "❌ Teilnehmer: " +
-          error.message
+        "❌ Teilnehmer: " + error.message
       );
       return;
     }
 
     const result: Member[] =
       (data || []).map((row: any) => {
-        const profile = Array.isArray(
-          row.profiles
-        )
+        const profile = Array.isArray(row.profiles)
           ? row.profiles[0]
           : row.profiles;
 
@@ -252,10 +248,11 @@ export default function Home() {
           id: row.id,
           profile_id: row.profile_id,
           username:
-            profile?.username ||
-            "Teilnehmer",
-          points: 0,
-          drinks: 0,
+            profile?.username || "Teilnehmer",
+          points: Number(profile?.points || 0),
+          drinks: Number(
+            profile?.drinks_count || 0
+          ),
           gewicht_kg: Number(
             profile?.gewicht_kg || 82
           ),
@@ -263,8 +260,7 @@ export default function Home() {
             profile?.alter || 33
           ),
           geschlecht:
-            profile?.geschlecht ||
-            "männlich",
+            profile?.geschlecht || "männlich",
         };
       });
 
@@ -294,8 +290,7 @@ export default function Home() {
 
     if (error) {
       setMessage(
-        "❌ Getränke: " +
-          error.message
+        "❌ Getränke: " + error.message
       );
       return;
     }
@@ -318,8 +313,7 @@ export default function Home() {
 
     if (error) {
       setMessage(
-        "❌ Trinkverlauf: " +
-          error.message
+        "❌ Trinkverlauf: " + error.message
       );
       return;
     }
@@ -339,8 +333,7 @@ export default function Home() {
 
     if (error) {
       setMessage(
-        "❌ Zahlungen: " +
-          error.message
+        "❌ Zahlungen: " + error.message
       );
       return;
     }
@@ -351,77 +344,22 @@ export default function Home() {
   async function loadInviteCode() {
     if (!eventId) return;
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("events")
       .select("invite_code")
       .eq("id", eventId)
       .single();
 
-    setInviteCode(
-      data?.invite_code || ""
-    );
+    if (error) return;
+
+    setInviteCode(data?.invite_code || "");
   }
 
   /*
-   * Die tatsächlichen Teilnehmerzahlen,
-   * Punkte und Getränke werden aus den
-   * gespeicherten Trinkvorgängen berechnet.
+   * ============================================================
+   * EINLADUNG
+   * ============================================================
    */
-  function getMemberDrinkCount(
-    profileId: string
-  ) {
-    return consumptions.filter(
-      (item) =>
-        item.profile_id === profileId
-    ).length;
-  }
-
-  function getMemberPoints(
-    profileId: string
-  ) {
-    return getMemberDrinkCount(
-      profileId
-    ) * 10;
-  }
-
-  function getMember(
-    profileId: string
-  ) {
-    return members.find(
-      (member) =>
-        member.profile_id === profileId
-    );
-  }
-
-  function getDrinkName(
-    drink: Drink
-  ) {
-    return (
-      drink.drink_name ||
-      drink.getraenk ||
-      "Getränk"
-    );
-  }
-
-  function getDrinkLiters(
-    drink: Drink
-  ) {
-    return Number(
-      drink.liters ??
-        drink.menge ??
-        0
-    );
-  }
-
-  function getDrinkAlcohol(
-    drink: Drink
-  ) {
-    return Number(
-      drink.alcohol_percent ??
-        drink.alkohol ??
-        0
-    );
-  }
 
   async function createInviteCode() {
     if (!eventId) return;
@@ -440,13 +378,13 @@ export default function Home() {
 
     if (error) {
       setMessage(
-        "❌ Code: " +
-          error.message
+        "❌ Code: " + error.message
       );
       return;
     }
 
     setInviteCode(code);
+
     setMessage(
       "✅ Einladungscode erstellt."
     );
@@ -506,8 +444,7 @@ export default function Home() {
     const profile =
       profiles.find(
         (item) =>
-          item.id ===
-          currentProfileId
+          item.id === currentProfileId
       ) || profiles[0];
 
     if (!profile) {
@@ -539,17 +476,16 @@ export default function Home() {
       return;
     }
 
-    const {
-      error: insertError,
-    } = await supabase
-      .from("event_members")
-      .insert({
-        event_id: event.id,
-        profile_id: profile.id,
-        joined_at:
-          new Date().toISOString(),
-        joined_via_code: code,
-      });
+    const { error: insertError } =
+      await supabase
+        .from("event_members")
+        .insert({
+          event_id: event.id,
+          profile_id: profile.id,
+          joined_at:
+            new Date().toISOString(),
+          joined_via_code: code,
+        });
 
     if (insertError) {
       setMessage(
@@ -568,6 +504,12 @@ export default function Home() {
       `✅ Du bist dem Event „${event.title}“ beigetreten.`
     );
   }
+
+  /*
+   * ============================================================
+   * TEILNEHMER
+   * ============================================================
+   */
 
   async function addParticipant() {
     setMessage("");
@@ -605,8 +547,7 @@ export default function Home() {
       .from("event_members")
       .insert({
         event_id: eventId,
-        profile_id:
-          selectedProfile,
+        profile_id: selectedProfile,
         joined_at:
           new Date().toISOString(),
       });
@@ -653,6 +594,12 @@ export default function Home() {
     );
   }
 
+  /*
+   * ============================================================
+   * GETRÄNKE
+   * ============================================================
+   */
+
   async function saveDrink() {
     setMessage("");
 
@@ -670,6 +617,45 @@ export default function Home() {
       return;
     }
 
+    const drinkLiters =
+      Number(liters);
+
+    const drinkAlcohol =
+      Number(alcohol);
+
+    const drinkPrice =
+      Number(price);
+
+    if (
+      !Number.isFinite(drinkLiters) ||
+      drinkLiters <= 0
+    ) {
+      setMessage(
+        "❌ Bitte eine gültige Literzahl eingeben."
+      );
+      return;
+    }
+
+    if (
+      !Number.isFinite(drinkAlcohol) ||
+      drinkAlcohol < 0
+    ) {
+      setMessage(
+        "❌ Bitte einen gültigen Alkoholwert eingeben."
+      );
+      return;
+    }
+
+    if (
+      !Number.isFinite(drinkPrice) ||
+      drinkPrice < 0
+    ) {
+      setMessage(
+        "❌ Bitte einen gültigen Preis eingeben."
+      );
+      return;
+    }
+
     const {
       error: insertError,
     } = await supabase
@@ -680,13 +666,13 @@ export default function Home() {
           drinkName.trim(),
         getraenk:
           drinkName.trim(),
-        liters: Number(liters),
-        menge: Number(liters),
+        liters: drinkLiters,
+        menge: drinkLiters,
         alcohol_percent:
-          Number(alcohol),
+          drinkAlcohol,
         alkohol:
-          Number(alcohol),
-        preis: Number(price),
+          drinkAlcohol,
+        preis: drinkPrice,
         quantity: 1,
       });
 
@@ -711,17 +697,15 @@ export default function Home() {
   }
 
   /*
-   * JEDER Klick auf ein Getränk erzeugt
-   * einen NEUEN Trinkvorgang.
+   * Jeder Klick auf ein Getränk erzeugt
+   * einen neuen Trinkvorgang.
    *
-   * Das Getränk bleibt immer sichtbar.
+   * Das Getränk bleibt weiterhin verfügbar.
    */
   async function drinkNow(
     drinkId: string,
     profileId: string
   ) {
-    if (!eventId) return;
-
     if (!profileId) {
       setMessage(
         "❌ Kein Teilnehmer ausgewählt."
@@ -730,7 +714,11 @@ export default function Home() {
     }
 
     const member =
-      getMember(profileId);
+      members.find(
+        (item) =>
+          item.profile_id ===
+          profileId
+      );
 
     if (!member) {
       setMessage(
@@ -761,22 +749,17 @@ export default function Home() {
       return;
     }
 
-    /*
-     * profiles.points und profiles.drinks_count
-     * werden ebenfalls synchronisiert.
-     *
-     * Die Anzeige selbst benutzt aber immer
-     * drink_consumptions als Quelle.
-     */
-    const newDrinks =
-      getMemberDrinkCount(
-        profileId
-      ) + 1;
-
     const newPoints =
-      newDrinks * 10;
+      Number(member.points || 0) +
+      10;
 
-    await supabase
+    const newDrinks =
+      Number(member.drinks || 0) +
+      1;
+
+    const {
+      error: profileError,
+    } = await supabase
       .from("profiles")
       .update({
         points: newPoints,
@@ -784,32 +767,31 @@ export default function Home() {
       })
       .eq("id", profileId);
 
-    await loadConsumptions();
-    await loadProfiles();
-    await loadMembers();
-
-    const drink =
-      drinks.find(
-        (item) => item.id === drinkId
+    if (profileError) {
+      setMessage(
+        "❌ Profil: " +
+          profileError.message
       );
+      return;
+    }
+
+    await Promise.all([
+      loadProfiles(),
+      loadMembers(),
+      loadConsumptions(),
+    ]);
 
     setMessage(
-      `🍺 ${member.username} hat ${
-        drink
-          ? getDrinkName(drink)
-          : "ein Getränk"
-      } getrunken. +10 Punkte`
+      `🍺 ${member.username} hat ein Getränk getrunken. +10 Punkte`
     );
   }
 
   /*
-   * Eigene Getränke entfernen.
-   *
-   * Der entsprechende Trinkvorgang wird gelöscht
-   * und Punkte/Getränke werden automatisch
-   * aus den verbleibenden Trinkvorgängen
-   * neu berechnet.
+   * ============================================================
+   * TRINKVORGANG ENTFERNEN
+   * ============================================================
    */
+
   async function removeConsumption(
     consumption: Consumption
   ) {
@@ -822,6 +804,15 @@ export default function Home() {
       );
       return;
     }
+
+    const member =
+      members.find(
+        (item) =>
+          item.profile_id ===
+          consumption.profile_id
+      );
+
+    if (!member) return;
 
     const {
       error: deleteError,
@@ -841,67 +832,61 @@ export default function Home() {
       return;
     }
 
-    /*
-     * Erst Trinkvorgänge neu laden,
-     * danach daraus die korrekten Werte
-     * berechnen.
-     */
-    const {
-      data: remaining,
-      error: reloadError,
-    } = await supabase
-      .from("drink_consumptions")
-      .select(
-        "id,event_id,drink_id,profile_id,created_at"
-      )
-      .eq("event_id", eventId);
+    const newPoints =
+      Math.max(
+        0,
+        Number(member.points || 0) -
+          10
+      );
 
-    if (reloadError) {
+    const newDrinks =
+      Math.max(
+        0,
+        Number(member.drinks || 0) -
+          1
+      );
+
+    const { error: profileError } =
+      await supabase
+        .from("profiles")
+        .update({
+          points: newPoints,
+          drinks_count:
+            newDrinks,
+        })
+        .eq(
+          "id",
+          consumption.profile_id
+        );
+
+    if (profileError) {
       setMessage(
-        "❌ Trinkverlauf: " +
-          reloadError.message
+        "❌ Profil: " +
+          profileError.message
       );
       return;
     }
 
-    const remainingForProfile =
-      (remaining || []).filter(
-        (item) =>
-          item.profile_id ===
-          consumption.profile_id
-      ).length;
-
-    await supabase
-      .from("profiles")
-      .update({
-        points:
-          remainingForProfile * 10,
-        drinks_count:
-          remainingForProfile,
-      })
-      .eq(
-        "id",
-        consumption.profile_id
-      );
-
-    await loadConsumptions();
-    await loadProfiles();
-    await loadMembers();
+    await Promise.all([
+      loadProfiles(),
+      loadMembers(),
+      loadConsumptions(),
+    ]);
 
     setMessage(
       "↩️ Getränk entfernt."
     );
   }
 
+  /*
+   * ============================================================
+   * ZAHLUNGEN
+   * ============================================================
+   */
+
   async function togglePayment(
     member: Member
   ) {
-    const amountPerPerson =
-      members.length > 0
-        ? totalCost /
-          members.length
-        : 0;
-
     const existing =
       payments.find(
         (payment) =>
@@ -977,40 +962,128 @@ export default function Home() {
   }
 
   /*
-   * Promille:
-   *
-   * Jeder einzelne Trinkvorgang wird anhand
-   * seiner eigenen Uhrzeit berücksichtigt.
-   *
-   * Dadurch sinkt älterer Alkohol weiter,
-   * während neuere Getränke ihren aktuellen
-   * Wert behalten.
+   * ============================================================
+   * HILFSFUNKTIONEN
+   * ============================================================
    */
+
+  function getDrinkName(
+    drink: Drink
+  ) {
+    return (
+      drink.drink_name ||
+      drink.getraenk ||
+      "Getränk"
+    );
+  }
+
+  function getDrinkLiters(
+    drink: Drink
+  ) {
+    return Number(
+      drink.liters ??
+        drink.menge ??
+        0
+    );
+  }
+
+  function getDrinkAlcohol(
+    drink: Drink
+  ) {
+    return Number(
+      drink.alcohol_percent ??
+        drink.alkohol ??
+        0
+    );
+  }
+
+  function getDrinkPrice(
+    drink: Drink
+  ) {
+    return Number(
+      drink.preis || 0
+    );
+  }
+
+  /*
+   * ============================================================
+   * PROMILLE
+   * ============================================================
+   *
+   * Rechnerische Schätzung.
+   *
+   * Für jeden einzelnen Trinkvorgang:
+   *
+   * 1. Alkoholmenge in Gramm berechnen.
+   * 2. Widmark-Verteilungsfaktor verwenden.
+   * 3. Zeit seit dem jeweiligen Getränk berücksichtigen.
+   * 4. Geschätzten Alkoholabbau abziehen.
+   *
+   * Wichtig:
+   * Das ist KEIN medizinisches Messverfahren.
+   */
+
   function calculatePromille(
     profileId: string
   ) {
     const member =
-      getMember(profileId);
+      members.find(
+        (item) =>
+          item.profile_id ===
+          profileId
+      );
 
     if (!member) return 0;
 
-    const personal =
+    const personalConsumptions =
       consumptions.filter(
         (item) =>
           item.profile_id ===
           profileId
       );
 
+    if (
+      personalConsumptions.length ===
+      0
+    ) {
+      return 0;
+    }
+
+    const weight =
+      Number(member.gewicht_kg);
+
+    if (
+      !Number.isFinite(weight) ||
+      weight <= 0
+    ) {
+      return 0;
+    }
+
+    const gender =
+      (
+        member.geschlecht || ""
+      ).toLowerCase();
+
     const distribution =
-      member.geschlecht
-        ?.toLowerCase()
-        .includes("frau")
+      gender.includes("frau") ||
+      gender.includes("weib")
         ? 0.55
         : 0.68;
 
-    let promille = 0;
+    let totalPromille = 0;
 
-    for (const consumption of personal) {
+    /*
+     * Alkoholabbau pro Stunde.
+     * Für die App verwenden wir hier
+     * einen festen Schätzwert.
+     */
+    const eliminationRate =
+      0.15;
+
+    for (
+      const consumption of
+        personalConsumptions
+    ) {
       const drink =
         drinks.find(
           (item) =>
@@ -1026,18 +1099,31 @@ export default function Home() {
       const alcoholPercent =
         getDrinkAlcohol(drink);
 
+      if (
+        volume <= 0 ||
+        alcoholPercent <= 0
+      ) {
+        continue;
+      }
+
+      /*
+       * Alkoholmenge:
+       *
+       * Liter × 1000 = ml
+       * × Alkoholanteil
+       * × 0,789 g/ml
+       */
       const alcoholGrams =
         volume *
         1000 *
         (alcoholPercent / 100) *
         0.789;
 
-      const weight =
-        member.gewicht_kg > 0
-          ? member.gewicht_kg
-          : 82;
-
-      const basePromille =
+      /*
+       * Ausgangswert dieses einzelnen
+       * Getränks.
+       */
+      const initialPromille =
         alcoholGrams /
         (weight * distribution);
 
@@ -1054,27 +1140,36 @@ export default function Home() {
         );
 
       /*
-       * Vereinfachter rechnerischer Abbau:
-       * 0,15 ‰ pro Stunde.
+       * Alkoholabbau seit diesem
+       * Trinkvorgang.
        */
+      const eliminated =
+        elapsedHours *
+        eliminationRate;
+
       const remaining =
         Math.max(
           0,
-          basePromille -
-            elapsedHours *
-              0.15
+          initialPromille -
+            eliminated
         );
 
-      promille += remaining;
+      totalPromille += remaining;
     }
 
-    return Number(
-      Math.max(
-        0,
-        promille
-      ).toFixed(2)
+    return Math.max(
+      0,
+      Number(
+        totalPromille.toFixed(2)
+      )
     );
   }
+
+  /*
+   * ============================================================
+   * GESAMTWERTE
+   * ============================================================
+   */
 
   const totalLiters =
     consumptions.reduce(
@@ -1097,11 +1192,15 @@ export default function Home() {
     );
 
   /*
-   * Kosten:
-   * Nur tatsächlich getrunkene Getränke
-   * werden als Verbrauch gezählt.
+   * WICHTIG:
+   *
+   * Die Kosten werden jetzt NICHT mehr
+   * aus der Getränkeliste summiert.
+   *
+   * Stattdessen wird nur berechnet,
+   * was tatsächlich getrunken wurde.
    */
-  const totalConsumedCost =
+  const totalCost =
     consumptions.reduce(
       (sum, consumption) => {
         const drink =
@@ -1113,23 +1212,20 @@ export default function Home() {
 
         return (
           sum +
-          Number(
-            drink?.preis || 0
-          )
+          (drink
+            ? getDrinkPrice(drink)
+            : 0)
         );
       },
       0
     );
 
-  const totalCost =
-    totalConsumedCost;
-
   const totalPoints =
     members.reduce(
       (sum, member) =>
         sum +
-        getMemberPoints(
-          member.profile_id
+        Number(
+          member.points || 0
         ),
       0
     );
@@ -1143,12 +1239,8 @@ export default function Home() {
   const ranking =
     [...members].sort(
       (a, b) =>
-        getMemberPoints(
-          b.profile_id
-        ) -
-        getMemberPoints(
-          a.profile_id
-        )
+        Number(b.points) -
+        Number(a.points)
     );
 
   const paidCount =
@@ -1173,7 +1265,8 @@ export default function Home() {
     );
 
   /*
-   * Häufig getrunkene Getränke zuerst.
+   * Häufig verwendete Getränke
+   * zuerst anzeigen.
    */
   const drinkUsage =
     consumptions.reduce<
@@ -1188,14 +1281,31 @@ export default function Home() {
 
   const sortedDrinks =
     [...drinks].sort(
-      (a, b) =>
-        (drinkUsage[b.id] || 0) -
-        (drinkUsage[a.id] || 0)
+      (a, b) => {
+        const usageDifference =
+          (drinkUsage[b.id] || 0) -
+          (drinkUsage[a.id] || 0);
+
+        if (
+          usageDifference !== 0
+        ) {
+          return usageDifference;
+        }
+
+        return getDrinkName(
+          a
+        ).localeCompare(
+          getDrinkName(b),
+          "de"
+        );
+      }
     );
 
   const currentMember =
-    getMember(
-      currentProfileId
+    members.find(
+      (member) =>
+        member.profile_id ===
+        currentProfileId
     );
 
   const currentPromille =
@@ -1211,6 +1321,12 @@ export default function Home() {
         item.profile_id ===
         currentProfileId
     );
+
+  /*
+   * ============================================================
+   * RENDER
+   * ============================================================
+   */
 
   return (
     <main className="page">
@@ -1333,11 +1449,9 @@ export default function Home() {
 
           <div className="stat">
             <span>🍺</span>
-
             <strong>
               {consumptions.length}
             </strong>
-
             <small>
               Getrunken
             </small>
@@ -1345,11 +1459,11 @@ export default function Home() {
 
           <div className="stat">
             <span>💧</span>
-
             <strong>
-              {totalLiters.toFixed(1)}
+              {totalLiters.toFixed(
+                1
+              )}
             </strong>
-
             <small>
               Liter
             </small>
@@ -1357,23 +1471,21 @@ export default function Home() {
 
           <div className="stat">
             <span>💶</span>
-
             <strong>
-              {totalCost.toFixed(2)} €
+              {totalCost.toFixed(
+                2
+              )} €
             </strong>
-
             <small>
-              Kosten
+              Tatsächlich getrunken
             </small>
           </div>
 
           <div className="stat">
             <span>👥</span>
-
             <strong>
               {members.length}
             </strong>
-
             <small>
               Teilnehmer
             </small>
@@ -1397,16 +1509,13 @@ export default function Home() {
                 currentProfileId
               }
               onChange={(e) => {
-                const value =
-                  e.target.value;
-
                 setCurrentProfileId(
-                  value
+                  e.target.value
                 );
 
                 localStorage.setItem(
                   "guesten-current-profile",
-                  value
+                  e.target.value
                 );
               }}
             >
@@ -1492,66 +1601,54 @@ export default function Home() {
           )}
 
           {members.map(
-            (member) => {
-              const memberDrinks =
-                getMemberDrinkCount(
-                  member.profile_id
-                );
+            (member) => (
+              <div
+                className="member"
+                key={member.id}
+              >
 
-              const memberPoints =
-                getMemberPoints(
-                  member.profile_id
-                );
-
-              return (
-                <div
-                  className="member"
-                  key={member.id}
-                >
-
-                  <div className="avatar">
-                    {member.username
-                      .charAt(0)
-                      .toUpperCase()}
-                  </div>
-
-                  <div>
-                    <strong>
-                      {member.username}
-                    </strong>
-
-                    <small>
-                      🍺{" "}
-                      {memberDrinks}
-                      {" · "}
-                      🏆{" "}
-                      {memberPoints}
-                      {" Punkte"}
-                    </small>
-
-                    <small className="promilleSmall">
-                      🍷{" "}
-                      {calculatePromille(
-                        member.profile_id
-                      ).toFixed(2)}
-                      {" ‰"}
-                    </small>
-                  </div>
-
-                  <button
-                    className="remove"
-                    onClick={() =>
-                      removeParticipant(
-                        member.id
-                      )
-                    }
-                  >
-                    ×
-                  </button>
-
+                <div className="avatar">
+                  {member.username
+                    .charAt(0)
+                    .toUpperCase()}
                 </div>
-              );
-            }
+
+                <div>
+                  <strong>
+                    {member.username}
+                  </strong>
+
+                  <small>
+                    🍺{" "}
+                    {member.drinks}
+                    {" · "}
+                    🏆{" "}
+                    {member.points}
+                    {" Punkte"}
+                  </small>
+
+                  <small className="promilleSmall">
+                    🍷{" "}
+                    {calculatePromille(
+                      member.profile_id
+                    ).toFixed(2)}
+                    {" ‰"}
+                  </small>
+                </div>
+
+                <button
+                  className="remove"
+                  onClick={() =>
+                    removeParticipant(
+                      member.id
+                    )
+                  }
+                >
+                  ×
+                </button>
+
+              </div>
+            )
           )}
 
         </section>
@@ -1588,6 +1685,7 @@ export default function Home() {
 
             <input
               type="number"
+              step="0.1"
               value={alcohol}
               onChange={(e) =>
                 setAlcohol(
@@ -1637,7 +1735,7 @@ export default function Home() {
           0 ? (
             <div className="empty">
               Noch keine Getränke
-              angelegt.
+              vorhanden.
             </div>
           ) : (
             sortedDrinks.map(
@@ -1676,8 +1774,14 @@ export default function Home() {
                             drink
                           ).toFixed(1)}
                           {" % · "}
-                          {usage}
-                          × getrunken
+                          {usage}× getrunken
+                        </small>
+
+                        <small className="drinkPrice">
+                          {getDrinkPrice(
+                            drink
+                          ).toFixed(2)}{" "}
+                          € pro Getränk
                         </small>
                       </div>
 
@@ -1692,7 +1796,8 @@ export default function Home() {
                         )
                       }
                       disabled={
-                        !currentProfileId
+                        !currentProfileId ||
+                        !currentMember
                       }
                     >
                       🍺{" "}
@@ -1802,8 +1907,13 @@ export default function Home() {
 
               <p>
                 Gewicht:{" "}
-                {currentMember.gewicht_kg}
-                {" kg"}
+                {currentMember.gewicht_kg ||
+                  "–"}{" "}
+                kg
+                {" · "}
+                Alter:{" "}
+                {currentMember.alter ||
+                  "–"}
               </p>
 
               <div className="promille">
@@ -1819,17 +1929,34 @@ export default function Home() {
                 </strong>
 
                 <small>
-                  Die Berechnung berücksichtigt
-                  die einzelnen Trinkzeiten und
-                  den geschätzten Alkoholabbau.
+                  Die Berechnung wird
+                  laufend anhand der
+                  einzelnen Trinkzeiten
+                  und des geschätzten
+                  Alkoholabbaus aktualisiert.
+                </small>
+
+                <small>
+                  Letzte Aktualisierung:{" "}
+                  {new Date(
+                    now
+                  ).toLocaleTimeString(
+                    "de-DE",
+                    {
+                      hour: "2-digit",
+                      minute:
+                        "2-digit",
+                    }
+                  )}
                 </small>
               </div>
 
               <p className="warning">
-                ⚠️ Die Promilleanzeige ist
-                nur eine rechnerische Schätzung
-                und darf nicht zur Beurteilung
-                der Fahrtüchtigkeit verwendet
+                ⚠️ Die Promilleanzeige
+                ist nur eine rechnerische
+                Schätzung und darf nicht
+                zur Beurteilung der
+                Fahrtüchtigkeit verwendet
                 werden.
               </p>
             </>
@@ -1865,8 +1992,10 @@ export default function Home() {
                   );
 
                 const member =
-                  getMember(
-                    consumption.profile_id
+                  members.find(
+                    (item) =>
+                      item.profile_id ===
+                      consumption.profile_id
                   );
 
                 return (
@@ -1929,8 +2058,19 @@ export default function Home() {
           </div>
 
           <p className="center">
-            Tatsächlich getrunkene Getränke
+            Tatsächlich getrunkene
+            Getränke
           </p>
+
+          <div className="row">
+            <span>
+              🍺 Getrunken
+            </span>
+
+            <strong>
+              {consumptions.length}
+            </strong>
+          </div>
 
           <div className="row">
             <span>
@@ -2070,56 +2210,43 @@ export default function Home() {
             </p>
           ) : (
             ranking.map(
-              (member, index) => {
+              (member, index) => (
+                <div
+                  className="ranking"
+                  key={member.id}
+                >
 
-                const memberDrinks =
-                  getMemberDrinkCount(
-                    member.profile_id
-                  );
+                  <span className="rank">
+                    {index === 0
+                      ? "🥇"
+                      : index === 1
+                      ? "🥈"
+                      : index === 2
+                      ? "🥉"
+                      : index + 1}
+                  </span>
 
-                const memberPoints =
-                  getMemberPoints(
-                    member.profile_id
-                  );
+                  <div>
+                    <strong>
+                      {member.username}
+                    </strong>
 
-                return (
-                  <div
-                    className="ranking"
-                    key={member.id}
-                  >
-
-                    <span className="rank">
-                      {index === 0
-                        ? "🥇"
-                        : index === 1
-                        ? "🥈"
-                        : index === 2
-                        ? "🥉"
-                        : index + 1}
-                    </span>
-
-                    <div>
-                      <strong>
-                        {member.username}
-                      </strong>
-
-                      <small>
-                        🍺{" "}
-                        {memberDrinks}
-                      </small>
-                    </div>
-
-                    <div className="points">
-                      {memberPoints}
-
-                      <small>
-                        Punkte
-                      </small>
-                    </div>
-
+                    <small>
+                      🍺{" "}
+                      {member.drinks}
+                    </small>
                   </div>
-                );
-              }
+
+                  <div className="points">
+                    {member.points}
+
+                    <small>
+                      Punkte
+                    </small>
+                  </div>
+
+                </div>
+              )
             )
           )}
 
@@ -2477,6 +2604,10 @@ export default function Home() {
         .drinkButton {
           white-space: nowrap;
           background: #f59e0b;
+        }
+
+        .drinkPrice {
+          color: #fbbf24;
         }
 
         .consumption {
