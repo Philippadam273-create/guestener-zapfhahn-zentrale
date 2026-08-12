@@ -8,9 +8,9 @@ type Profile = {
   username: string | null;
   points: number | null;
   drinks_count: number | null;
-  gewicht_kg: number | null;
-  alter: number | null;
-  geschlecht: string | null;
+  gewicht_kg?: number | null;
+  alter?: number | null;
+  geschlecht?: string | null;
 };
 
 type Member = {
@@ -19,10 +19,6 @@ type Member = {
   username: string;
   points: number;
   drinks: number;
-  gewicht_kg: number | null;
-  alter: number | null;
-  geschlecht: string | null;
-  promille: number;
 };
 
 type Drink = {
@@ -99,7 +95,6 @@ export default function Home() {
     if (!data || data.length === 0) return;
 
     const saved = localStorage.getItem("guesten-active-event");
-
     const exists = data.some((event) => event.id === saved);
 
     setEventId(saved && exists ? saved : data[0].id);
@@ -146,47 +141,19 @@ export default function Home() {
       return;
     }
 
-    const result: Member[] = [];
-
-    for (const row of data || []) {
+    const result: Member[] = (data || []).map((row: any) => {
       const profile = Array.isArray(row.profiles)
         ? row.profiles[0]
         : row.profiles;
 
-      if (!profile) continue;
-
-      let promille = 0;
-
-      const { data: promilleData } = await supabase.rpc(
-        "calculate_promille",
-        {
-          p_profile_id: profile.id,
-          p_event_id: eventId,
-        }
-      );
-
-      if (promilleData !== null && promilleData !== undefined) {
-        promille = Number(promilleData) || 0;
-      }
-
-      result.push({
+      return {
         id: row.id,
         profile_id: row.profile_id,
-        username: profile.username || "Teilnehmer",
-        points: Number(profile.points || 0),
-        drinks: Number(profile.drinks_count || 0),
-        gewicht_kg:
-          profile.gewicht_kg !== null
-            ? Number(profile.gewicht_kg)
-            : null,
-        alter:
-          profile.alter !== null
-            ? Number(profile.alter)
-            : null,
-        geschlecht: profile.geschlecht || null,
-        promille,
-      });
-    }
+        username: profile?.username || "Teilnehmer",
+        points: Number(profile?.points || 0),
+        drinks: Number(profile?.drinks_count || 0),
+      };
+    });
 
     setMembers(result);
   }
@@ -301,12 +268,14 @@ export default function Home() {
       return;
     }
 
-    const { data: event, error: eventError } =
-      await supabase
-        .from("events")
-        .select("id,title,invite_code")
-        .eq("invite_code", code)
-        .single();
+    const {
+      data: event,
+      error: eventError,
+    } = await supabase
+      .from("events")
+      .select("id,title,invite_code")
+      .eq("invite_code", code)
+      .single();
 
     if (eventError || !event) {
       setMessage("❌ Einladungscode ist ungültig.");
@@ -336,7 +305,7 @@ export default function Home() {
       return;
     }
 
-    const { error } = await supabase
+    const { error: joinError } = await supabase
       .from("event_members")
       .insert({
         event_id: event.id,
@@ -345,8 +314,8 @@ export default function Home() {
         joined_via_code: code,
       });
 
-    if (error) {
-      setMessage("❌ Beitreten: " + error.message);
+    if (joinError) {
+      setMessage("❌ Beitreten: " + joinError.message);
       return;
     }
 
@@ -382,7 +351,7 @@ export default function Home() {
       return;
     }
 
-    const { error } = await supabase
+    const { error: participantError } = await supabase
       .from("event_members")
       .insert({
         event_id: eventId,
@@ -390,8 +359,10 @@ export default function Home() {
         joined_at: new Date().toISOString(),
       });
 
-    if (error) {
-      setMessage("❌ Teilnehmer: " + error.message);
+    if (participantError) {
+      setMessage(
+        "❌ Teilnehmer: " + participantError.message
+      );
       return;
     }
 
@@ -403,13 +374,13 @@ export default function Home() {
   }
 
   async function removeParticipant(memberId: string) {
-    const { error } = await supabase
+    const { error: removeError } = await supabase
       .from("event_members")
       .delete()
       .eq("id", memberId);
 
-    if (error) {
-      setMessage("❌ Entfernen: " + error.message);
+    if (removeError) {
+      setMessage("❌ Entfernen: " + removeError.message);
       return;
     }
 
@@ -431,7 +402,7 @@ export default function Home() {
       return;
     }
 
-    const { error } = await supabase
+    const { error: drinkError } = await supabase
       .from("drinks")
       .insert({
         event_id: eventId,
@@ -445,8 +416,8 @@ export default function Home() {
         quantity: 1,
       });
 
-    if (error) {
-      setMessage("❌ Getränk: " + error.message);
+    if (drinkError) {
+      setMessage("❌ Getränk: " + drinkError.message);
       return;
     }
 
@@ -456,11 +427,28 @@ export default function Home() {
     setPrice("0");
 
     await loadDrinks();
-    await loadMembers();
 
     setMessage("✅ Getränk gespeichert.");
   }
 
+  /*
+   * ==========================================================
+   * NEU:
+   *
+   * Ein Getränk kann jetzt MEHRFACH ausgewählt werden.
+   *
+   * Beispiel:
+   *
+   * Krombacher 0,5 L
+   *
+   * Philipp → 1x
+   * Philipp → 2x
+   * Philipp → 3x
+   *
+   * Jede weitere Auswahl erzeugt einen neuen Getränkeeintag.
+   * Dadurch bleibt das ursprüngliche Getränk erhalten.
+   * ==========================================================
+   */
   async function assignDrink(
     profileId: string,
     drinkId: string
@@ -476,35 +464,86 @@ export default function Home() {
       return;
     }
 
-    if (drink.profile_id) {
+    /*
+     * Wenn das Getränk noch niemandem gehört,
+     * wird der vorhandene Datensatz verwendet.
+     *
+     * Wenn es bereits zugeordnet wurde,
+     * wird eine Kopie erstellt.
+     */
+    if (!drink.profile_id) {
+      const { error: updateError } = await supabase
+        .from("drinks")
+        .update({
+          profile_id: profileId,
+        })
+        .eq("id", drinkId);
+
+      if (updateError) {
+        setMessage(
+          "❌ Zuordnung: " + updateError.message
+        );
+        return;
+      }
+    } else {
+      /*
+       * Getränk wurde bereits benutzt.
+       * Deshalb erstellen wir einen neuen Verbrauch.
+       */
+      const { error: duplicateError } = await supabase
+        .from("drinks")
+        .insert({
+          event_id: drink.event_id,
+          drink_name:
+            drink.drink_name || drink.getraenk,
+          getraenk:
+            drink.getraenk || drink.drink_name,
+          liters:
+            drink.liters ?? drink.menge ?? 0,
+          menge:
+            drink.menge ?? drink.liters ?? 0,
+          alcohol_percent:
+            drink.alcohol_percent ??
+            drink.alkohol ??
+            0,
+          alkohol:
+            drink.alkohol ??
+            drink.alcohol_percent ??
+            0,
+          preis: Number(drink.preis || 0),
+          profile_id: profileId,
+          quantity: 1,
+        });
+
+      if (duplicateError) {
+        setMessage(
+          "❌ Getränk konnte nicht erneut zugeordnet werden: " +
+            duplicateError.message
+        );
+        return;
+      }
+    }
+
+    /*
+     * Punkte und Getränkeanzahl erhöhen.
+     */
+    const { data: profile, error: profileError } =
+      await supabase
+        .from("profiles")
+        .select("points,drinks_count")
+        .eq("id", profileId)
+        .single();
+
+    if (profileError) {
       setMessage(
-        "❌ Dieses Getränk ist bereits zugeordnet."
+        "❌ Profil konnte nicht geladen werden: " +
+          profileError.message
       );
       return;
     }
-
-    const { error: drinkError } = await supabase
-      .from("drinks")
-      .update({
-        profile_id: profileId,
-      })
-      .eq("id", drinkId);
-
-    if (drinkError) {
-      setMessage(
-        "❌ Zuordnung: " + drinkError.message
-      );
-      return;
-    }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("points,drinks_count")
-      .eq("id", profileId)
-      .single();
 
     if (profile) {
-      await supabase
+      const { error: pointsError } = await supabase
         .from("profiles")
         .update({
           points: Number(profile.points || 0) + 10,
@@ -512,6 +551,14 @@ export default function Home() {
             Number(profile.drinks_count || 0) + 1,
         })
         .eq("id", profileId);
+
+      if (pointsError) {
+        setMessage(
+          "❌ Punkte konnten nicht gespeichert werden: " +
+            pointsError.message
+        );
+        return;
+      }
     }
 
     await loadProfiles();
@@ -532,6 +579,17 @@ export default function Home() {
   async function togglePayment(member: Member) {
     setMessage("⏳ Zahlung wird gespeichert...");
 
+    const totalCost = drinks.reduce(
+      (sum, drink) =>
+        sum + Number(drink.preis || 0),
+      0
+    );
+
+    const amountPerPerson =
+      members.length > 0
+        ? totalCost / members.length
+        : 0;
+
     const existing = payments.find(
       (payment) =>
         payment.event_id === eventId &&
@@ -544,33 +602,41 @@ export default function Home() {
         : "bezahlt";
 
     if (existing) {
-      const { error } = await supabase
-        .from("payments")
-        .update({
-          status: newStatus,
-          betrag: amountPerPerson,
-          bezahlt_von: member.profile_id,
-          profile_id: member.profile_id,
-        })
-        .eq("id", existing.id);
+      const { error: paymentUpdateError } =
+        await supabase
+          .from("payments")
+          .update({
+            status: newStatus,
+            betrag: amountPerPerson,
+            bezahlt_von: member.profile_id,
+            profile_id: member.profile_id,
+          })
+          .eq("id", existing.id);
 
-      if (error) {
-        setMessage("❌ Zahlung: " + error.message);
+      if (paymentUpdateError) {
+        setMessage(
+          "❌ Zahlung: " +
+            paymentUpdateError.message
+        );
         return;
       }
     } else {
-      const { error } = await supabase
-        .from("payments")
-        .insert({
-          event_id: eventId,
-          profile_id: member.profile_id,
-          bezahlt_von: member.profile_id,
-          betrag: amountPerPerson,
-          status: newStatus,
-        });
+      const { error: paymentInsertError } =
+        await supabase
+          .from("payments")
+          .insert({
+            event_id: eventId,
+            profile_id: member.profile_id,
+            bezahlt_von: member.profile_id,
+            betrag: amountPerPerson,
+            status: newStatus,
+          });
 
-      if (error) {
-        setMessage("❌ Zahlung: " + error.message);
+      if (paymentInsertError) {
+        setMessage(
+          "❌ Zahlung: " +
+            paymentInsertError.message
+        );
         return;
       }
     }
@@ -587,7 +653,11 @@ export default function Home() {
   const totalLiters = drinks.reduce(
     (sum, drink) =>
       sum +
-      Number(drink.liters ?? drink.menge ?? 0),
+      Number(
+        drink.liters ??
+          drink.menge ??
+          0
+      ),
     0
   );
 
@@ -618,7 +688,8 @@ export default function Home() {
       payments.some(
         (payment) =>
           payment.event_id === eventId &&
-          payment.profile_id === member.profile_id &&
+          payment.profile_id ===
+            member.profile_id &&
           payment.status === "bezahlt"
       )
   ).length;
@@ -634,8 +705,13 @@ export default function Home() {
           <div className="logo">🍻</div>
 
           <div>
-            <h1>Güstener Zapfhahn Zentrale</h1>
-            <p>Events · Getränke · Kosten · Rankings</p>
+            <h1>
+              Güstener Zapfhahn Zentrale
+            </h1>
+
+            <p>
+              Events · Getränke · Kosten · Rankings
+            </p>
           </div>
         </header>
 
@@ -664,6 +740,7 @@ export default function Home() {
 
           {eventId && (
             <div className="inviteBox">
+
               <h3>🔗 Freunde einladen</h3>
 
               <p>
@@ -671,13 +748,17 @@ export default function Home() {
               </p>
 
               <div className="codeRow">
+
                 <strong>
                   {inviteCode || "------"}
                 </strong>
 
-                <button onClick={copyInviteCode}>
+                <button
+                  onClick={copyInviteCode}
+                >
                   📋 Kopieren
                 </button>
+
               </div>
 
               <button
@@ -686,11 +767,13 @@ export default function Home() {
               >
                 🔄 Neuen Code erstellen
               </button>
+
             </div>
           )}
         </section>
 
         <section className="card">
+
           <h2>👥 Event beitreten</h2>
 
           <p>
@@ -698,6 +781,7 @@ export default function Home() {
           </p>
 
           <div className="joinBox">
+
             <input
               value={joinCode}
               onChange={(e) =>
@@ -709,18 +793,26 @@ export default function Home() {
               maxLength={6}
             />
 
-            <button onClick={joinEventWithCode}>
+            <button
+              onClick={joinEventWithCode}
+            >
               🚀 Event beitreten
             </button>
+
           </div>
+
         </section>
 
         <div className="stats">
 
           <div className="stat">
             <span>🍺</span>
-            <strong>{drinks.length}</strong>
-            <small>Getränke</small>
+            <strong>
+              {drinks.length}
+            </strong>
+            <small>
+              Getränke
+            </small>
           </div>
 
           <div className="stat">
@@ -728,7 +820,9 @@ export default function Home() {
             <strong>
               {totalLiters.toFixed(1)}
             </strong>
-            <small>Liter</small>
+            <small>
+              Liter
+            </small>
           </div>
 
           <div className="stat">
@@ -736,13 +830,19 @@ export default function Home() {
             <strong>
               {totalCost.toFixed(2)} €
             </strong>
-            <small>Kosten</small>
+            <small>
+              Kosten
+            </small>
           </div>
 
           <div className="stat">
             <span>👥</span>
-            <strong>{members.length}</strong>
-            <small>Teilnehmer</small>
+            <strong>
+              {members.length}
+            </strong>
+            <small>
+              Teilnehmer
+            </small>
           </div>
 
         </div>
@@ -759,7 +859,8 @@ export default function Home() {
             (profile) =>
               !members.some(
                 (member) =>
-                  member.profile_id === profile.id
+                  member.profile_id ===
+                  profile.id
               )
           ).length > 0 ? (
 
@@ -773,6 +874,7 @@ export default function Home() {
                   )
                 }
               >
+
                 <option value="">
                   Teilnehmer auswählen
                 </option>
@@ -782,10 +884,12 @@ export default function Home() {
                     (profile) =>
                       !members.some(
                         (member) =>
-                          member.profile_id === profile.id
+                          member.profile_id ===
+                          profile.id
                       )
                   )
                   .map((profile) => (
+
                     <option
                       key={profile.id}
                       value={profile.id}
@@ -793,7 +897,9 @@ export default function Home() {
                       {profile.username ||
                         "Unbenannt"}
                     </option>
+
                   ))}
+
               </select>
 
               <button
@@ -805,12 +911,16 @@ export default function Home() {
             </div>
 
           ) : (
+
             <div className="successBox">
-              ✅ Alle vorhandenen Profile sind bereits dabei.
+              ✅ Alle vorhandenen Profile
+              sind bereits dabei.
             </div>
+
           )}
 
           {members.map((member) => (
+
             <div
               className="member"
               key={member.id}
@@ -823,6 +933,7 @@ export default function Home() {
               </div>
 
               <div>
+
                 <strong>
                   {member.username}
                 </strong>
@@ -833,21 +944,21 @@ export default function Home() {
                   🏆 {member.points} Punkte
                 </small>
 
-                <div className="promilleMini">
-                  🍷 {member.promille.toFixed(2)} ‰
-                </div>
               </div>
 
               <button
                 className="remove"
                 onClick={() =>
-                  removeParticipant(member.id)
+                  removeParticipant(
+                    member.id
+                  )
                 }
               >
                 ×
               </button>
 
             </div>
+
           ))}
 
         </section>
@@ -860,7 +971,9 @@ export default function Home() {
             placeholder="Getränk"
             value={drinkName}
             onChange={(e) =>
-              setDrinkName(e.target.value)
+              setDrinkName(
+                e.target.value
+              )
             }
           />
 
@@ -869,29 +982,32 @@ export default function Home() {
             <input
               type="number"
               step="0.1"
-              placeholder="Liter"
               value={liters}
               onChange={(e) =>
-                setLiters(e.target.value)
+                setLiters(
+                  e.target.value
+                )
               }
             />
 
             <input
               type="number"
-              placeholder="Alkohol %"
               value={alcohol}
               onChange={(e) =>
-                setAlcohol(e.target.value)
+                setAlcohol(
+                  e.target.value
+                )
               }
             />
 
             <input
               type="number"
               step="0.01"
-              placeholder="Preis €"
               value={price}
               onChange={(e) =>
-                setPrice(e.target.value)
+                setPrice(
+                  e.target.value
+                )
               }
             />
 
@@ -908,14 +1024,25 @@ export default function Home() {
 
         <section className="card">
 
-          <h2>🔗 Getränk zuordnen</h2>
+          <h2>
+            🔗 Getränk zuordnen
+          </h2>
+
+          <p>
+            Ein Getränk kann jetzt mehrfach
+            ausgewählt werden.
+          </p>
 
           {members.length === 0 ? (
+
             <p>
               👥 Zuerst Teilnehmer hinzufügen.
             </p>
+
           ) : (
+
             members.map((member) => (
+
               <div
                 className="assign"
                 key={member.id}
@@ -928,14 +1055,26 @@ export default function Home() {
                 <select
                   defaultValue=""
                   onChange={(e) => {
-                    if (!e.target.value) return;
+
+                    const selectedDrinkId =
+                      e.target.value;
+
+                    if (!selectedDrinkId)
+                      return;
 
                     assignDrink(
                       member.profile_id,
-                      e.target.value
+                      selectedDrinkId
                     );
 
+                    /*
+                     * Dropdown wieder zurücksetzen,
+                     * damit dasselbe Getränk
+                     * sofort erneut ausgewählt
+                     * werden kann.
+                     */
                     e.target.value = "";
+
                   }}
                 >
 
@@ -944,31 +1083,40 @@ export default function Home() {
                   </option>
 
                   {drinks.map((drink) => (
+
                     <option
                       key={drink.id}
                       value={drink.id}
-                      disabled={!!drink.profile_id}
                     >
+
                       {drink.drink_name ||
                         drink.getraenk ||
                         "Getränk"}
+
                       {" · "}
+
                       {Number(
                         drink.liters ??
                           drink.menge ??
                           0
                       ).toFixed(1)}
+
                       L
+
                       {drink.profile_id
-                        ? " ✓"
+                        ? " ✓ erneut möglich"
                         : ""}
+
                     </option>
+
                   ))}
 
                 </select>
 
               </div>
+
             ))
+
           )}
 
         </section>
@@ -987,6 +1135,7 @@ export default function Home() {
               );
 
             return (
+
               <div
                 className="drink"
                 key={drink.id}
@@ -997,6 +1146,7 @@ export default function Home() {
                 </div>
 
                 <div>
+
                   <strong>
                     {drink.drink_name ||
                       drink.getraenk ||
@@ -1004,143 +1154,57 @@ export default function Home() {
                   </strong>
 
                   <small>
+
                     {Number(
                       drink.liters ??
                         drink.menge ??
                         0
                     ).toFixed(1)}
+
                     {" Liter · "}
+
                     {Number(
                       drink.alcohol_percent ??
                         drink.alkohol ??
                         0
                     ).toFixed(1)}
+
                     %
+
                   </small>
 
                   {member && (
+
                     <small className="assigned">
                       👤 {member.username}
                     </small>
+
                   )}
+
                 </div>
 
                 <strong className="price">
+
                   {Number(
                     drink.preis || 0
                   ).toFixed(2)}
+
                   €
+
                 </strong>
 
               </div>
+
             );
           })}
 
         </section>
 
-        {/* ======================================
-            PROMILLE
-        ====================================== */}
-
-        <section className="card promilleCard">
-
-          <h2>🍷 Promille-Übersicht</h2>
-
-          <p>
-            Geschätzter Wert anhand der zugeordneten
-            Getränke und Profildaten.
-          </p>
-
-          {members.length === 0 ? (
-            <div className="successBox">
-              👥 Noch keine Teilnehmer.
-            </div>
-          ) : (
-            <div className="promilleGrid">
-
-              {members.map((member) => {
-
-                let status = "Nüchtern";
-                let statusClass = "safe";
-
-                if (member.promille >= 0.3) {
-                  status = "Alkohol vorhanden";
-                  statusClass = "warning";
-                }
-
-                if (member.promille >= 0.5) {
-                  status = "Deutlich alkoholisiert";
-                  statusClass = "danger";
-                }
-
-                if (member.promille >= 1.0) {
-                  status = "Stark alkoholisiert";
-                  statusClass = "veryDanger";
-                }
-
-                return (
-                  <div
-                    className="promillePerson"
-                    key={member.id}
-                  >
-
-                    <div className="promilleAvatar">
-                      {member.username
-                        .charAt(0)
-                        .toUpperCase()}
-                    </div>
-
-                    <div className="promilleInfo">
-
-                      <strong>
-                        {member.username}
-                      </strong>
-
-                      <small>
-                        {member.gewicht_kg
-                          ? `${member.gewicht_kg} kg`
-                          : "Gewicht fehlt"}
-                        {" · "}
-                        {member.alter
-                          ? `${member.alter} Jahre`
-                          : "Alter fehlt"}
-                      </small>
-
-                      <span
-                        className={
-                          "promilleStatus " +
-                          statusClass
-                        }
-                      >
-                        {status}
-                      </span>
-
-                    </div>
-
-                    <div className="promilleValue">
-                      {member.promille.toFixed(2)}
-                      <small>‰</small>
-                    </div>
-
-                  </div>
-                );
-              })}
-
-            </div>
-          )}
-
-          <div className="promilleNotice">
-            ⚠️ Die Promilleanzeige ist nur eine
-            grobe rechnerische Schätzung und darf
-            niemals zur Beurteilung der Fahrtüchtigkeit
-            verwendet werden.
-          </div>
-
-        </section>
-
         <section className="card">
 
-          <h2>💶 Kostenaufteilung</h2>
+          <h2>
+            💶 Kostenaufteilung
+          </h2>
 
           <div className="total">
             {totalCost.toFixed(2)} €
@@ -1151,34 +1215,64 @@ export default function Home() {
           </p>
 
           <div className="row">
-            <span>👥 Teilnehmer</span>
-            <strong>{members.length}</strong>
+
+            <span>
+              👥 Teilnehmer
+            </span>
+
+            <strong>
+              {members.length}
+            </strong>
+
           </div>
 
           <div className="row">
-            <span>💶 Pro Person</span>
+
+            <span>
+              💶 Pro Person
+            </span>
+
             <strong>
               {amountPerPerson.toFixed(2)} €
             </strong>
+
           </div>
 
           <div className="paymentSummary">
 
             <div className="paymentBox paid">
+
               <span>✅</span>
-              <strong>{paidCount}</strong>
-              <small>Bezahlt</small>
+
+              <strong>
+                {paidCount}
+              </strong>
+
+              <small>
+                Bezahlt
+              </small>
+
             </div>
 
             <div className="paymentBox open">
+
               <span>⏳</span>
-              <strong>{openCount}</strong>
-              <small>Offen</small>
+
+              <strong>
+                {openCount}
+              </strong>
+
+              <small>
+                Offen
+              </small>
+
             </div>
 
           </div>
 
-          <h3>💶 Zahlungen</h3>
+          <h3>
+            💶 Zahlungen
+          </h3>
 
           {members.map((member) => {
 
@@ -1194,6 +1288,7 @@ export default function Home() {
               payment?.status === "bezahlt";
 
             return (
+
               <div
                 className={
                   isPaid
@@ -1210,6 +1305,7 @@ export default function Home() {
                 </div>
 
                 <div className="paymentInfo">
+
                   <strong>
                     {member.username}
                   </strong>
@@ -1218,6 +1314,7 @@ export default function Home() {
                     Anteil:{" "}
                     {amountPerPerson.toFixed(2)} €
                   </small>
+
                 </div>
 
                 <button
@@ -1236,23 +1333,29 @@ export default function Home() {
                 </button>
 
               </div>
+
             );
+
           })}
 
         </section>
 
         <section className="card">
 
-          <h2>🏆 Ranking</h2>
+          <h2>
+            🏆 Ranking
+          </h2>
 
           {ranking.map(
             (member, index) => (
+
               <div
                 className="ranking"
                 key={member.id}
               >
 
                 <span className="rank">
+
                   {index === 0
                     ? "🥇"
                     : index === 1
@@ -1260,9 +1363,11 @@ export default function Home() {
                     : index === 2
                     ? "🥉"
                     : index + 1}
+
                 </span>
 
                 <div>
+
                   <strong>
                     {member.username}
                   </strong>
@@ -1270,37 +1375,50 @@ export default function Home() {
                   <small>
                     🍺 {member.drinks}
                   </small>
+
                 </div>
 
                 <div className="points">
+
                   {member.points}
-                  <small>Punkte</small>
+
+                  <small>
+                    Punkte
+                  </small>
+
                 </div>
 
               </div>
+
             )
           )}
 
           <div className="totalPoints">
-            🏆 Gesamtpunkte: {totalPoints}
+            🏆 Gesamtpunkte:{" "}
+            {totalPoints}
           </div>
 
         </section>
 
         {message && (
+
           <div className="message">
             {message}
           </div>
+
         )}
 
         <footer>
+
           <strong>
             🍻 Güstener Zapfhahn Zentrale
           </strong>
 
           <small>
-            Dein Event. Deine Getränke. Deine Runde.
+            Dein Event. Deine Getränke.
+            Deine Runde.
           </small>
+
         </footer>
 
       </div>
@@ -1315,7 +1433,10 @@ export default function Home() {
           min-height: 100vh;
           padding: 16px;
           color: white;
-          font-family: Arial, Helvetica, sans-serif;
+          font-family:
+            Arial,
+            Helvetica,
+            sans-serif;
           background:
             radial-gradient(
               circle at top,
@@ -1333,14 +1454,16 @@ export default function Home() {
           display: flex;
           align-items: center;
           gap: 14px;
-          padding: 10px 4px 25px;
+          padding:
+            10px 4px 25px;
         }
 
         .logo {
           font-size: 38px;
           padding: 12px;
           border-radius: 18px;
-          background: rgba(255,255,255,.07);
+          background:
+            rgba(255,255,255,.07);
         }
 
         h1 {
@@ -1349,12 +1472,14 @@ export default function Home() {
         }
 
         h2 {
-          margin: 0 0 8px;
+          margin:
+            0 0 8px;
           font-size: 20px;
         }
 
         h3 {
-          margin: 20px 0 10px;
+          margin:
+            20px 0 10px;
         }
 
         p {
@@ -1371,16 +1496,22 @@ export default function Home() {
           padding: 18px;
           margin-bottom: 15px;
           border-radius: 20px;
-          background: rgba(255,255,255,.06);
-          border: 1px solid rgba(255,255,255,.08);
+          background:
+            rgba(255,255,255,.06);
+          border:
+            1px solid
+            rgba(255,255,255,.08);
         }
 
         .inviteBox {
           margin-top: 15px;
           padding: 16px;
           border-radius: 16px;
-          background: rgba(245,158,11,.08);
-          border: 1px solid rgba(245,158,11,.25);
+          background:
+            rgba(245,158,11,.08);
+          border:
+            1px solid
+            rgba(245,158,11,.25);
         }
 
         .inviteBox h3 {
@@ -1389,7 +1520,8 @@ export default function Home() {
 
         .codeRow {
           display: grid;
-          grid-template-columns: 1fr auto;
+          grid-template-columns:
+            1fr auto;
           gap: 10px;
           align-items: center;
         }
@@ -1412,19 +1544,22 @@ export default function Home() {
 
         .joinBox {
           display: grid;
-          grid-template-columns: 1fr auto;
+          grid-template-columns:
+            1fr auto;
           gap: 8px;
         }
 
         .joinBox input {
           margin: 0;
-          text-transform: uppercase;
+          text-transform:
+            uppercase;
           letter-spacing: 3px;
         }
 
         .stats {
           display: grid;
-          grid-template-columns: repeat(4,1fr);
+          grid-template-columns:
+            repeat(4,1fr);
           gap: 10px;
           margin-bottom: 15px;
         }
@@ -1433,7 +1568,8 @@ export default function Home() {
           text-align: center;
           padding: 14px 5px;
           border-radius: 16px;
-          background: rgba(255,255,255,.06);
+          background:
+            rgba(255,255,255,.06);
         }
 
         .stat span {
@@ -1453,7 +1589,8 @@ export default function Home() {
           padding: 13px;
           margin-bottom: 10px;
           border-radius: 12px;
-          border: 1px solid #344252;
+          border:
+            1px solid #344252;
           background: #121a23;
           color: white;
           font-size: 15px;
@@ -1469,26 +1606,32 @@ export default function Home() {
           cursor: pointer;
         }
 
+        button:active {
+          transform: scale(.98);
+        }
+
         .addParticipant {
           display: grid;
-          grid-template-columns: 1fr auto;
+          grid-template-columns:
+            1fr auto;
           gap: 8px;
         }
 
         .member {
           display: grid;
-          grid-template-columns: 40px 1fr auto;
+          grid-template-columns:
+            40px 1fr auto;
           align-items: center;
           gap: 10px;
           padding: 11px;
           margin-top: 8px;
           border-radius: 14px;
-          background: rgba(255,255,255,.05);
+          background:
+            rgba(255,255,255,.05);
         }
 
         .avatar,
-        .paymentAvatar,
-        .promilleAvatar {
+        .paymentAvatar {
           width: 38px;
           height: 38px;
           border-radius: 50%;
@@ -1507,7 +1650,8 @@ export default function Home() {
 
         .three {
           display: grid;
-          grid-template-columns: repeat(3,1fr);
+          grid-template-columns:
+            repeat(3,1fr);
           gap: 8px;
         }
 
@@ -1517,11 +1661,18 @@ export default function Home() {
 
         .assign {
           display: grid;
-          grid-template-columns: 1fr 1.5fr;
+          grid-template-columns:
+            1fr 1.5fr;
           gap: 12px;
           align-items: center;
           padding: 10px 0;
-          border-bottom: 1px solid rgba(255,255,255,.07);
+          border-bottom:
+            1px solid
+            rgba(255,255,255,.07);
+        }
+
+        .assign select {
+          margin-bottom: 0;
         }
 
         .drink {
@@ -1531,7 +1682,8 @@ export default function Home() {
           padding: 12px;
           margin-top: 8px;
           border-radius: 14px;
-          background: rgba(255,255,255,.05);
+          background:
+            rgba(255,255,255,.05);
         }
 
         .drinkIcon {
@@ -1550,101 +1702,9 @@ export default function Home() {
           padding: 12px;
           margin-bottom: 10px;
           border-radius: 12px;
-          background: rgba(34,197,94,.10);
-          color: #4ade80;
-        }
-
-        /* PROMILLE */
-
-        .promilleCard {
-          border-color: rgba(168,85,247,.25);
           background:
-            linear-gradient(
-              135deg,
-              rgba(168,85,247,.08),
-              rgba(255,255,255,.04)
-            );
-        }
-
-        .promilleGrid {
-          display: grid;
-          gap: 10px;
-        }
-
-        .promillePerson {
-          display: grid;
-          grid-template-columns: 42px 1fr auto;
-          gap: 12px;
-          align-items: center;
-          padding: 13px;
-          border-radius: 16px;
-          background: rgba(255,255,255,.05);
-          border: 1px solid rgba(255,255,255,.07);
-        }
-
-        .promilleInfo {
-          min-width: 0;
-        }
-
-        .promilleStatus {
-          display: inline-block;
-          margin-top: 7px;
-          padding: 4px 8px;
-          border-radius: 999px;
-          font-size: 11px;
-          font-weight: bold;
-        }
-
-        .promilleStatus.safe {
-          background: rgba(34,197,94,.15);
+            rgba(34,197,94,.10);
           color: #4ade80;
-        }
-
-        .promilleStatus.warning {
-          background: rgba(245,158,11,.15);
-          color: #fbbf24;
-        }
-
-        .promilleStatus.danger {
-          background: rgba(239,68,68,.15);
-          color: #f87171;
-        }
-
-        .promilleStatus.veryDanger {
-          background: rgba(220,38,38,.25);
-          color: #ef4444;
-        }
-
-        .promilleValue {
-          font-size: 30px;
-          font-weight: bold;
-          color: #c084fc;
-          text-align: right;
-        }
-
-        .promilleValue small {
-          display: inline;
-          color: #94a3b8;
-          font-size: 13px;
-          margin-left: 3px;
-        }
-
-        .promilleMini {
-          color: #c084fc;
-          font-size: 13px;
-          font-weight: bold;
-          margin-top: 5px;
-        }
-
-        .promilleNotice {
-          margin-top: 15px;
-          padding: 12px;
-          border-radius: 12px;
-          background: rgba(245,158,11,.08);
-          border: 1px solid rgba(245,158,11,.2);
-          color: #fbbf24;
-          font-size: 12px;
-          line-height: 1.5;
         }
 
         .total {
@@ -1664,12 +1724,14 @@ export default function Home() {
           padding: 13px;
           margin-top: 8px;
           border-radius: 12px;
-          background: rgba(255,255,255,.05);
+          background:
+            rgba(255,255,255,.05);
         }
 
         .paymentSummary {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns:
+            1fr 1fr;
           gap: 10px;
           margin-top: 15px;
         }
@@ -1678,7 +1740,8 @@ export default function Home() {
           text-align: center;
           padding: 15px;
           border-radius: 15px;
-          background: rgba(255,255,255,.05);
+          background:
+            rgba(255,255,255,.05);
         }
 
         .paymentBox span {
@@ -1693,28 +1756,37 @@ export default function Home() {
         }
 
         .paymentBox.paid {
-          border: 1px solid rgba(34,197,94,.35);
+          border:
+            1px solid
+            rgba(34,197,94,.35);
         }
 
         .paymentBox.open {
-          border: 1px solid rgba(245,158,11,.35);
+          border:
+            1px solid
+            rgba(245,158,11,.35);
         }
 
         .paymentPerson {
           display: grid;
-          grid-template-columns: 40px 1fr auto;
+          grid-template-columns:
+            40px 1fr auto;
           align-items: center;
           gap: 10px;
           padding: 12px;
           margin-top: 8px;
           border-radius: 15px;
-          background: rgba(255,255,255,.05);
-          border: 1px solid transparent;
+          background:
+            rgba(255,255,255,.05);
+          border:
+            1px solid transparent;
         }
 
         .paidRow {
-          border-color: rgba(34,197,94,.4);
-          background: rgba(34,197,94,.08);
+          border-color:
+            rgba(34,197,94,.4);
+          background:
+            rgba(34,197,94,.08);
         }
 
         .paymentInfo {
@@ -1733,13 +1805,15 @@ export default function Home() {
 
         .ranking {
           display: grid;
-          grid-template-columns: 45px 1fr auto;
+          grid-template-columns:
+            45px 1fr auto;
           align-items: center;
           gap: 10px;
           padding: 13px;
           margin-top: 8px;
           border-radius: 14px;
-          background: rgba(255,255,255,.05);
+          background:
+            rgba(255,255,255,.05);
         }
 
         .rank {
@@ -1762,7 +1836,8 @@ export default function Home() {
           padding: 15px;
           text-align: center;
           border-radius: 14px;
-          background: rgba(245,158,11,.1);
+          background:
+            rgba(245,158,11,.1);
           color: #fbbf24;
           font-weight: bold;
         }
@@ -1785,51 +1860,50 @@ export default function Home() {
         @media(max-width:650px) {
 
           .stats {
-            grid-template-columns: repeat(2,1fr);
+            grid-template-columns:
+              repeat(2,1fr);
           }
 
           .three {
-            grid-template-columns: 1fr;
+            grid-template-columns:
+              1fr;
           }
 
           .addParticipant {
-            grid-template-columns: 1fr;
+            grid-template-columns:
+              1fr;
           }
 
           .assign {
-            grid-template-columns: 1fr;
+            grid-template-columns:
+              1fr;
           }
 
           .paymentPerson {
-            grid-template-columns: 40px 1fr;
+            grid-template-columns:
+              40px 1fr;
           }
 
           .paymentPerson button {
-            grid-column: 1 / -1;
+            grid-column:
+              1 / -1;
             width: 100%;
           }
 
           .joinBox {
-            grid-template-columns: 1fr;
+            grid-template-columns:
+              1fr;
           }
 
           .codeRow {
-            grid-template-columns: 1fr;
+            grid-template-columns:
+              1fr;
           }
 
           .codeRow strong {
             font-size: 22px;
           }
 
-          .promillePerson {
-            grid-template-columns: 40px 1fr;
-          }
-
-          .promilleValue {
-            grid-column: 2;
-            text-align: left;
-            font-size: 27px;
-          }
         }
 
       `}</style>
