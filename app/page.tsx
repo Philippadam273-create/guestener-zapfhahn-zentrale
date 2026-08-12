@@ -3,58 +3,57 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 
-/* =========================================================
+/* ============================================================
    TYPES
-========================================================= */
+   ============================================================ */
 
-type Event = {
+type EventRow = {
   id: string;
   title: string;
   description?: string | null;
   location?: string | null;
-  image?: string | null;
-  invite_code?: string | null;
   start_date?: string | null;
   end_date?: string | null;
-  is_active?: boolean | null;
+  invite_code?: string | null;
 
-  ranking_enabled?: boolean | null;
-  show_points?: boolean | null;
-  show_ranking?: boolean | null;
-  show_promille?: boolean | null;
-  show_statistics?: boolean | null;
-  show_drink_amounts?: boolean | null;
-  photo_required?: boolean | null;
-  ai_recognition_enabled?: boolean | null;
-  manual_entry_allowed?: boolean | null;
-  cost_overview_enabled?: boolean | null;
-  auto_split_costs?: boolean | null;
-  team_mode?: boolean | null;
-  show_photos?: boolean | null;
-  show_costs?: boolean | null;
-  privacy_mode?: boolean | null;
+  ranking_enabled?: boolean;
+  show_points?: boolean;
+  show_ranking?: boolean;
+  show_promille?: boolean;
+  show_statistics?: boolean;
+  show_drink_amounts?: boolean;
+  photo_required?: boolean;
+  ai_recognition_enabled?: boolean;
+  manual_entry_allowed?: boolean;
+  cost_overview_enabled?: boolean;
+  auto_split_costs?: boolean;
+  team_mode?: boolean;
+  show_photos?: boolean;
+  show_costs?: boolean;
+  privacy_mode?: boolean;
 };
 
 type Profile = {
   id: string;
-  username?: string | null;
-  points?: number | null;
-  drinks_count?: number | null;
+  username: string | null;
+  points: number | null;
+  drinks_count: number | null;
   weight_kg?: number | null;
   height_cm?: number | null;
   age?: number | null;
   gender?: string | null;
+  gewicht_kg?: number | null;
+  alter?: number | null;
+  geschlecht?: string | null;
 };
 
-type Participant = {
+type EventMember = {
   id: string;
+  event_id: string;
   profile_id: string;
-  name: string;
-  points: number;
-  drinks: number;
-  liters: number;
-  cost: number;
-  challengePoints: number;
+  joined_at?: string;
+  joined_via_code?: string | null;
+  profile?: Profile | null;
 };
 
 type Drink = {
@@ -68,9 +67,9 @@ type Drink = {
   liters?: number | null;
   alcohol_percent?: number | null;
   quantity?: number | null;
-
   image?: string | null;
   comment?: string | null;
+  created_at?: string | null;
 
   image_path?: string | null;
   ai_detected?: boolean | null;
@@ -83,55 +82,74 @@ type Drink = {
   marke?: string | null;
   bezahlt_von?: string | null;
   promille_wert?: number | null;
+
   getraenk?: string | null;
   menge?: number | null;
   alkohol?: number | null;
   preis?: number | null;
   foto?: string | null;
-
-  created_at?: string | null;
 };
 
 type Challenge = {
   id: string;
   event_id: string;
   title: string;
-  description: string;
-  target_profile_id: string;
-  target_name: string;
-  status: "voting" | "active" | "completed";
-  difficulty: "normal" | "hard" | "legendary";
+  description?: string | null;
+  category?: string | null;
   points: number;
-  winner_option?: string | null;
-  created_at?: string | null;
+  status: string;
+  created_by_profile_id?: string | null;
+  assigned_profile_id?: string | null;
+  winner_profile_id?: string | null;
+  required_votes: number;
+  duration_minutes?: number | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  created_at?: string;
+  completed_at?: string | null;
+  is_active?: boolean;
 };
 
-type ChallengeOption = {
+type ChallengeTemplate = {
   id: string;
-  challenge_id: string;
-  text: string;
-  votes: number;
+  title: string;
+  description?: string | null;
+  category?: string | null;
+  default_points: number;
+  requires_vote: boolean;
+  minimum_votes: number;
 };
 
 type ChallengeVote = {
   id: string;
   challenge_id: string;
-  option_id: string;
-  profile_id: string;
+  voter_profile_id: string;
+  target_profile_id?: string | null;
+  vote: string;
+  comment?: string | null;
+  created_at?: string;
 };
 
-type Payment = {
-  id: string;
-  event_id: string;
-  betrag?: number | null;
-  profile_id?: string | null;
-  bezahlt_von?: string | null;
-  status?: string | null;
+type RankingTitle = {
+  min_points: number;
+  title: string;
+  emoji?: string | null;
+  description?: string | null;
 };
 
-/* =========================================================
+type MessageType = "success" | "error" | "info";
+
+/* ============================================================
    HELPERS
-========================================================= */
+   ============================================================ */
+
+function money(value: number) {
+  return `${value.toFixed(2)} €`;
+}
+
+function liters(value: number) {
+  return `${value.toFixed(2)} L`;
+}
 
 function getDrinkName(drink: Drink) {
   return (
@@ -160,152 +178,106 @@ function getDrinkPrice(drink: Drink) {
   return Number(drink.preis ?? 0);
 }
 
-function getRankingTitle(
-  index: number,
-  person: Participant
-) {
-  if (index === 0) {
-    return "🍻 Zapfhahn-König";
-  }
-
-  if (index === 1) {
-    return "🔥 Fast schon Legende";
-  }
-
-  if (index === 2) {
-    return "🥉 Stammgast in Ausbildung";
-  }
-
-  if (person.challengePoints >= 50) {
-    return "🎯 Challenge-Maschine";
-  }
-
-  if (person.drinks >= 8) {
-    return "🍺 Rundenmeister";
-  }
-
-  if (person.drinks >= 5) {
-    return "🥴 Zapfhahn-Veteran";
-  }
-
-  if (person.drinks >= 3) {
-    return "😂 Solider Durst";
-  }
-
-  if (person.drinks >= 1) {
-    return "🍻 Dabei sein ist alles";
-  }
-
-  return "😇 Noch trocken hinter den Ohren";
-}
-
-function getDifficultyPoints(
-  difficulty: Challenge["difficulty"]
-) {
-  if (difficulty === "legendary") {
-    return 30;
-  }
-
-  if (difficulty === "hard") {
-    return 20;
-  }
-
-  return 10;
-}
-
-/* =========================================================
-   MAIN COMPONENT
-========================================================= */
+/* ============================================================
+   MAIN
+   ============================================================ */
 
 export default function Home() {
-  /* -------------------------------------------------------
-     BASIC STATE
-  ------------------------------------------------------- */
+  /* ----------------------------------------------------------
+     EVENTS
+     ---------------------------------------------------------- */
 
-  const [events, setEvents] = useState<Event[]>([]);
+  const [events, setEvents] = useState<EventRow[]>([]);
   const [eventId, setEventId] = useState("");
 
+  /* ----------------------------------------------------------
+     PROFILES / MEMBERS
+     ---------------------------------------------------------- */
+
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [participants, setParticipants] =
-    useState<Participant[]>([]);
+  const [members, setMembers] = useState<EventMember[]>([]);
+  const [currentProfileId, setCurrentProfileId] = useState("");
+
+  const [personName, setPersonName] = useState("");
+
+  /* ----------------------------------------------------------
+     DRINKS
+     ---------------------------------------------------------- */
 
   const [drinks, setDrinks] = useState<Drink[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-
-  const [challenges, setChallenges] =
-    useState<Challenge[]>([]);
-
-  const [challengeOptions, setChallengeOptions] =
-    useState<ChallengeOption[]>([]);
-
-  const [challengeVotes, setChallengeVotes] =
-    useState<ChallengeVote[]>([]);
-
-  const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState("");
-
-  /* -------------------------------------------------------
-     UI STATE
-  ------------------------------------------------------- */
-
-  const [activeTab, setActiveTab] =
-    useState<"home" | "drinks" | "challenges" | "ranking">(
-      "home"
-    );
-
-  const [showDrinkForm, setShowDrinkForm] =
-    useState(false);
-
-  const [showChallengeForm, setShowChallengeForm] =
-    useState(false);
-
-  /* -------------------------------------------------------
-     DRINK FORM
-  ------------------------------------------------------- */
 
   const [drinkName, setDrinkName] = useState("");
   const [drinkBrand, setDrinkBrand] = useState("");
-  const [drinkCategory, setDrinkCategory] =
-    useState("Bier");
-  const [drinkLiters, setDrinkLiters] =
-    useState("0.5");
-  const [drinkAlcohol, setDrinkAlcohol] =
-    useState("5");
-  const [drinkPrice, setDrinkPrice] =
-    useState("0");
+  const [drinkCategory, setDrinkCategory] = useState("Bier");
+  const [drinkLiters, setDrinkLiters] = useState("0.5");
+  const [drinkAlcohol, setDrinkAlcohol] = useState("5");
+  const [drinkPrice, setDrinkPrice] = useState("0");
 
-  /* -------------------------------------------------------
-     PARTICIPANT FORM
-  ------------------------------------------------------- */
+  /* ----------------------------------------------------------
+     CHALLENGES
+     ---------------------------------------------------------- */
 
-  const [participantName, setParticipantName] =
+  const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [challengeTemplates, setChallengeTemplates] = useState<
+    ChallengeTemplate[]
+  >([]);
+
+  const [selectedChallengeTemplate, setSelectedChallengeTemplate] =
     useState("");
 
-  /* -------------------------------------------------------
-     CHALLENGE FORM
-  ------------------------------------------------------- */
-
-  const [challengeTarget, setChallengeTarget] =
-    useState("");
-
+  const [challengeTitle, setChallengeTitle] = useState("");
   const [challengeDescription, setChallengeDescription] =
     useState("");
+  const [challengeCategory, setChallengeCategory] =
+    useState("Quatsch");
+  const [challengePoints, setChallengePoints] =
+    useState("10");
+  const [requiredVotes, setRequiredVotes] =
+    useState("2");
 
-  const [challengeDifficulty, setChallengeDifficulty] =
-    useState<Challenge["difficulty"]>("normal");
-
-  const [challengeOption1, setChallengeOption1] =
+  const [selectedChallengeId, setSelectedChallengeId] =
     useState("");
 
-  const [challengeOption2, setChallengeOption2] =
+  const [challengeTargetProfile, setChallengeTargetProfile] =
     useState("");
 
-  const [challengeOption3, setChallengeOption3] =
-    useState("");
+  /* ----------------------------------------------------------
+     UI
+     ---------------------------------------------------------- */
 
-  /* -------------------------------------------------------
+  const [activeTab, setActiveTab] = useState<
+    "home" | "drinks" | "challenges" | "ranking"
+  >("home");
+
+  const [showAddDrink, setShowAddDrink] = useState(false);
+  const [showAddChallenge, setShowAddChallenge] =
+    useState(false);
+
+  const [message, setMessage] = useState("");
+  const [messageType, setMessageType] =
+    useState<MessageType>("info");
+
+  const [loading, setLoading] = useState(false);
+
+  /* ============================================================
+     MESSAGE
+     ============================================================ */
+
+  function showMessage(
+    text: string,
+    type: MessageType = "info"
+  ) {
+    setMessage(text);
+    setMessageType(type);
+
+    window.setTimeout(() => {
+      setMessage("");
+    }, 4000);
+  }
+
+  /* ============================================================
      LOAD EVENTS
-  ------------------------------------------------------- */
+     ============================================================ */
 
   async function loadEvents() {
     const { data, error } = await supabase
@@ -316,101 +288,99 @@ export default function Home() {
       });
 
     if (error) {
-      setMessage("❌ Events konnten nicht geladen werden.");
+      showMessage(
+        `Events konnten nicht geladen werden: ${error.message}`,
+        "error"
+      );
       return;
     }
 
-    if (data) {
-      setEvents(data);
+    const rows = (data || []) as EventRow[];
 
-      if (!eventId && data.length > 0) {
-        setEventId(data[0].id);
-      }
+    setEvents(rows);
+
+    if (!eventId && rows.length > 0) {
+      setEventId(rows[0].id);
     }
   }
 
-  /* -------------------------------------------------------
+  /* ============================================================
      LOAD PROFILES
-  ------------------------------------------------------- */
+     ============================================================ */
 
   async function loadProfiles() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .select("*")
       .order("username", {
         ascending: true,
       });
 
-    if (data) {
-      setProfiles(data);
+    if (error) {
+      showMessage(
+        `Profile konnten nicht geladen werden: ${error.message}`,
+        "error"
+      );
+      return;
+    }
+
+    const rows = (data || []) as Profile[];
+
+    setProfiles(rows);
+
+    if (!currentProfileId && rows.length > 0) {
+      setCurrentProfileId(rows[0].id);
     }
   }
 
-  /* -------------------------------------------------------
+  /* ============================================================
      LOAD EVENT MEMBERS
-  ------------------------------------------------------- */
+     ============================================================ */
 
-  async function loadParticipants() {
-    if (!eventId) return;
+  async function loadMembers() {
+    if (!eventId) {
+      setMembers([]);
+      return;
+    }
 
     const { data, error } = await supabase
       .from("event_members")
-      .select(
-        `
-        id,
-        event_id,
-        profile_id,
-        joined_at,
-        joined_via_code
-        `
-      )
+      .select("*")
       .eq("event_id", eventId)
       .order("joined_at", {
         ascending: true,
       });
 
     if (error) {
-      setMessage(
-        "❌ Teilnehmer konnten nicht geladen werden."
+      showMessage(
+        `Teilnehmer konnten nicht geladen werden: ${error.message}`,
+        "error"
       );
       return;
     }
 
-    if (!data) {
-      setParticipants([]);
-      return;
-    }
+    const raw = (data || []) as EventMember[];
 
-    const result: Participant[] = data.map(
-      (member: any) => {
-        const profile = profiles.find(
-          (p) => p.id === member.profile_id
-        );
+    const enriched = raw.map((member) => ({
+      ...member,
+      profile:
+        profiles.find(
+          (profile) => profile.id === member.profile_id
+        ) || null,
+    }));
 
-        return {
-          id: member.id,
-          profile_id: member.profile_id,
-          name:
-            profile?.username ||
-            "Teilnehmer",
-          points: 0,
-          drinks: 0,
-          liters: 0,
-          cost: 0,
-          challengePoints: 0,
-        };
-      }
-    );
-
-    setParticipants(result);
+    setMembers(enriched);
   }
 
-  /* -------------------------------------------------------
+  /* ============================================================
      LOAD DRINKS
-  ------------------------------------------------------- */
+     ============================================================ */
 
   async function loadDrinks() {
-    if (!eventId) return;
+    if (!eventId) {
+      setDrinks([]);
+      return;
+    }
 
     const { data, error } = await supabase
       .from("drinks")
@@ -421,43 +391,25 @@ export default function Home() {
       });
 
     if (error) {
-      setMessage(
-        "❌ Getränke konnten nicht geladen werden."
+      showMessage(
+        `Getränke konnten nicht geladen werden: ${error.message}`,
+        "error"
       );
       return;
     }
 
-    if (data) {
-      setDrinks(data);
-    }
+    setDrinks((data || []) as Drink[]);
   }
 
-  /* -------------------------------------------------------
-     LOAD PAYMENTS
-  ------------------------------------------------------- */
-
-  async function loadPayments() {
-    if (!eventId) return;
-
-    const { data } = await supabase
-      .from("payments")
-      .select("*")
-      .eq("event_id", eventId)
-      .order("created_at", {
-        ascending: false,
-      });
-
-    if (data) {
-      setPayments(data);
-    }
-  }
-
-  /* -------------------------------------------------------
+  /* ============================================================
      LOAD CHALLENGES
-  ------------------------------------------------------- */
+     ============================================================ */
 
   async function loadChallenges() {
-    if (!eventId) return;
+    if (!eventId) {
+      setChallenges([]);
+      return;
+    }
 
     const { data, error } = await supabase
       .from("challenges")
@@ -468,92 +420,102 @@ export default function Home() {
       });
 
     if (error) {
-      /*
-        Falls die Challenge-Tabelle noch nicht existiert,
-        zeigen wir keinen kompletten Fehlerbildschirm.
-      */
+      showMessage(
+        `Challenges konnten nicht geladen werden: ${error.message}`,
+        "error"
+      );
       return;
     }
 
-    if (data) {
-      setChallenges(data);
-    }
-
-    const challengeIds =
-      (data || []).map((c: Challenge) => c.id);
-
-    if (challengeIds.length === 0) {
-      setChallengeOptions([]);
-      setChallengeVotes([]);
-      return;
-    }
-
-    const { data: options } = await supabase
-      .from("challenge_options")
-      .select("*")
-      .in("challenge_id", challengeIds);
-
-    const { data: votes } = await supabase
-      .from("challenge_votes")
-      .select("*")
-      .in("challenge_id", challengeIds);
-
-    if (options) {
-      setChallengeOptions(options);
-    }
-
-    if (votes) {
-      setChallengeVotes(votes);
-    }
+    setChallenges((data || []) as Challenge[]);
   }
 
-  /* -------------------------------------------------------
-     INITIAL LOAD
-  ------------------------------------------------------- */
+  /* ============================================================
+     LOAD CHALLENGE TEMPLATES
+     ============================================================ */
 
-  useEffect(() => {
-    async function start() {
-      setLoading(true);
+  async function loadChallengeTemplates() {
+    const { data, error } = await supabase
+      .from("challenge_templates")
+      .select("*")
+      .eq("is_active", true)
+      .order("title", {
+        ascending: true,
+      });
 
-      await loadEvents();
-      await loadProfiles();
-
-      setLoading(false);
+    if (error) {
+      showMessage(
+        `Challenge-Vorlagen konnten nicht geladen werden: ${error.message}`,
+        "error"
+      );
+      return;
     }
 
-    start();
+    setChallengeTemplates(
+      (data || []) as ChallengeTemplate[]
+    );
+  }
+
+  /* ============================================================
+     INITIAL LOAD
+     ============================================================ */
+
+  useEffect(() => {
+    loadEvents();
+    loadProfiles();
+    loadChallengeTemplates();
   }, []);
 
-  /* -------------------------------------------------------
-     LOAD EVENT DATA
-  ------------------------------------------------------- */
+  /* ============================================================
+     EVENT CHANGE
+     ============================================================ */
 
   useEffect(() => {
     if (!eventId) return;
 
-    async function loadEverything() {
-      await loadDrinks();
-      await loadPayments();
-      await loadParticipants();
-      await loadChallenges();
-    }
-
-    loadEverything();
+    loadDrinks();
+    loadChallenges();
+    loadMembers();
   }, [eventId, profiles.length]);
 
-  /* ========================================================
+  /* ============================================================
      CURRENT EVENT
-  ======================================================== */
+     ============================================================ */
 
   const currentEvent = useMemo(() => {
-    return events.find(
-      (event) => event.id === eventId
-    );
+    return events.find((event) => event.id === eventId);
   }, [events, eventId]);
 
-  /* ========================================================
-     CALCULATIONS
-  ======================================================== */
+  /* ============================================================
+     MEMBERS WITH PROFILE
+     ============================================================ */
+
+  const memberProfiles = useMemo(() => {
+    return members
+      .map((member) => {
+        const profile =
+          profiles.find(
+            (p) => p.id === member.profile_id
+          ) || member.profile;
+
+        return {
+          member,
+          profile,
+        };
+      })
+      .filter(
+        (
+          item
+        ): item is {
+          member: EventMember;
+          profile: Profile;
+        } => Boolean(item.profile)
+      );
+  }, [members, profiles]);
+
+  /* ============================================================
+     TOTALS
+     ============================================================ */
 
   const totalLiters = useMemo(() => {
     return drinks.reduce(
@@ -565,7 +527,7 @@ export default function Home() {
     );
   }, [drinks]);
 
-  const totalDrinkCost = useMemo(() => {
+  const totalCost = useMemo(() => {
     return drinks.reduce(
       (sum, drink) =>
         sum +
@@ -575,577 +537,836 @@ export default function Home() {
     );
   }, [drinks]);
 
-  const totalPayments = useMemo(() => {
-    return payments.reduce(
-      (sum, payment) =>
-        sum + Number(payment.betrag ?? 0),
-      0
-    );
-  }, [payments]);
-
-  const totalCost =
-    totalDrinkCost > 0
-      ? totalDrinkCost
-      : totalPayments;
-
-  const totalDrinkCount = useMemo(() => {
+  const totalDrinks = useMemo(() => {
     return drinks.reduce(
       (sum, drink) =>
-        sum +
-        Number(drink.quantity ?? 1),
+        sum + Number(drink.quantity ?? 1),
       0
     );
   }, [drinks]);
 
-  /* -------------------------------------------------------
-     PARTICIPANT STATISTICS
-  ------------------------------------------------------- */
+  const averageCost = useMemo(() => {
+    if (memberProfiles.length === 0) {
+      return 0;
+    }
 
-  const participantStats = useMemo(() => {
-    const map = new Map<
-      string,
-      Participant
-    >();
+    return totalCost / memberProfiles.length;
+  }, [totalCost, memberProfiles.length]);
 
-    participants.forEach((person) => {
-      map.set(person.profile_id, {
-        ...person,
-      });
-    });
+  /* ============================================================
+     RANKING TITLE
+     ============================================================ */
 
-    drinks.forEach((drink) => {
-      if (!drink.profile_id) return;
+  const getLocalRankingTitle = (
+    points: number
+  ): RankingTitle => {
+    if (points >= 2000) {
+      return {
+        min_points: 2000,
+        title: "Endgegner der Theke",
+        emoji: "💀",
+        description: "Die absolute Endstufe.",
+      };
+    }
 
-      const person =
-        map.get(drink.profile_id);
+    if (points >= 1200) {
+      return {
+        min_points: 1200,
+        title: "Güstener Trinklegende",
+        emoji: "🔥",
+        description: "Eine lebende Legende.",
+      };
+    }
 
-      if (!person) return;
+    if (points >= 850) {
+      return {
+        min_points: 850,
+        title: "Hopfen-Herrscher",
+        emoji: "🍺",
+        description: "Der Zapfhahn gehorcht.",
+      };
+    }
 
-      const quantity =
-        Number(drink.quantity ?? 1);
+    if (points >= 600) {
+      return {
+        min_points: 600,
+        title: "Kneipen-König",
+        emoji: "👑",
+        description: "Die Krone sitzt.",
+      };
+    }
 
-      person.drinks += quantity;
+    if (points >= 400) {
+      return {
+        min_points: 400,
+        title: "Promille-Pilot",
+        emoji: "✈️",
+        description: "Bitte anschnallen.",
+      };
+    }
 
-      person.liters +=
-        getDrinkLiters(drink) *
-        quantity;
+    if (points >= 250) {
+      return {
+        min_points: 250,
+        title: "Zapfhahn-Meister",
+        emoji: "🏆",
+        description: "Kaum noch aufzuhalten.",
+      };
+    }
 
-      person.cost +=
-        getDrinkPrice(drink) *
-        quantity;
+    if (points >= 150) {
+      return {
+        min_points: 150,
+        title: "Bier-Baron",
+        emoji: "👑",
+        description: "Respekt an der Theke.",
+      };
+    }
 
-      person.points +=
-        10 * quantity;
-    });
+    if (points >= 100) {
+      return {
+        min_points: 100,
+        title: "Hopfen-Held",
+        emoji: "🦸",
+        description: "Ein echter Kämpfer.",
+      };
+    }
 
-    challenges
-      .filter(
-        (challenge) =>
-          challenge.status === "completed"
-      )
-      .forEach((challenge) => {
-        const person = map.get(
-          challenge.target_profile_id
-        );
+    if (points >= 50) {
+      return {
+        min_points: 50,
+        title: "Zapfhahn-Lehrling",
+        emoji: "🍺",
+        description: "Die Ausbildung läuft.",
+      };
+    }
 
-        if (!person) return;
+    if (points >= 25) {
+      return {
+        min_points: 25,
+        title: "Bierpraktikant",
+        emoji: "🍻",
+        description: "Erste Erfahrungen gesammelt.",
+      };
+    }
 
-        person.challengePoints +=
-          Number(challenge.points ?? 0);
+    return {
+      min_points: 0,
+      title: "Anfänger der gepflegten Eskalation",
+      emoji: "🍺",
+      description: "Noch ist alles unter Kontrolle.",
+    };
+  };
 
-        person.points +=
-          Number(challenge.points ?? 0);
-      });
-
-    return Array.from(map.values());
-  }, [
-    participants,
-    drinks,
-    challenges,
-  ]);
+  /* ============================================================
+     RANKING
+     ============================================================ */
 
   const ranking = useMemo(() => {
-    return [...participantStats].sort(
-      (a, b) => b.points - a.points
-    );
-  }, [participantStats]);
+    return memberProfiles
+      .map(({ profile }) => {
+        const challengePoints = challenges
+          .filter(
+            (challenge) =>
+              challenge.winner_profile_id ===
+              profile.id
+          )
+          .reduce(
+            (sum, challenge) =>
+              sum + Number(challenge.points || 0),
+            0
+          );
 
-  const totalPoints = useMemo(() => {
-    return participantStats.reduce(
-      (sum, person) =>
-        sum + person.points,
-      0
-    );
-  }, [participantStats]);
+        const basePoints = Number(
+          profile.points || 0
+        );
 
-  const completedChallenges =
-    challenges.filter(
-      (c) => c.status === "completed"
-    ).length;
+        const totalPoints =
+          basePoints + challengePoints;
 
-  const openChallenges =
-    challenges.filter(
-      (c) => c.status !== "completed"
-    ).length;
+        return {
+          profile,
+          points: totalPoints,
+          title: getLocalRankingTitle(
+            totalPoints
+          ),
+        };
+      })
+      .sort((a, b) => b.points - a.points);
+  }, [memberProfiles, challenges]);
 
-  /* ========================================================
-     MESSAGE
-  ======================================================== */
-
-  function showMessage(text: string) {
-    setMessage(text);
-
-    setTimeout(() => {
-      setMessage("");
-    }, 4000);
-  }
-
-  /* ========================================================
+  /* ============================================================
      ADD PARTICIPANT
-  ======================================================== */
+     ============================================================ */
 
   async function addParticipant() {
+    const name = personName.trim();
+
+    if (!name) {
+      showMessage(
+        "Bitte zuerst einen Namen eingeben.",
+        "error"
+      );
+      return;
+    }
+
     if (!eventId) {
       showMessage(
-        "❌ Bitte zuerst ein Event auswählen."
+        "Bitte zuerst ein Event auswählen.",
+        "error"
       );
       return;
     }
 
-    if (!participantName.trim()) {
+    setLoading(true);
+
+    try {
+      let profile = profiles.find(
+        (p) =>
+          p.username?.toLowerCase() ===
+          name.toLowerCase()
+      );
+
+      /* --------------------------------------------------------
+         EXISTIERENDES PROFIL
+         -------------------------------------------------------- */
+
+      if (!profile) {
+        const { data, error } = await supabase
+          .from("profiles")
+          .insert({
+            username: name,
+            role: "member",
+            points: 0,
+            drinks_count: 0,
+          })
+          .select("*")
+          .single();
+
+        if (error) {
+          showMessage(
+            `Teilnehmer konnte nicht angelegt werden: ${error.message}`,
+            "error"
+          );
+          return;
+        }
+
+        profile = data as Profile;
+
+        setProfiles((old) => [
+          ...old,
+          profile!,
+        ]);
+      }
+
+      /* --------------------------------------------------------
+         PRÜFEN OB SCHON IM EVENT
+         -------------------------------------------------------- */
+
+      const alreadyMember = members.some(
+        (member) =>
+          member.profile_id === profile!.id
+      );
+
+      if (alreadyMember) {
+        showMessage(
+          "Diese Person ist bereits im Event.",
+          "error"
+        );
+        return;
+      }
+
+      /* --------------------------------------------------------
+         EVENT_MEMBER
+         -------------------------------------------------------- */
+
+      const { error: memberError } =
+        await supabase
+          .from("event_members")
+          .insert({
+            event_id: eventId,
+            profile_id: profile.id,
+          });
+
+      if (memberError) {
+        showMessage(
+          `Teilnehmer konnte nicht hinzugefügt werden: ${memberError.message}`,
+          "error"
+        );
+        return;
+      }
+
+      setPersonName("");
+
       showMessage(
-        "❌ Bitte einen Namen eingeben."
+        `${name} wurde dem Event hinzugefügt.`,
+        "success"
       );
-      return;
+
+      await loadMembers();
+    } finally {
+      setLoading(false);
     }
+  }
 
-    const existing = profiles.find(
-      (profile) =>
-        profile.username?.toLowerCase() ===
-        participantName
-          .trim()
-          .toLowerCase()
-    );
+  /* ============================================================
+     REMOVE PARTICIPANT
+     ============================================================ */
 
-    if (!existing) {
-      showMessage(
-        "❌ Dieser Teilnehmer existiert noch nicht in profiles."
-      );
-      return;
-    }
-
-    const alreadyMember =
-      participants.some(
-        (person) =>
-          person.profile_id ===
-          existing.id
-      );
-
-    if (alreadyMember) {
-      showMessage(
-        "❌ Teilnehmer ist bereits dabei."
-      );
-      return;
-    }
-
+  async function removeParticipant(
+    memberId: string
+  ) {
     const { error } = await supabase
       .from("event_members")
-      .insert({
-        event_id: eventId,
-        profile_id: existing.id,
-        joined_via_code: "manual",
-      });
+      .delete()
+      .eq("id", memberId);
 
     if (error) {
       showMessage(
-        "❌ Teilnehmer konnte nicht hinzugefügt werden: " +
-          error.message
+        `Teilnehmer konnte nicht entfernt werden: ${error.message}`,
+        "error"
       );
       return;
     }
 
-    setParticipantName("");
-
-    await loadParticipants();
-
     showMessage(
-      "🎉 Teilnehmer ist dabei!"
+      "Teilnehmer entfernt.",
+      "success"
     );
+
+    await loadMembers();
   }
 
-  /* ========================================================
-     ADD DRINK
-  ======================================================== */
+  /* ============================================================
+     SAVE DRINK
+     ============================================================ */
 
   async function saveDrink() {
     if (!eventId) {
       showMessage(
-        "❌ Bitte zuerst ein Event auswählen."
+        "Bitte zuerst ein Event auswählen.",
+        "error"
       );
       return;
     }
 
     if (!drinkName.trim()) {
       showMessage(
-        "❌ Bitte ein Getränk eingeben."
+        "Bitte ein Getränk eingeben.",
+        "error"
       );
       return;
     }
 
-    const { error } = await supabase
-      .from("drinks")
-      .insert({
-        event_id: eventId,
-        drink_name:
-          drinkName.trim(),
-        getraenk:
-          drinkName.trim(),
-        brand:
-          drinkBrand.trim() || null,
-        marke:
-          drinkBrand.trim() || null,
-        category:
-          drinkCategory,
-        liters:
-          Number(drinkLiters),
-        menge:
-          Number(drinkLiters),
-        alcohol_percent:
-          Number(drinkAlcohol),
-        alkohol:
-          Number(drinkAlcohol),
-        preis:
-          Number(drinkPrice),
-        quantity: 1,
-        ai_detected: false,
-      });
+    setLoading(true);
 
-    if (error) {
+    try {
+      const { error } = await supabase
+        .from("drinks")
+        .insert({
+          event_id: eventId,
+
+          drink_name:
+            drinkName.trim(),
+
+          getraenk:
+            drinkName.trim(),
+
+          brand:
+            drinkBrand.trim() || null,
+
+          marke:
+            drinkBrand.trim() || null,
+
+          category:
+            drinkCategory,
+
+          liters:
+            Number(drinkLiters) || 0,
+
+          menge:
+            Number(drinkLiters) || 0,
+
+          alcohol_percent:
+            Number(drinkAlcohol) || 0,
+
+          alkohol:
+            Number(drinkAlcohol) || 0,
+
+          preis:
+            Number(drinkPrice) || 0,
+
+          quantity: 1,
+        });
+
+      if (error) {
+        showMessage(
+          `Getränk konnte nicht gespeichert werden: ${error.message}`,
+          "error"
+        );
+        return;
+      }
+
+      setDrinkName("");
+      setDrinkBrand("");
+      setDrinkLiters("0.5");
+      setDrinkAlcohol("5");
+      setDrinkPrice("0");
+
+      setShowAddDrink(false);
+
       showMessage(
-        "❌ Getränk konnte nicht gespeichert werden: " +
-          error.message
+        "🍺 Getränk gespeichert!",
+        "success"
       );
-      return;
+
+      await loadDrinks();
+    } finally {
+      setLoading(false);
     }
-
-    setDrinkName("");
-    setDrinkBrand("");
-    setDrinkCategory("Bier");
-    setDrinkLiters("0.5");
-    setDrinkAlcohol("5");
-    setDrinkPrice("0");
-
-    setShowDrinkForm(false);
-
-    await loadDrinks();
-
-    showMessage(
-      "🍺 Getränk gespeichert!"
-    );
   }
 
-  /* ========================================================
+  /* ============================================================
      ASSIGN DRINK
-  ======================================================== */
+     ============================================================ */
 
   async function assignDrink(
-    drinkId: string,
+    drink: Drink,
     profileId: string
   ) {
-    if (!profileId) return;
-
     const { error } = await supabase
       .from("drinks")
       .update({
         profile_id: profileId,
       })
-      .eq("id", drinkId);
+      .eq("id", drink.id);
 
     if (error) {
       showMessage(
-        "❌ Getränk konnte nicht zugeordnet werden: " +
-          error.message
+        `Getränk konnte nicht zugeordnet werden: ${error.message}`,
+        "error"
       );
       return;
     }
 
-    await loadDrinks();
-
     showMessage(
-      "🍺 Getränk wurde zugeordnet! +10 Punkte"
+      "🍺 Getränk wurde zugeordnet!",
+      "success"
     );
+
+    await loadDrinks();
   }
 
-  /* ========================================================
+  /* ============================================================
      CREATE CHALLENGE
-  ======================================================== */
+     ============================================================ */
 
   async function createChallenge() {
     if (!eventId) {
       showMessage(
-        "❌ Kein Event ausgewählt."
+        "Bitte zuerst ein Event auswählen.",
+        "error"
       );
       return;
     }
 
-    if (!challengeTarget) {
+    if (!challengeTitle.trim()) {
       showMessage(
-        "❌ Wähle zuerst einen Teilnehmer."
+        "Bitte einen Challenge-Titel eingeben.",
+        "error"
       );
       return;
     }
 
-    if (!challengeDescription.trim()) {
+    setLoading(true);
+
+    try {
+      const { data, error } =
+        await supabase
+          .from("challenges")
+          .insert({
+            event_id: eventId,
+
+            title:
+              challengeTitle.trim(),
+
+            description:
+              challengeDescription.trim() ||
+              null,
+
+            category:
+              challengeCategory,
+
+            points:
+              Number(challengePoints) || 10,
+
+            required_votes:
+              Math.max(
+                1,
+                Number(requiredVotes) || 1
+              ),
+
+            status: "open",
+
+            created_by_profile_id:
+              currentProfileId || null,
+
+            is_active: true,
+          })
+          .select("*")
+          .single();
+
+      if (error) {
+        showMessage(
+          `Challenge konnte nicht erstellt werden: ${error.message}`,
+          "error"
+        );
+        return;
+      }
+
+      if (data) {
+        setChallenges((old) => [
+          data as Challenge,
+          ...old,
+        ]);
+      }
+
+      setChallengeTitle("");
+      setChallengeDescription("");
+      setChallengeCategory("Quatsch");
+      setChallengePoints("10");
+      setRequiredVotes("2");
+      setSelectedChallengeTemplate("");
+
+      setShowAddChallenge(false);
+
       showMessage(
-        "❌ Gib eine Aufgabe ein."
+        "🎯 Challenge erstellt!",
+        "success"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /* ============================================================
+     CREATE CHALLENGE FROM TEMPLATE
+     ============================================================ */
+
+  async function createFromTemplate() {
+    const template =
+      challengeTemplates.find(
+        (item) =>
+          item.id ===
+          selectedChallengeTemplate
+      );
+
+    if (!template) {
+      showMessage(
+        "Bitte eine Challenge-Vorlage auswählen.",
+        "error"
       );
       return;
     }
 
-    const optionsText = [
-      challengeOption1,
-      challengeOption2,
-      challengeOption3,
-    ].filter(
-      (value) => value.trim()
+    setChallengeTitle(template.title);
+    setChallengeDescription(
+      template.description || ""
+    );
+    setChallengeCategory(
+      template.category || "Quatsch"
+    );
+    setChallengePoints(
+      String(template.default_points)
+    );
+    setRequiredVotes(
+      String(
+        template.requires_vote
+          ? template.minimum_votes
+          : 1
+      )
     );
 
-    if (optionsText.length < 2) {
+    setShowAddChallenge(true);
+  }
+
+  /* ============================================================
+     RANDOM ASSIGNMENT
+     ============================================================ */
+
+  async function assignRandomChallenge(
+    challenge: Challenge
+  ) {
+    const available =
+      memberProfiles.map(
+        ({ profile }) => profile
+      );
+
+    if (available.length === 0) {
       showMessage(
-        "❌ Bitte mindestens zwei Antwortmöglichkeiten eingeben."
+        "Es gibt noch keine Teilnehmer.",
+        "error"
       );
       return;
     }
 
-    const target =
-      participantStats.find(
-        (person) =>
-          person.profile_id ===
-          challengeTarget
-      );
+    const random =
+      available[
+        Math.floor(
+          Math.random() *
+            available.length
+        )
+      ];
 
-    if (!target) {
-      showMessage(
-        "❌ Teilnehmer nicht gefunden."
-      );
-      return;
-    }
-
-    const points =
-      getDifficultyPoints(
-        challengeDifficulty
-      );
-
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("challenges")
-      .insert({
-        event_id: eventId,
-        title:
-          "🎯 Was soll " +
-          target.name +
-          " machen?",
-        description:
-          challengeDescription.trim(),
-        target_profile_id:
-          target.profile_id,
-        target_name:
-          target.name,
-        status: "voting",
-        difficulty:
-          challengeDifficulty,
-        points,
+      .update({
+        assigned_profile_id:
+          random.id,
       })
-      .select()
-      .single();
+      .eq("id", challenge.id);
 
-    if (error || !data) {
+    if (error) {
       showMessage(
-        "❌ Challenge konnte nicht erstellt werden: " +
-          (error?.message || "Unbekannter Fehler")
+        `Challenge konnte nicht vergeben werden: ${error.message}`,
+        "error"
       );
       return;
     }
 
-    const optionRows =
-      optionsText.map((text) => ({
-        challenge_id: data.id,
-        text: text.trim(),
-        votes: 0,
-      }));
-
-    const { error: optionError } =
-      await supabase
-        .from("challenge_options")
-        .insert(optionRows);
-
-    if (optionError) {
-      showMessage(
-        "❌ Challenge wurde erstellt, aber die Optionen konnten nicht gespeichert werden."
+    await supabase
+      .from("challenge_participants")
+      .upsert(
+        {
+          challenge_id:
+            challenge.id,
+          profile_id:
+            random.id,
+        },
+        {
+          onConflict:
+            "challenge_id,profile_id",
+        }
       );
-      return;
-    }
-
-    setChallengeTarget("");
-    setChallengeDescription("");
-    setChallengeDifficulty("normal");
-    setChallengeOption1("");
-    setChallengeOption2("");
-    setChallengeOption3("");
-
-    setShowChallengeForm(false);
-
-    await loadChallenges();
 
     showMessage(
-      "🎯 Challenge gestartet! Jetzt darf die Gruppe abstimmen."
+      `🎲 Challenge geht an ${random.username || "Teilnehmer"}!`,
+      "success"
+    );
+
+    await loadChallenges();
+  }
+
+  /* ============================================================
+     ADD CHALLENGE PARTICIPANT
+     ============================================================ */
+
+  async function addChallengeParticipant(
+    challengeId: string,
+    profileId: string
+  ) {
+    if (!profileId) return;
+
+    const { error } = await supabase
+      .from("challenge_participants")
+      .upsert(
+        {
+          challenge_id: challengeId,
+          profile_id: profileId,
+          accepted: true,
+        },
+        {
+          onConflict:
+            "challenge_id,profile_id",
+        }
+      );
+
+    if (error) {
+      showMessage(
+        `Teilnehmer konnte nicht zur Challenge hinzugefügt werden: ${error.message}`,
+        "error"
+      );
+      return;
+    }
+
+    showMessage(
+      "Teilnehmer für Challenge hinzugefügt.",
+      "success"
     );
   }
 
-  /* ========================================================
-     VOTE
-  ======================================================== */
+  /* ============================================================
+     LOAD VOTES
+     ============================================================ */
 
-  async function voteChallenge(
-    challengeId: string,
-    optionId: string,
-    voterProfileId: string
+  async function getVotes(
+    challengeId: string
   ) {
-    if (!voterProfileId) {
+    const { data, error } = await supabase
+      .from("challenge_votes")
+      .select("*")
+      .eq(
+        "challenge_id",
+        challengeId
+      );
+
+    if (error) {
       showMessage(
-        "❌ Bitte einen Teilnehmer auswählen."
+        `Abstimmungen konnten nicht geladen werden: ${error.message}`,
+        "error"
+      );
+      return [];
+    }
+
+    return (data || []) as ChallengeVote[];
+  }
+
+  /* ============================================================
+     CAST VOTE
+     ============================================================ */
+
+  async function castVote(
+    challenge: Challenge,
+    targetProfileId: string,
+    vote: "winner" | "loser"
+  ) {
+    if (!currentProfileId) {
+      showMessage(
+        "Bitte zuerst einen eigenen Teilnehmer auswählen.",
+        "error"
       );
       return;
     }
 
-    const alreadyVoted =
-      challengeVotes.some(
-        (vote) =>
-          vote.challenge_id ===
-            challengeId &&
-          vote.profile_id ===
-            voterProfileId
-      );
-
-    if (alreadyVoted) {
+    if (!targetProfileId) {
       showMessage(
-        "🗳️ Du hast bereits abgestimmt."
+        "Bitte eine Person auswählen.",
+        "error"
       );
       return;
     }
 
     const { error } = await supabase
       .from("challenge_votes")
-      .insert({
-        challenge_id:
-          challengeId,
-        option_id:
-          optionId,
-        profile_id:
-          voterProfileId,
-      });
+      .upsert(
+        {
+          challenge_id:
+            challenge.id,
+
+          voter_profile_id:
+            currentProfileId,
+
+          target_profile_id:
+            targetProfileId,
+
+          vote,
+
+          comment: null,
+        },
+        {
+          onConflict:
+            "challenge_id,voter_profile_id",
+        }
+      );
 
     if (error) {
       showMessage(
-        "❌ Abstimmung konnte nicht gespeichert werden: " +
-          error.message
+        `Abstimmung konnte nicht gespeichert werden: ${error.message}`,
+        "error"
       );
       return;
     }
 
-    const option =
-      challengeOptions.find(
-        (item) =>
-          item.id === optionId
-      );
-
-    if (option) {
-      await supabase
-        .from("challenge_options")
-        .update({
-          votes:
-            Number(option.votes ?? 0) +
-            1,
-        })
-        .eq("id", optionId);
-    }
-
-    await loadChallenges();
-
     showMessage(
-      "🗳️ Stimme abgegeben!"
+      vote === "winner"
+        ? "🗳️ Stimme für die Person abgegeben!"
+        : "🗳️ Stimme gegen die Person abgegeben!",
+      "success"
     );
   }
 
-  /* ========================================================
+  /* ============================================================
      COMPLETE CHALLENGE
-  ======================================================== */
+     ============================================================ */
 
   async function completeChallenge(
-    challenge: Challenge
+    challenge: Challenge,
+    winnerProfileId: string
   ) {
-    const options =
-      challengeOptions.filter(
-        (option) =>
-          option.challenge_id ===
-          challenge.id
-      );
-
-    if (options.length === 0) {
+    if (!winnerProfileId) {
       showMessage(
-        "❌ Keine Abstimmungsoptionen gefunden."
+        "Bitte zuerst einen Gewinner auswählen.",
+        "error"
       );
       return;
     }
 
-    const sorted =
-      [...options].sort(
-        (a, b) =>
-          Number(b.votes) -
-          Number(a.votes)
+    const { error } = await supabase.rpc(
+      "complete_challenge",
+      {
+        p_challenge_id:
+          challenge.id,
+
+        p_winner_profile_id:
+          winnerProfileId,
+      }
+    );
+
+    if (error) {
+      showMessage(
+        `Challenge konnte nicht abgeschlossen werden: ${error.message}`,
+        "error"
       );
+      return;
+    }
 
-    const winner = sorted[0];
+    showMessage(
+      "🏆 Challenge abgeschlossen und Punkte vergeben!",
+      "success"
+    );
 
+    await loadChallenges();
+    await loadProfiles();
+  }
+
+  /* ============================================================
+     CANCEL CHALLENGE
+     ============================================================ */
+
+  async function cancelChallenge(
+    challengeId: string
+  ) {
     const { error } = await supabase
       .from("challenges")
       .update({
-        status: "completed",
-        winner_option:
-          winner.text,
+        status: "cancelled",
+        is_active: false,
       })
-      .eq("id", challenge.id);
+      .eq("id", challengeId);
 
     if (error) {
       showMessage(
-        "❌ Challenge konnte nicht beendet werden."
+        `Challenge konnte nicht beendet werden: ${error.message}`,
+        "error"
       );
       return;
     }
 
-    await loadChallenges();
-
     showMessage(
-      "🏆 Abstimmung beendet! " +
-        challenge.target_name +
-        " muss: " +
-        winner.text
+      "Challenge beendet.",
+      "success"
     );
+
+    await loadChallenges();
   }
 
-  /* ========================================================
+  /* ============================================================
      DELETE DRINK
-  ======================================================== */
+     ============================================================ */
 
   async function deleteDrink(
     drinkId: string
   ) {
-    const confirmed =
-      window.confirm(
-        "Getränk wirklich löschen?"
-      );
-
-    if (!confirmed) return;
-
     const { error } = await supabase
       .from("drinks")
       .delete()
@@ -1153,126 +1374,129 @@ export default function Home() {
 
     if (error) {
       showMessage(
-        "❌ Getränk konnte nicht gelöscht werden."
+        `Getränk konnte nicht gelöscht werden: ${error.message}`,
+        "error"
       );
       return;
     }
 
-    await loadDrinks();
-
     showMessage(
-      "🗑️ Getränk gelöscht."
+      "Getränk gelöscht.",
+      "success"
+    );
+
+    await loadDrinks();
+  }
+
+  /* ============================================================
+     CHALLENGE STATUS LABEL
+     ============================================================ */
+
+  function challengeStatus(
+    status: string
+  ) {
+    switch (status) {
+      case "completed":
+        return "🏆 Abgeschlossen";
+
+      case "cancelled":
+        return "❌ Beendet";
+
+      case "open":
+      default:
+        return "🔥 Aktiv";
+    }
+  }
+
+  /* ============================================================
+     PERSON NAME
+     ============================================================ */
+
+  function profileName(
+    profileId?: string | null
+  ) {
+    if (!profileId) {
+      return "Niemand";
+    }
+
+    return (
+      profiles.find(
+        (profile) =>
+          profile.id === profileId
+      )?.username ||
+      "Unbekannt"
     );
   }
 
-  /* ========================================================
-     LOADING
-  ======================================================== */
+  /* ============================================================
+     PAGE
+     ============================================================ */
 
-  if (loading) {
-    return (
-      <main className="app">
-        <div className="loading">
-          <div className="loadingEmoji">
+  return (
+    <main className="page">
+      <div className="app">
+
+        {/* ====================================================
+            HEADER
+        ==================================================== */}
+
+        <header className="hero">
+
+          <div className="heroIcon">
             🍻
           </div>
 
-          <h1>
-            Güstener Zapfhahn Zentrale
-          </h1>
-
-          <p>
-            Zapfhahn wird geöffnet...
-          </p>
-        </div>
-      </main>
-    );
-  }
-
-  /* ========================================================
-     RENDER
-  ======================================================== */
-
-  return (
-    <main className="app">
-
-      <div className="backgroundGlow glow1" />
-      <div className="backgroundGlow glow2" />
-
-      <div className="appContainer">
-
-        {/* =================================================
-            HEADER
-        ================================================= */}
-
-        <header className="header">
-
-          <div className="brand">
-
-            <div className="brandIcon">
-              🍻
+          <div className="heroText">
+            <div className="eyebrow">
+              GÜSTEN · PARTY · CHAOS
             </div>
 
-            <div>
-              <h1>
-                Güstener
-                <br />
-                Zapfhahn Zentrale
-              </h1>
+            <h1>
+              Güstener
+              <br />
+              Zapfhahn Zentrale
+            </h1>
 
-              <p>
-                Hier wird Geschichte
-                geschrieben.
-              </p>
-            </div>
-
-          </div>
-
-          <div className="headerBadge">
-            🔥 LIVE
+            <p>
+              Dein Event. Deine Getränke.
+              Deine Challenges.
+            </p>
           </div>
 
         </header>
 
-        {/* =================================================
+
+        {/* ====================================================
             EVENT SELECT
-        ================================================= */}
+        ==================================================== */}
 
-        <section className="eventHero">
+        <section className="glassCard eventCard">
 
-          <div className="eventHeroTop">
+          <div className="sectionTop">
 
             <div>
-              <span className="eyebrow">
-                📅 AKTUELLES EVENT
+              <span className="sectionEmoji">
+                📅
               </span>
 
-              <h2>
-                {currentEvent?.title ||
-                  "Kein Event"}
-              </h2>
+              <div>
+                <h2>
+                  Aktuelles Event
+                </h2>
 
-              {currentEvent?.location && (
                 <p>
-                  📍{" "}
-                  {currentEvent.location}
+                  Wähle deine Party aus.
                 </p>
-              )}
-            </div>
-
-            <div className="beerEmoji">
-              🍺
+              </div>
             </div>
 
           </div>
 
           <select
-            className="eventSelect"
+            className="bigSelect"
             value={eventId}
             onChange={(e) =>
-              setEventId(
-                e.target.value
-              )
+              setEventId(e.target.value)
             }
           >
             <option value="">
@@ -1289,25 +1513,42 @@ export default function Home() {
             ))}
           </select>
 
+          {currentEvent && (
+            <div className="eventInfo">
+
+              <strong>
+                🎉 {currentEvent.title}
+              </strong>
+
+              {currentEvent.location && (
+                <span>
+                  📍 {currentEvent.location}
+                </span>
+              )}
+
+            </div>
+          )}
+
         </section>
 
-        {/* =================================================
+
+        {/* ====================================================
             STATS
-        ================================================= */}
+        ==================================================== */}
 
         <section className="statsGrid">
 
-          <div className="statCard">
+          <div className="stat">
             <span>🍺</span>
             <strong>
-              {totalDrinkCount}
+              {totalDrinks}
             </strong>
             <small>
               Getränke
             </small>
           </div>
 
-          <div className="statCard">
+          <div className="stat">
             <span>💧</span>
             <strong>
               {totalLiters.toFixed(1)}
@@ -1317,31 +1558,32 @@ export default function Home() {
             </small>
           </div>
 
-          <div className="statCard">
-            <span>👥</span>
+          <div className="stat">
+            <span>💶</span>
             <strong>
-              {participants.length}
+              {totalCost.toFixed(0)} €
             </strong>
             <small>
-              Leute
+              Kosten
             </small>
           </div>
 
-          <div className="statCard">
-            <span>🎯</span>
+          <div className="stat">
+            <span>👥</span>
             <strong>
-              {totalPoints}
+              {memberProfiles.length}
             </strong>
             <small>
-              Punkte
+              Teilnehmer
             </small>
           </div>
 
         </section>
 
-        {/* =================================================
+
+        {/* ====================================================
             NAVIGATION
-        ================================================= */}
+        ==================================================== */}
 
         <nav className="bottomNav">
 
@@ -1356,9 +1598,7 @@ export default function Home() {
             }
           >
             <span>🏠</span>
-            <small>
-              Start
-            </small>
+            Home
           </button>
 
           <button
@@ -1372,9 +1612,7 @@ export default function Home() {
             }
           >
             <span>🍺</span>
-            <small>
-              Getränke
-            </small>
+            Getränke
           </button>
 
           <button
@@ -1384,15 +1622,11 @@ export default function Home() {
                 : "navButton"
             }
             onClick={() =>
-              setActiveTab(
-                "challenges"
-              )
+              setActiveTab("challenges")
             }
           >
             <span>🎯</span>
-            <small>
-              Challenges
-            </small>
+            Challenges
           </button>
 
           <button
@@ -1402,60 +1636,65 @@ export default function Home() {
                 : "navButton"
             }
             onClick={() =>
-              setActiveTab(
-                "ranking"
-              )
+              setActiveTab("ranking")
             }
           >
             <span>🏆</span>
-            <small>
-              Ranking
-            </small>
+            Ranking
           </button>
 
         </nav>
 
-        {/* =================================================
+
+        {/* ====================================================
             HOME
-        ================================================= */}
+        ==================================================== */}
 
         {activeTab === "home" && (
           <>
 
             {/* PARTICIPANTS */}
 
-            <section className="card">
+            <section className="glassCard">
 
-              <div className="sectionHeader">
+              <div className="sectionTop">
 
                 <div>
-                  <span className="eyebrow">
-                    👥 DIE RUNDE
+                  <span className="sectionEmoji">
+                    👥
                   </span>
 
-                  <h2>
-                    Wer ist dabei?
-                  </h2>
-                </div>
+                  <div>
+                    <h2>
+                      Teilnehmer
+                    </h2>
 
-                <span className="sectionEmoji">
-                  🥳
-                </span>
+                    <p>
+                      Wer ist heute dabei?
+                    </p>
+                  </div>
+                </div>
 
               </div>
 
-              <div className="participantInput">
+
+              <div className="inputRow">
 
                 <input
-                  value={
-                    participantName
-                  }
+                  value={personName}
                   onChange={(e) =>
-                    setParticipantName(
+                    setPersonName(
                       e.target.value
                     )
                   }
                   placeholder="Name eingeben..."
+                  onKeyDown={(e) => {
+                    if (
+                      e.key === "Enter"
+                    ) {
+                      addParticipant();
+                    }
+                  }}
                 />
 
                 <button
@@ -1463,173 +1702,197 @@ export default function Home() {
                   onClick={
                     addParticipant
                   }
+                  disabled={loading}
                 >
                   ➕
+                  <span>
+                    Hinzufügen
+                  </span>
                 </button>
 
               </div>
 
-              {participantStats.length ===
-              0 ? (
-                <div className="empty">
-                  <span>
-                    👀
-                  </span>
 
-                  <p>
-                    Noch niemand da.
-                  </p>
+              <div className="peopleList">
 
-                  <small>
-                    Sei der Erste!
-                  </small>
-                </div>
-              ) : (
-                <div className="peopleGrid">
+                {memberProfiles.length ===
+                0 ? (
+                  <div className="empty">
+                    <span>
+                      👻
+                    </span>
 
-                  {participantStats.map(
-                    (person) => (
+                    <strong>
+                      Noch niemand da
+                    </strong>
+
+                    <small>
+                      Trag den ersten
+                      Teilnehmer ein.
+                    </small>
+                  </div>
+                ) : (
+                  memberProfiles.map(
+                    ({
+                      member,
+                      profile,
+                    }) => (
                       <div
-                        className="personChip"
-                        key={
-                          person.profile_id
-                        }
+                        className="personRow"
+                        key={member.id}
                       >
+
                         <div className="avatar">
-                          {person.name
+                          {(
+                            profile.username ||
+                            "?"
+                          )
                             .charAt(0)
                             .toUpperCase()}
                         </div>
 
-                        <div>
+                        <div className="personInfo">
+
                           <strong>
-                            {person.name}
+                            {profile.username}
                           </strong>
 
                           <small>
-                            🏆{" "}
-                            {person.points}
-                            {" · "}
-                            🍺{" "}
-                            {person.drinks}
+                            ⭐{" "}
+                            {profile.points ||
+                              0}{" "}
+                            Punkte
                           </small>
+
                         </div>
+
+                        <button
+                          className="smallDanger"
+                          onClick={() =>
+                            removeParticipant(
+                              member.id
+                            )
+                          }
+                        >
+                          ×
+                        </button>
+
                       </div>
                     )
-                  )}
-
-                </div>
-              )}
-
-            </section>
-
-            {/* QUICK ACTIONS */}
-
-            <section className="card">
-
-              <div className="sectionHeader">
-
-                <div>
-                  <span className="eyebrow">
-                    ⚡ SCHNELLSTART
-                  </span>
-
-                  <h2>
-                    Was geht?
-                  </h2>
-                </div>
-
-              </div>
-
-              <div className="quickGrid">
-
-                <button
-                  className="quickButton beer"
-                  onClick={() => {
-                    setShowDrinkForm(true);
-                    setActiveTab(
-                      "drinks"
-                    );
-                  }}
-                >
-                  <span>🍺</span>
-                  <strong>
-                    Getränk
-                  </strong>
-                  <small>
-                    hinzufügen
-                  </small>
-                </button>
-
-                <button
-                  className="quickButton challenge"
-                  onClick={() => {
-                    setShowChallengeForm(
-                      true
-                    );
-                    setActiveTab(
-                      "challenges"
-                    );
-                  }}
-                >
-                  <span>🎯</span>
-                  <strong>
-                    Challenge
-                  </strong>
-                  <small>
-                    starten
-                  </small>
-                </button>
-
-                <button
-                  className="quickButton ranking"
-                  onClick={() =>
-                    setActiveTab(
-                      "ranking"
-                    )
-                  }
-                >
-                  <span>🏆</span>
-                  <strong>
-                    Ranking
-                  </strong>
-                  <small>
-                    ansehen
-                  </small>
-                </button>
+                  )
+                )}
 
               </div>
 
             </section>
 
-            {/* CHALLENGE TEASER */}
 
-            <section className="partyBanner">
+            {/* COST */}
+
+            {memberProfiles.length >
+              0 && (
+              <section className="glassCard">
+
+                <div className="sectionTop">
+
+                  <div>
+                    <span className="sectionEmoji">
+                      💶
+                    </span>
+
+                    <div>
+                      <h2>
+                        Kosten
+                      </h2>
+
+                      <p>
+                        Die Runde auf
+                        einen Blick.
+                      </p>
+                    </div>
+                  </div>
+
+                </div>
+
+                <div className="costHero">
+                  {money(totalCost)}
+                </div>
+
+                <div className="costRows">
+
+                  <div>
+                    <span>
+                      👥 Teilnehmer
+                    </span>
+
+                    <strong>
+                      {
+                        memberProfiles.length
+                      }
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>
+                      💶 Pro Person
+                    </span>
+
+                    <strong>
+                      {money(
+                        averageCost
+                      )}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>
+                      🍺 Getränke
+                    </span>
+
+                    <strong>
+                      {totalDrinks}
+                    </strong>
+                  </div>
+
+                </div>
+
+              </section>
+            )}
+
+
+            {/* QUICK CHALLENGE */}
+
+            <section className="challengeHero">
 
               <div>
-                <span>
-                  🎯 CHALLENGES
+
+                <span className="challengeHeroEmoji">
+                  🎯
                 </span>
 
-                <strong>
-                  {openChallenges}
-                  {" "}
-                  offene Aufgaben
-                </strong>
+                <h2>
+                  Zeit für eine
+                  Challenge?
+                </h2>
 
-                <small>
-                  Die Gruppe entscheidet.
-                </small>
+                <p>
+                  Macht die Party
+                  interessanter.
+                </p>
+
               </div>
 
               <button
-                onClick={() =>
+                onClick={() => {
                   setActiveTab(
                     "challenges"
-                  )
-                }
+                  );
+                  setShowAddChallenge(
+                    true
+                  );
+                }}
               >
-                Los geht's →
+                Los geht's 🚀
               </button>
 
             </section>
@@ -1637,68 +1900,114 @@ export default function Home() {
           </>
         )}
 
-        {/* =================================================
+
+        {/* ====================================================
             DRINKS
-        ================================================= */}
+        ==================================================== */}
 
         {activeTab === "drinks" && (
           <>
 
-            <section className="card">
+            <section className="glassCard">
 
-              <div className="sectionHeader">
+              <div className="sectionTop">
 
                 <div>
-                  <span className="eyebrow">
-                    🍺 ZAPFHAHN
+                  <span className="sectionEmoji">
+                    🍺
                   </span>
 
-                  <h2>
-                    Getränke
-                  </h2>
+                  <div>
+                    <h2>
+                      Getränke
+                    </h2>
+
+                    <p>
+                      Alles, was heute
+                      vernichtet wird.
+                    </p>
+                  </div>
                 </div>
 
                 <button
-                  className="smallAction"
+                  className="iconButton"
                   onClick={() =>
-                    setShowDrinkForm(
-                      !showDrinkForm
+                    setShowAddDrink(
+                      !showAddDrink
                     )
                   }
                 >
-                  {showDrinkForm
+                  {showAddDrink
                     ? "×"
-                    : "➕"}
+                    : "＋"}
                 </button>
 
               </div>
 
-              {showDrinkForm && (
+
+              {showAddDrink && (
                 <div className="formBox">
 
                   <input
-                    placeholder="Getränk"
-                    value={
-                      drinkName
-                    }
+                    value={drinkName}
                     onChange={(e) =>
                       setDrinkName(
                         e.target.value
                       )
                     }
+                    placeholder="Getränk..."
                   />
 
                   <input
-                    placeholder="Marke (optional)"
-                    value={
-                      drinkBrand
-                    }
+                    value={drinkBrand}
                     onChange={(e) =>
                       setDrinkBrand(
                         e.target.value
                       )
                     }
+                    placeholder="Marke (optional)..."
                   />
+
+                  <div className="formGrid">
+
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={drinkLiters}
+                      onChange={(e) =>
+                        setDrinkLiters(
+                          e.target.value
+                        )
+                      }
+                      placeholder="Liter"
+                    />
+
+                    <input
+                      type="number"
+                      value={
+                        drinkAlcohol
+                      }
+                      onChange={(e) =>
+                        setDrinkAlcohol(
+                          e.target.value
+                        )
+                      }
+                      placeholder="Alkohol %"
+                    />
+
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={drinkPrice}
+                      onChange={(e) =>
+                        setDrinkPrice(
+                          e.target.value
+                        )
+                      }
+                      placeholder="Preis €"
+                    />
+
+                  </div>
 
                   <select
                     value={
@@ -1723,11 +2032,7 @@ export default function Home() {
                     </option>
 
                     <option>
-                      Longdrink
-                    </option>
-
-                    <option>
-                      Shot
+                      Schnaps
                     </option>
 
                     <option>
@@ -1743,56 +2048,12 @@ export default function Home() {
                     </option>
                   </select>
 
-                  <div className="formGrid">
-
-                    <input
-                      type="number"
-                      step="0.1"
-                      placeholder="Liter"
-                      value={
-                        drinkLiters
-                      }
-                      onChange={(e) =>
-                        setDrinkLiters(
-                          e.target.value
-                        )
-                      }
-                    />
-
-                    <input
-                      type="number"
-                      placeholder="Alkohol %"
-                      value={
-                        drinkAlcohol
-                      }
-                      onChange={(e) =>
-                        setDrinkAlcohol(
-                          e.target.value
-                        )
-                      }
-                    />
-
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="Preis €"
-                      value={
-                        drinkPrice
-                      }
-                      onChange={(e) =>
-                        setDrinkPrice(
-                          e.target.value
-                        )
-                      }
-                    />
-
-                  </div>
-
                   <button
-                    className="fullButton"
+                    className="primaryButton full"
                     onClick={
                       saveDrink
                     }
+                    disabled={loading}
                   >
                     🍻 Getränk speichern
                   </button>
@@ -1800,657 +2061,564 @@ export default function Home() {
                 </div>
               )}
 
-              {drinks.length ===
-              0 ? (
-                <div className="empty">
-                  <span>
-                    🍺
-                  </span>
 
-                  <p>
-                    Noch keine Getränke.
-                  </p>
-                </div>
-              ) : (
-                <div className="drinkList">
+              <div className="drinkList">
 
-                  {drinks.map(
-                    (drink) => {
+                {drinks.length === 0 ? (
+                  <div className="empty">
+                    <span>
+                      🍺
+                    </span>
 
-                      const assigned =
-                        participantStats.find(
-                          (person) =>
-                            person.profile_id ===
-                            drink.profile_id
-                        );
+                    <strong>
+                      Noch keine Getränke
+                    </strong>
 
-                      return (
-                        <div
-                          className="drinkItem"
-                          key={
-                            drink.id
-                          }
-                        >
+                    <small>
+                      Zeit, den Zapfhahn
+                      anzuschmeißen.
+                    </small>
+                  </div>
+                ) : (
+                  drinks.map(
+                    (drink) => (
+                      <div
+                        className="drinkRow"
+                        key={drink.id}
+                      >
 
-                          <div className="drinkIcon">
-                            🍺
-                          </div>
+                        <div className="drinkIcon">
+                          🍺
+                        </div>
 
-                          <div className="drinkInfo">
+                        <div className="drinkInfo">
 
-                            <strong>
-                              {getDrinkName(
-                                drink
-                              )}
-                            </strong>
-
-                            <small>
-                              {drink.brand ||
-                                drink.marke ||
-                                "Getränk"}
-                              {" · "}
-                              {getDrinkLiters(
-                                drink
-                              ).toFixed(
-                                1
-                              )}
-                              {" L · "}
-                              {getDrinkAlcohol(
-                                drink
-                              ).toFixed(
-                                1
-                              )}
-                              %
-                            </small>
-
-                            {assigned && (
-                              <small className="assigned">
-                                👤{" "}
-                                {assigned.name}
-                              </small>
+                          <strong>
+                            {getDrinkName(
+                              drink
                             )}
+                          </strong>
 
-                          </div>
-
-                          <div className="drinkRight">
-
-                            <strong>
-                              {getDrinkPrice(
-                                drink
-                              ).toFixed(
-                                2
-                              )}
-                              €
-                            </strong>
-
-                            <select
-                              value={
-                                drink.profile_id ||
-                                ""
-                              }
-                              onChange={(
-                                e
-                              ) =>
-                                assignDrink(
-                                  drink.id,
-                                  e.target
-                                    .value
-                                )
-                              }
-                            >
-                              <option value="">
-                                Wem?
-                              </option>
-
-                              {participantStats.map(
-                                (
-                                  person
-                                ) => (
-                                  <option
-                                    key={
-                                      person.profile_id
-                                    }
-                                    value={
-                                      person.profile_id
-                                    }
-                                  >
-                                    {
-                                      person.name
-                                    }
-                                  </option>
-                                )
-                              )}
-
-                            </select>
-
-                            <button
-                              className="deleteButton"
-                              onClick={() =>
-                                deleteDrink(
-                                  drink.id
-                                )
-                              }
-                            >
-                              🗑️
-                            </button>
-
-                          </div>
+                          <small>
+                            {getDrinkLiters(
+                              drink
+                            ).toFixed(
+                              1
+                            )}{" "}
+                            L ·{" "}
+                            {getDrinkAlcohol(
+                              drink
+                            ).toFixed(
+                              1
+                            )}
+                            %
+                            {drink.brand
+                              ? ` · ${drink.brand}`
+                              : ""}
+                          </small>
 
                         </div>
-                      );
-                    }
+
+                        <div className="drinkPrice">
+                          {money(
+                            getDrinkPrice(
+                              drink
+                            )
+                          )}
+                        </div>
+
+                        <button
+                          className="smallDanger"
+                          onClick={() =>
+                            deleteDrink(
+                              drink.id
+                            )
+                          }
+                        >
+                          ×
+                        </button>
+
+                      </div>
+                    )
+                  )
+                )}
+
+              </div>
+
+            </section>
+
+
+            {/* ASSIGN DRINKS */}
+
+            {drinks.length > 0 &&
+              memberProfiles.length >
+                0 && (
+                <section className="glassCard">
+
+                  <div className="sectionTop">
+
+                    <div>
+                      <span className="sectionEmoji">
+                        🔗
+                      </span>
+
+                      <div>
+                        <h2>
+                          Getränk
+                          zuordnen
+                        </h2>
+
+                        <p>
+                          Wer hatte was?
+                        </p>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {drinks.map(
+                    (drink) => (
+                      <div
+                        className="assignmentRow"
+                        key={
+                          drink.id
+                        }
+                      >
+
+                        <div>
+                          <strong>
+                            🍺{" "}
+                            {getDrinkName(
+                              drink
+                            )}
+                          </strong>
+
+                          <small>
+                            {getDrinkLiters(
+                              drink
+                            ).toFixed(
+                              1
+                            )}{" "}
+                            L
+                          </small>
+                        </div>
+
+                        <select
+                          value={
+                            drink.profile_id ||
+                            ""
+                          }
+                          onChange={(e) =>
+                            assignDrink(
+                              drink,
+                              e.target
+                                .value
+                            )
+                          }
+                        >
+                          <option value="">
+                            Person auswählen
+                          </option>
+
+                          {memberProfiles.map(
+                            ({
+                              profile,
+                            }) => (
+                              <option
+                                key={
+                                  profile.id
+                                }
+                                value={
+                                  profile.id
+                                }
+                              >
+                                {
+                                  profile.username
+                                }
+                              </option>
+                            )
+                          )}
+                        </select>
+
+                      </div>
+                    )
                   )}
+
+                </section>
+              )}
+
+          </>
+        )}
+
+
+        {/* ====================================================
+            CHALLENGES
+        ==================================================== */}
+
+        {activeTab ===
+          "challenges" && (
+          <>
+
+            {/* CURRENT PROFILE */}
+
+            <section className="glassCard">
+
+              <div className="sectionTop">
+
+                <div>
+                  <span className="sectionEmoji">
+                    👤
+                  </span>
+
+                  <div>
+                    <h2>
+                      Du bist...
+                    </h2>
+
+                    <p>
+                      Wichtig für
+                      Abstimmungen.
+                    </p>
+                  </div>
+                </div>
+
+              </div>
+
+              <select
+                value={
+                  currentProfileId
+                }
+                onChange={(e) =>
+                  setCurrentProfileId(
+                    e.target.value
+                  )
+                }
+              >
+                <option value="">
+                  Teilnehmer auswählen
+                </option>
+
+                {memberProfiles.map(
+                  ({ profile }) => (
+                    <option
+                      key={
+                        profile.id
+                      }
+                      value={
+                        profile.id
+                      }
+                    >
+                      {profile.username}
+                    </option>
+                  )
+                )}
+
+              </select>
+
+            </section>
+
+
+            {/* CHALLENGE CREATE */}
+
+            <section className="glassCard">
+
+              <div className="sectionTop">
+
+                <div>
+                  <span className="sectionEmoji">
+                    🎯
+                  </span>
+
+                  <div>
+                    <h2>
+                      Challenge
+                    </h2>
+
+                    <p>
+                      Wer traut sich?
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  className="iconButton"
+                  onClick={() =>
+                    setShowAddChallenge(
+                      !showAddChallenge
+                    )
+                  }
+                >
+                  {showAddChallenge
+                    ? "×"
+                    : "＋"}
+                </button>
+
+              </div>
+
+
+              {challengeTemplates.length >
+                0 && (
+                <div className="templateBox">
+
+                  <label>
+                    🎲 Schnelle
+                    Challenge
+                  </label>
+
+                  <select
+                    value={
+                      selectedChallengeTemplate
+                    }
+                    onChange={(e) =>
+                      setSelectedChallengeTemplate(
+                        e.target.value
+                      )
+                    }
+                  >
+                    <option value="">
+                      Vorlage auswählen...
+                    </option>
+
+                    {challengeTemplates.map(
+                      (
+                        template
+                      ) => (
+                        <option
+                          key={
+                            template.id
+                          }
+                          value={
+                            template.id
+                          }
+                        >
+                          {template.title}{" "}
+                          ·{" "}
+                          {
+                            template.default_points
+                          }{" "}
+                          Punkte
+                        </option>
+                      )
+                    )}
+                  </select>
+
+                  <button
+                    className="secondaryButton full"
+                    onClick={
+                      createFromTemplate
+                    }
+                  >
+                    Vorlage verwenden
+                  </button>
+
+                </div>
+              )}
+
+
+              {showAddChallenge && (
+                <div className="formBox">
+
+                  <input
+                    value={
+                      challengeTitle
+                    }
+                    onChange={(e) =>
+                      setChallengeTitle(
+                        e.target.value
+                      )
+                    }
+                    placeholder="Challenge-Titel..."
+                  />
+
+                  <textarea
+                    value={
+                      challengeDescription
+                    }
+                    onChange={(e) =>
+                      setChallengeDescription(
+                        e.target.value
+                      )
+                    }
+                    placeholder="Was muss gemacht werden?"
+                    rows={4}
+                  />
+
+                  <div className="formGrid">
+
+                    <select
+                      value={
+                        challengeCategory
+                      }
+                      onChange={(e) =>
+                        setChallengeCategory(
+                          e.target.value
+                        )
+                      }
+                    >
+                      <option>
+                        Quatsch
+                      </option>
+
+                      <option>
+                        Trinken
+                      </option>
+
+                      <option>
+                        Mutprobe
+                      </option>
+
+                      <option>
+                        Geschicklichkeit
+                      </option>
+
+                      <option>
+                        Wissen
+                      </option>
+
+                      <option>
+                        Party
+                      </option>
+
+                      <option>
+                        Team
+                      </option>
+
+                      <option>
+                        Abstimmung
+                      </option>
+
+                      <option>
+                        Zufall
+                      </option>
+                    </select>
+
+                    <input
+                      type="number"
+                      value={
+                        challengePoints
+                      }
+                      onChange={(e) =>
+                        setChallengePoints(
+                          e.target.value
+                        )
+                      }
+                      placeholder="Punkte"
+                    />
+
+                    <input
+                      type="number"
+                      min="1"
+                      value={
+                        requiredVotes
+                      }
+                      onChange={(e) =>
+                        setRequiredVotes(
+                          e.target.value
+                        )
+                      }
+                      placeholder="Stimmen"
+                    />
+
+                  </div>
+
+                  <button
+                    className="primaryButton full"
+                    onClick={
+                      createChallenge
+                    }
+                    disabled={loading}
+                  >
+                    🚀 Challenge starten
+                  </button>
 
                 </div>
               )}
 
             </section>
 
-            {/* COST */}
 
-            <section className="moneyCard">
+            {/* CHALLENGE LIST */}
 
-              <span>
-                💶 GESAMTKOSTEN
-              </span>
+            <section className="challengeList">
 
-              <strong>
-                {totalCost.toFixed(2)} €
-              </strong>
+              {challenges.length ===
+              0 ? (
+                <div className="glassCard empty">
 
-              <small>
-                {participantStats.length >
-                0
-                  ? `${(
-                      totalCost /
-                      participantStats.length
-                    ).toFixed(
-                      2
-                    )} € pro Person`
-                  : "Noch keine Teilnehmer"}
-              </small>
+                  <span>
+                    🎯
+                  </span>
 
-            </section>
+                  <strong>
+                    Noch keine
+                    Challenges
+                  </strong>
 
-          </>
-        )}
-
-        {/* =================================================
-            CHALLENGES
-        ================================================= */}
-
-        {activeTab ===
-          "challenges" && (
-          <>
-
-            <section className="challengeHero">
-
-              <div>
-
-                <span>
-                  🎯 CHAOS-ZENTRALE
-                </span>
-
-                <h2>
-                  Wer muss ran?
-                </h2>
-
-                <p>
-                  Die Mehrheit entscheidet.
-                </p>
-
-              </div>
-
-              <div className="bigEmoji">
-                🤪
-              </div>
-
-            </section>
-
-            <button
-              className="fullButton challengeCreate"
-              onClick={() =>
-                setShowChallengeForm(
-                  !showChallengeForm
-                )
-              }
-            >
-              {showChallengeForm
-                ? "× Challenge abbrechen"
-                : "🎯 Neue Challenge starten"}
-            </button>
-
-            {showChallengeForm && (
-              <section className="card">
-
-                <div className="sectionHeader">
-
-                  <div>
-                    <span className="eyebrow">
-                      NEUE CHALLENGE
-                    </span>
-
-                    <h2>
-                      Wer muss ran?
-                    </h2>
-                  </div>
+                  <small>
+                    Starte die erste
+                    Eskalation.
+                  </small>
 
                 </div>
-
-                <label>
-                  Teilnehmer
-                </label>
-
-                <select
-                  value={
-                    challengeTarget
-                  }
-                  onChange={(e) =>
-                    setChallengeTarget(
-                      e.target.value
-                    )
-                  }
-                >
-                  <option value="">
-                    Teilnehmer auswählen
-                  </option>
-
-                  {participantStats.map(
-                    (person) => (
-                      <option
-                        key={
-                          person.profile_id
-                        }
-                        value={
-                          person.profile_id
-                        }
-                      >
-                        {person.name}
-                      </option>
-                    )
-                  )}
-
-                </select>
-
-                <label>
-                  Aufgabe
-                </label>
-
-                <input
-                  placeholder="z.B. Einen Tanz aufführen"
-                  value={
-                    challengeDescription
-                  }
-                  onChange={(e) =>
-                    setChallengeDescription(
-                      e.target.value
-                    )
-                  }
-                />
-
-                <label>
-                  Schwierigkeit
-                </label>
-
-                <select
-                  value={
-                    challengeDifficulty
-                  }
-                  onChange={(e) =>
-                    setChallengeDifficulty(
-                      e.target
-                        .value as Challenge["difficulty"]
-                    )
-                  }
-                >
-                  <option value="normal">
-                    😄 Normal · +10 Punkte
-                  </option>
-
-                  <option value="hard">
-                    🔥 Schwer · +20 Punkte
-                  </option>
-
-                  <option value="legendary">
-                    💀 Legendär · +30 Punkte
-                  </option>
-                </select>
-
-                <label>
-                  Abstimmung 1
-                </label>
-
-                <input
-                  placeholder="z.B. Tanzen"
-                  value={
-                    challengeOption1
-                  }
-                  onChange={(e) =>
-                    setChallengeOption1(
-                      e.target.value
-                    )
-                  }
-                />
-
-                <label>
-                  Abstimmung 2
-                </label>
-
-                <input
-                  placeholder="z.B. Singen"
-                  value={
-                    challengeOption2
-                  }
-                  onChange={(e) =>
-                    setChallengeOption2(
-                      e.target.value
-                    )
-                  }
-                />
-
-                <label>
-                  Abstimmung 3
-                </label>
-
-                <input
-                  placeholder="z.B. Eine Runde ausgeben"
-                  value={
-                    challengeOption3
-                  }
-                  onChange={(e) =>
-                    setChallengeOption3(
-                      e.target.value
-                    )
-                  }
-                />
-
-                <button
-                  className="fullButton"
-                  onClick={
-                    createChallenge
-                  }
-                >
-                  🚀 Challenge starten
-                </button>
-
-              </section>
-            )}
-
-            {challenges.length ===
-            0 ? (
-              <div className="empty bigEmpty">
-
-                <span>
-                  🎯
-                </span>
-
-                <h3>
-                  Noch kein Chaos.
-                </h3>
-
-                <p>
-                  Das können wir ändern.
-                </p>
-
-              </div>
-            ) : (
-              challenges.map(
-                (challenge) => {
-
-                  const options =
-                    challengeOptions.filter(
-                      (option) =>
-                        option.challenge_id ===
-                        challenge.id
-                    );
-
-                  const votes =
-                    challengeVotes.filter(
-                      (vote) =>
-                        vote.challenge_id ===
-                        challenge.id
-                    );
-
-                  const totalVotes =
-                    votes.length;
-
-                  const maxVotes =
-                    Math.max(
-                      ...options.map(
-                        (option) =>
-                          Number(
-                            option.votes
-                          )
-                      ),
-                      0
-                    );
-
-                  return (
-                    <section
-                      className="challengeCard"
+              ) : (
+                challenges.map(
+                  (challenge) => (
+                    <ChallengeCard
                       key={
                         challenge.id
                       }
-                    >
+                      challenge={
+                        challenge
+                      }
+                      profiles={
+                        memberProfiles.map(
+                          ({
+                            profile,
+                          }) =>
+                            profile
+                        )
+                      }
+                      currentProfileId={
+                        currentProfileId
+                      }
+                      targetProfile={
+                        challengeTargetProfile
+                      }
+                      onTargetChange={
+                        setChallengeTargetProfile
+                      }
+                      onVote={
+                        castVote
+                      }
+                      onRandom={
+                        assignRandomChallenge
+                      }
+                      onComplete={
+                        completeChallenge
+                      }
+                      onCancel={
+                        cancelChallenge
+                      }
+                      onParticipant={
+                        addChallengeParticipant
+                      }
+                      profileName={
+                        profileName
+                      }
+                    />
+                  )
+                )
+              )}
 
-                      <div className="challengeTop">
-
-                        <div>
-
-                          <span className="challengeStatus">
-                            {challenge.status ===
-                            "completed"
-                              ? "🏆 ERLEDIGT"
-                              : "🗳️ ABSTIMMUNG"}
-                          </span>
-
-                          <h3>
-                            {
-                              challenge.title
-                            }
-                          </h3>
-
-                          <p>
-                            {
-                              challenge.description
-                            }
-                          </p>
-
-                        </div>
-
-                        <div className="pointsBadge">
-                          +
-                          {
-                            challenge.points
-                          }
-                          <small>
-                            Punkte
-                          </small>
-                        </div>
-
-                      </div>
-
-                      {challenge.status ===
-                        "completed" ? (
-                        <div className="winnerBox">
-
-                          <span>
-                            🏆 GEWINNER
-                          </span>
-
-                          <strong>
-                            {
-                              challenge.winner_option
-                            }
-                          </strong>
-
-                          <p>
-                            {
-                              challenge.target_name
-                            }{" "}
-                            muss ran! 😂
-                          </p>
-
-                        </div>
-                      ) : (
-                        <>
-
-                          <div className="voteInfo">
-                            🗳️{" "}
-                            {
-                              totalVotes
-                            }{" "}
-                            Stimmen
-                          </div>
-
-                          <div className="optionList">
-
-                            {options.map(
-                              (
-                                option
-                              ) => {
-
-                                const percentage =
-                                  totalVotes >
-                                  0
-                                    ? Math.round(
-                                        (Number(
-                                          option.votes
-                                        ) /
-                                          totalVotes) *
-                                          100
-                                      )
-                                    : 0;
-
-                                const isLeader =
-                                  Number(
-                                    option.votes
-                                  ) ===
-                                    maxVotes &&
-                                  maxVotes >
-                                    0;
-
-                                return (
-                                  <div
-                                    className={
-                                      isLeader
-                                        ? "voteOption leader"
-                                        : "voteOption"
-                                    }
-                                    key={
-                                      option.id
-                                    }
-                                  >
-
-                                    <div className="voteOptionTop">
-
-                                      <strong>
-                                        {
-                                          option.text
-                                        }
-                                      </strong>
-
-                                      <span>
-                                        {
-                                          option.votes
-                                        }
-                                      </span>
-
-                                    </div>
-
-                                    <div className="progress">
-                                      <div
-                                        style={{
-                                          width:
-                                            `${percentage}%`,
-                                        }}
-                                      />
-                                    </div>
-
-                                    {participantStats.length >
-                                      0 && (
-                                      <select
-                                        defaultValue=""
-                                        onChange={(
-                                          e
-                                        ) => {
-                                          if (
-                                            e
-                                              .target
-                                              .value
-                                          ) {
-                                            voteChallenge(
-                                              challenge.id,
-                                              option.id,
-                                              e
-                                                .target
-                                                .value
-                                            );
-
-                                            e.target.value =
-                                              "";
-                                          }
-                                        }}
-                                      >
-                                        <option value="">
-                                          Stimme abgeben...
-                                        </option>
-
-                                        {participantStats.map(
-                                          (
-                                            person
-                                          ) => (
-                                            <option
-                                              key={
-                                                person.profile_id
-                                              }
-                                              value={
-                                                person.profile_id
-                                              }
-                                            >
-                                              {
-                                                person.name
-                                              }
-                                            </option>
-                                          )
-                                        )}
-
-                                      </select>
-                                    )}
-
-                                  </div>
-                                );
-                              }
-                            )}
-
-                          </div>
-
-                          <button
-                            className="completeButton"
-                            onClick={() =>
-                              completeChallenge(
-                                challenge
-                              )
-                            }
-                          >
-                            🏁 Abstimmung beenden
-                          </button>
-
-                        </>
-                      )}
-
-                    </section>
-                  );
-                }
-              )
-            )}
+            </section>
 
           </>
         )}
 
-        {/* =================================================
+
+        {/* ====================================================
             RANKING
-        ================================================= */}
+        ==================================================== */}
 
         {activeTab ===
           "ranking" && (
@@ -2458,237 +2626,174 @@ export default function Home() {
 
             <section className="rankingHero">
 
-              <span>
-                🏆 HALL OF FAME
-              </span>
-
-              <h2>
-                Wer hat den Zapfhahn gezähmt?
-              </h2>
-
-              <p>
-                Getränke + Challenges =
-                Gesamtpunkte
-              </p>
-
-            </section>
-
-            {ranking.length ===
-            0 ? (
-              <div className="empty bigEmpty">
-
+              <div>
                 <span>
                   🏆
                 </span>
 
-                <h3>
-                  Noch keine Helden.
-                </h3>
+                <h2>
+                  Hall of Fame
+                </h2>
 
                 <p>
-                  Erst trinken, dann
-                  Punkte sammeln.
+                  Wer beherrscht
+                  die Theke?
                 </p>
-
               </div>
-            ) : (
-              <div className="rankingList">
 
-                {ranking.map(
+            </section>
+
+
+            <section className="glassCard">
+
+              {ranking.length ===
+              0 ? (
+                <div className="empty">
+
+                  <span>
+                    👻
+                  </span>
+
+                  <strong>
+                    Noch kein Ranking
+                  </strong>
+
+                  <small>
+                    Erstmal Leute
+                    hinzufügen.
+                  </small>
+
+                </div>
+              ) : (
+                ranking.map(
                   (
-                    person,
+                    item,
                     index
-                  ) => {
+                  ) => (
+                    <div
+                      className={
+                        index === 0
+                          ? "rankRow first"
+                          : "rankRow"
+                      }
+                      key={
+                        item.profile.id
+                      }
+                    >
 
-                    const title =
-                      getRankingTitle(
-                        index,
-                        person
-                      );
+                      <div className="rankNumber">
 
-                    return (
-                      <div
-                        className={
-                          index === 0
-                            ? "rankCard first"
-                            : "rankCard"
-                        }
-                        key={
-                          person.profile_id
-                        }
-                      >
-
-                        <div className="rankNumber">
-
-                          {index ===
-                          0
-                            ? "🥇"
-                            : index ===
-                              1
-                            ? "🥈"
-                            : index ===
-                              2
-                            ? "🥉"
-                            : index + 1}
-
-                        </div>
-
-                        <div className="rankAvatar">
-
-                          {person.name
-                            .charAt(
-                              0
-                            )
-                            .toUpperCase()}
-
-                        </div>
-
-                        <div className="rankInfo">
-
-                          <strong>
-                            {
-                              person.name
-                            }
-                          </strong>
-
-                          <span>
-                            {title}
-                          </span>
-
-                          <small>
-                            🍺{" "}
-                            {
-                              person.drinks
-                            }{" "}
-                            Getränke
-                            {" · "}
-                            💧{" "}
-                            {
-                              person.liters
-                            .toFixed(
-                              1
-                            )
-                            }{" "}
-                            L
-                            {" · "}
-                            🎯{" "}
-                            {
-                              person.challengePoints
-                            }{" "}
-                            Challenge-Punkte
-                          </small>
-
-                        </div>
-
-                        <div className="rankPoints">
-
-                          <strong>
-                            {
-                              person.points
-                            }
-                          </strong>
-
-                          <small>
-                            Punkte
-                          </small>
-
-                        </div>
+                        {index === 0
+                          ? "🥇"
+                          : index === 1
+                          ? "🥈"
+                          : index === 2
+                          ? "🥉"
+                          : `${index + 1}.`}
 
                       </div>
-                    );
-                  }
-                )}
 
-              </div>
-            )}
+                      <div className="rankAvatar">
 
-            <section className="pointsExplanation">
+                        {(
+                          item.profile
+                            .username ||
+                          "?"
+                        )
+                          .charAt(0)
+                          .toUpperCase()}
 
-              <h3>
-                ⭐ So gibt's Punkte
-              </h3>
+                      </div>
 
-              <div>
-                🍺{" "}
-                <span>
-                  Getränk
-                </span>
-                <strong>
-                  +10
-                </strong>
-              </div>
+                      <div className="rankInfo">
 
-              <div>
-                😄{" "}
-                <span>
-                  Normale Challenge
-                </span>
-                <strong>
-                  +10
-                </strong>
-              </div>
+                        <strong>
+                          {
+                            item
+                              .profile
+                              .username
+                          }
+                        </strong>
 
-              <div>
-                🔥{" "}
-                <span>
-                  Schwere Challenge
-                </span>
-                <strong>
-                  +20
-                </strong>
-              </div>
+                        <span>
+                          {
+                            item.title
+                              .emoji
+                          }{" "}
+                          {
+                            item.title
+                              .title
+                          }
+                        </span>
 
-              <div>
-                💀{" "}
-                <span>
-                  Legendäre Challenge
-                </span>
-                <strong>
-                  +30
-                </strong>
-              </div>
+                      </div>
+
+                      <div className="rankPoints">
+
+                        <strong>
+                          {
+                            item.points
+                          }
+                        </strong>
+
+                        <small>
+                          Punkte
+                        </small>
+
+                      </div>
+
+                    </div>
+                  )
+                )
+              )}
 
             </section>
 
           </>
         )}
 
-        {/* =================================================
+
+        {/* ====================================================
             MESSAGE
-        ================================================= */}
+        ==================================================== */}
 
         {message && (
-          <div className="toast">
+          <div
+            className={`message ${messageType}`}
+          >
             {message}
           </div>
         )}
 
-        {/* =================================================
-            FOOTER
-        ================================================= */}
 
-        <footer className="footer">
+        {/* ====================================================
+            FOOTER
+        ==================================================== */}
+
+        <footer>
 
           <div>
             🍻
           </div>
 
           <strong>
-            Güstener Zapfhahn Zentrale
+            Güstener
+            Zapfhahn Zentrale
           </strong>
 
           <small>
-            Dein Event. Deine Getränke.
-            Dein Chaos.
+            Dein Event. Deine
+            Getränke. Deine Runde.
           </small>
 
         </footer>
 
       </div>
 
-      {/* ===================================================
+
+      {/* ======================================================
           STYLES
-      =================================================== */}
+      ====================================================== */}
 
       <style jsx global>{`
 
@@ -2701,1636 +2806,984 @@ export default function Home() {
           margin: 0;
           padding: 0;
           min-height: 100%;
-          background: #070b10;
+          background: #07090d;
         }
 
         body {
-          font-family:
-            Inter,
-            ui-sans-serif,
-            system-ui,
-            -apple-system,
-            BlinkMacSystemFont,
-            "Segoe UI",
-            sans-serif;
-
-          color: #f8fafc;
+          overflow-x: hidden;
         }
 
         button,
         input,
-        select {
+        select,
+        textarea {
           font: inherit;
         }
 
         button {
-          cursor: pointer;
+          -webkit-tap-highlight-color:
+            transparent;
         }
 
-        .app {
-          position: relative;
+        .page {
           min-height: 100vh;
           width: 100%;
-          overflow-x: hidden;
-
+          margin: 0;
+          padding: 0;
           background:
             radial-gradient(
               circle at 15% 0%,
-              rgba(
-                245,
-                158,
-                11,
-                .15
-              ),
-              transparent 30%
+              rgba(245, 158, 11, .18),
+              transparent 32%
             ),
             radial-gradient(
-              circle at 90% 10%,
-              rgba(
-                249,
-                115,
-                22,
-                .12
-              ),
-              transparent 28%
+              circle at 90% 15%,
+              rgba(239, 68, 68, .14),
+              transparent 30%
             ),
-            #070b10;
-
-          padding:
-            18px
-            18px
-            40px;
+            linear-gradient(
+              145deg,
+              #07090d 0%,
+              #10151d 48%,
+              #07090d 100%
+            );
+          color: #fff;
+          font-family:
+            Arial,
+            Helvetica,
+            sans-serif;
         }
 
-        .appContainer {
-          position: relative;
-          z-index: 2;
-
+        .app {
           width: 100%;
-          max-width: 920px;
-
+          max-width: 900px;
           margin: 0 auto;
+          padding:
+            20px
+            18px
+            80px;
         }
 
-        .backgroundGlow {
-          position: fixed;
-          width: 280px;
-          height: 280px;
+        .hero {
+          display: flex;
+          align-items: center;
+          gap: 18px;
+          padding:
+            10px
+            0
+            25px;
+        }
 
-          border-radius: 50%;
+        .heroIcon {
+          width: 72px;
+          height: 72px;
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 22px;
+          background:
+            linear-gradient(
+              145deg,
+              #fbbf24,
+              #f59e0b
+            );
+          font-size: 38px;
+          box-shadow:
+            0 15px 35px
+            rgba(245, 158, 11, .25);
+          transform:
+            rotate(-4deg);
+        }
 
-          filter: blur(100px);
+        .eyebrow {
+          color: #fbbf24;
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: 2px;
+          margin-bottom: 5px;
+        }
 
-          opacity: .12;
+        h1 {
+          margin: 0;
+          font-size:
+            clamp(
+              27px,
+              7vw,
+              44px
+            );
+          line-height: .95;
+          letter-spacing: -1.5px;
+        }
 
+        .hero p {
+          margin:
+            9px
+            0
+            0;
+          color: #8f9aaa;
+          font-size: 14px;
+        }
+
+        .glassCard {
+          position: relative;
+          overflow: hidden;
+          margin-bottom: 14px;
+          padding: 18px;
+          border:
+            1px solid
+            rgba(255,255,255,.08);
+          border-radius: 22px;
+          background:
+            rgba(255,255,255,.045);
+          box-shadow:
+            0 15px 45px
+            rgba(0,0,0,.18);
+          backdrop-filter:
+            blur(16px);
+        }
+
+        .glassCard::before {
+          content: "";
+          position: absolute;
+          inset: 0;
           pointer-events: none;
+          background:
+            linear-gradient(
+              135deg,
+              rgba(255,255,255,.045),
+              transparent 40%
+            );
         }
 
-        .glow1 {
-          top: 10%;
-          left: -100px;
-          background: #f59e0b;
-        }
-
-        .glow2 {
-          bottom: 10%;
-          right: -100px;
-          background: #fb7185;
-        }
-
-        /* HEADER */
-
-        .header {
+        .sectionTop {
+          position: relative;
+          z-index: 1;
           display: flex;
           align-items: center;
           justify-content: space-between;
-
-          gap: 15px;
-
-          padding:
-            8px
-            2px
-            22px;
+          gap: 12px;
+          margin-bottom: 16px;
         }
 
-        .brand {
+        .sectionTop > div {
           display: flex;
           align-items: center;
-
           gap: 12px;
         }
 
-        .brandIcon {
-          width: 58px;
-          height: 58px;
+        .sectionEmoji {
+          width: 44px;
+          height: 44px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          border-radius: 14px;
+          background:
+            rgba(245,158,11,.12);
+          font-size: 23px;
+        }
 
+        h2 {
+          margin: 0;
+          font-size: 20px;
+        }
+
+        .sectionTop p {
+          margin:
+            3px
+            0
+            0;
+          color: #7f8a99;
+          font-size: 12px;
+        }
+
+        input,
+        select,
+        textarea {
+          width: 100%;
+          border:
+            1px solid
+            #29313d;
+          outline: none;
+          border-radius: 13px;
+          padding:
+            13px
+            14px;
+          background:
+            #10151c;
+          color: #fff;
+          transition:
+            border-color .2s,
+            box-shadow .2s;
+        }
+
+        textarea {
+          resize: vertical;
+          min-height: 100px;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+          border-color:
+            #f59e0b;
+          box-shadow:
+            0 0 0 3px
+            rgba(245,158,11,.10);
+        }
+
+        input::placeholder,
+        textarea::placeholder {
+          color: #596473;
+        }
+
+        .bigSelect {
+          position: relative;
+          z-index: 1;
+          font-size: 15px;
+        }
+
+        .eventInfo {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+          margin-top: 10px;
+          color: #8d98a7;
+          font-size: 12px;
+        }
+
+        .eventInfo strong {
+          color: #fbbf24;
+        }
+
+        .statsGrid {
           display: grid;
-          place-items: center;
+          grid-template-columns:
+            repeat(4, 1fr);
+          gap: 10px;
+          margin-bottom: 14px;
+        }
 
+        .stat {
+          min-width: 0;
+          padding: 15px 8px;
+          text-align: center;
+          border:
+            1px solid
+            rgba(255,255,255,.06);
           border-radius: 18px;
+          background:
+            rgba(255,255,255,.04);
+        }
 
+        .stat span {
+          display: block;
+          font-size: 20px;
+        }
+
+        .stat strong {
+          display: block;
+          margin-top: 4px;
+          font-size: 19px;
+        }
+
+        .stat small {
+          display: block;
+          margin-top: 2px;
+          color: #727d8b;
+          font-size: 10px;
+        }
+
+        .inputRow {
+          position: relative;
+          z-index: 1;
+          display: grid;
+          grid-template-columns:
+            1fr
+            auto;
+          gap: 8px;
+        }
+
+        .primaryButton,
+        .secondaryButton {
+          border: none;
+          border-radius: 13px;
+          padding:
+            12px
+            16px;
+          cursor: pointer;
+          font-weight: 900;
+          transition:
+            transform .15s,
+            opacity .15s;
+        }
+
+        .primaryButton {
           background:
             linear-gradient(
               135deg,
               #fbbf24,
-              #f97316
+              #f59e0b
             );
-
-          box-shadow:
-            0 12px 30px
-            rgba(
-              245,
-              158,
-              11,
-              .2
-            );
-
-          font-size: 30px;
+          color: #111;
         }
 
-        .brand h1 {
-          margin: 0;
-
-          font-size: 22px;
-          line-height: 1.05;
-
-          letter-spacing:
-            -.5px;
-        }
-
-        .brand p {
-          margin:
-            5px
-            0
-            0;
-
-          color: #94a3b8;
-
-          font-size: 12px;
-        }
-
-        .headerBadge {
-          padding:
-            8px
-            10px;
-
-          border-radius: 999px;
-
+        .secondaryButton {
           background:
-            rgba(
-              34,
-              197,
-              94,
-              .12
-            );
-
-          border:
-            1px solid
-            rgba(
-              34,
-              197,
-              94,
-              .25
-            );
-
-          color: #86efac;
-
-          font-size: 11px;
-          font-weight: 800;
+            #252e3a;
+          color: #fff;
         }
 
-        /* HERO */
-
-        .eventHero {
-          position: relative;
-
-          padding: 22px;
-
-          border-radius: 26px;
-
-          background:
-            linear-gradient(
-              135deg,
-              rgba(
-                245,
-                158,
-                11,
-                .19
-              ),
-              rgba(
-                249,
-                115,
-                22,
-                .08
-              )
-            );
-
-          border:
-            1px solid
-            rgba(
-              255,
-              255,
-              255,
-              .08
-            );
-
-          box-shadow:
-            0 20px 60px
-            rgba(
-              0,
-              0,
-              0,
-              .22
-            );
-
-          margin-bottom: 12px;
-        }
-
-        .eventHeroTop {
-          display: flex;
-
-          justify-content:
-            space-between;
-
-          align-items: center;
-
-          gap: 15px;
-        }
-
-        .eyebrow {
-          display: block;
-
-          color: #fbbf24;
-
-          font-size: 10px;
-          font-weight: 900;
-
-          letter-spacing:
-            1.3px;
-
-          margin-bottom: 7px;
-        }
-
-        .eventHero h2 {
-          margin:
-            0
-            0
-            5px;
-
-          font-size: 28px;
-
-          letter-spacing:
-            -.8px;
-        }
-
-        .eventHero p {
-          margin: 0;
-
-          color: #cbd5e1;
-
-          font-size: 13px;
-        }
-
-        .beerEmoji {
-          font-size: 52px;
-
+        .primaryButton:hover,
+        .secondaryButton:hover,
+        .challengeHero button:hover {
           transform:
-            rotate(8deg);
+            translateY(-1px);
         }
 
-        .eventSelect {
+        .primaryButton:disabled {
+          opacity: .5;
+          cursor: wait;
+        }
+
+        .full {
           width: 100%;
-
-          margin-top: 18px;
-
-          padding:
-            13px
-            14px;
-
-          border-radius: 14px;
-
-          border:
-            1px solid
-            rgba(
-              255,
-              255,
-              255,
-              .1
-            );
-
-          background:
-            rgba(
-              0,
-              0,
-              0,
-              .25
-            );
-
-          color: white;
-
-          outline: none;
         }
 
-        /* STATS */
-
-        .statsGrid {
-          display: grid;
-
-          grid-template-columns:
-            repeat(
-              4,
-              1fr
-            );
-
-          gap: 9px;
-
-          margin-bottom: 12px;
-        }
-
-        .statCard {
-          padding:
-            14px
-            10px;
-
-          text-align: center;
-
-          border-radius: 18px;
-
-          background:
-            rgba(
-              255,
-              255,
-              255,
-              .045
-            );
-
-          border:
-            1px solid
-            rgba(
-              255,
-              255,
-              255,
-              .06
-            );
-        }
-
-        .statCard span {
-          display: block;
-
-          font-size: 21px;
-        }
-
-        .statCard strong {
-          display: block;
-
-          margin:
-            5px
-            0
-            2px;
-
-          font-size: 19px;
-        }
-
-        .statCard small {
-          color: #64748b;
-
-          font-size: 10px;
-        }
-
-        /* NAV */
-
-        .bottomNav {
-          display: grid;
-
-          grid-template-columns:
-            repeat(
-              4,
-              1fr
-            );
-
-          gap: 6px;
-
-          padding: 6px;
-
-          margin-bottom: 12px;
-
-          border-radius: 18px;
-
-          background:
-            rgba(
-              255,
-              255,
-              255,
-              .04
-            );
-
-          border:
-            1px solid
-            rgba(
-              255,
-              255,
-              255,
-              .06
-            );
-        }
-
-        .navButton {
-          border: none;
-
-          padding:
-            9px
-            5px;
-
-          border-radius: 13px;
-
-          background:
-            transparent;
-
-          color: #64748b;
-        }
-
-        .navButton span {
-          display: block;
-
-          font-size: 20px;
-        }
-
-        .navButton small {
-          font-size: 10px;
-        }
-
-        .navButton.active {
-          background:
-            rgba(
-              245,
-              158,
-              11,
-              .15
-            );
-
-          color: #fbbf24;
-        }
-
-        /* CARDS */
-
-        .card {
-          padding: 19px;
-
-          margin-bottom: 12px;
-
-          border-radius: 22px;
-
-          background:
-            rgba(
-              255,
-              255,
-              255,
-              .045
-            );
-
-          border:
-            1px solid
-            rgba(
-              255,
-              255,
-              255,
-              .07
-            );
-
-          box-shadow:
-            0 15px 40px
-            rgba(
-              0,
-              0,
-              0,
-              .12
-            );
-        }
-
-        .sectionHeader {
-          display: flex;
-
-          justify-content:
-            space-between;
-
-          align-items: center;
-
-          margin-bottom: 15px;
-        }
-
-        .sectionHeader h2 {
-          margin: 0;
-
-          font-size: 21px;
-
-          letter-spacing:
-            -.4px;
-        }
-
-        .sectionEmoji {
-          font-size: 30px;
-        }
-
-        .smallAction {
+        .iconButton {
           width: 40px;
           height: 40px;
-
           border: none;
-
           border-radius: 12px;
-
           background:
-            #f59e0b;
-
-          color: #111827;
-
-          font-size: 21px;
-
-          font-weight: 900;
+            #222b37;
+          color: #fff;
+          font-size: 22px;
+          cursor: pointer;
         }
 
-        /* INPUTS */
-
-        input,
-        select {
-          width: 100%;
-
-          padding:
-            13px
-            14px;
-
-          border-radius: 13px;
-
-          border:
-            1px solid
-            rgba(
-              255,
-              255,
-              255,
-              .1
-            );
-
-          background:
-            #10161e;
-
-          color: #f8fafc;
-
-          outline: none;
+        .peopleList,
+        .drinkList {
+          position: relative;
+          z-index: 1;
         }
 
-        input:focus,
-        select:focus {
-          border-color:
-            rgba(
-              245,
-              158,
-              11,
-              .6
-            );
-        }
-
-        .participantInput {
-          display: grid;
-
-          grid-template-columns:
-            1fr
-            52px;
-
-          gap: 8px;
-        }
-
-        .primaryButton {
-          border: none;
-
-          border-radius: 13px;
-
-          background:
-            #f59e0b;
-
-          color: #111827;
-
-          font-size: 21px;
-        }
-
-        /* PEOPLE */
-
-        .peopleGrid {
-          display: grid;
-
-          grid-template-columns:
-            repeat(
-              2,
-              1fr
-            );
-
-          gap: 8px;
-
-          margin-top: 12px;
-        }
-
-        .personChip {
+        .personRow {
           display: flex;
-
           align-items: center;
-
-          gap: 9px;
-
-          padding: 10px;
-
+          gap: 11px;
+          padding: 11px;
+          margin-top: 8px;
           border-radius: 15px;
-
           background:
-            rgba(
-              255,
-              255,
-              255,
-              .045
-            );
+            rgba(255,255,255,.045);
         }
 
         .avatar,
         .rankAvatar {
-          display: grid;
-
-          place-items: center;
-
+          display: flex;
+          align-items: center;
+          justify-content: center;
           flex-shrink: 0;
-
-          border-radius: 50%;
-
+          font-weight: 900;
           background:
             linear-gradient(
-              135deg,
-              #fbbf24,
-              #f97316
+              145deg,
+              #374151,
+              #1f2937
             );
-
-          color: #111827;
-
-          font-weight: 900;
         }
 
         .avatar {
-          width: 36px;
-          height: 36px;
+          width: 42px;
+          height: 42px;
+          border-radius: 13px;
         }
 
-        .personChip strong {
-          display: block;
-
-          font-size: 13px;
+        .personInfo {
+          flex: 1;
+          min-width: 0;
         }
 
-        .personChip small {
+        .personInfo strong {
           display: block;
+        }
 
-          color: #64748b;
-
-          font-size: 10px;
-
+        .personInfo small {
+          display: block;
           margin-top: 3px;
+          color: #7d8998;
+          font-size: 11px;
         }
 
-        /* QUICK */
-
-        .quickGrid {
-          display: grid;
-
-          grid-template-columns:
-            repeat(
-              3,
-              1fr
-            );
-
-          gap: 9px;
-        }
-
-        .quickButton {
-          min-height: 125px;
-
-          display: flex;
-
-          flex-direction:
-            column;
-
-          justify-content:
-            center;
-
-          align-items: center;
-
+        .smallDanger {
           border: none;
+          width: 31px;
+          height: 31px;
+          border-radius: 10px;
+          background:
+            #242d38;
+          color: #a8b1bd;
+          cursor: pointer;
+          font-weight: 900;
+        }
 
-          border-radius: 18px;
+        .smallDanger:hover {
+          background:
+            #7f1d1d;
+          color: #fff;
+        }
 
-          color: white;
+        .costHero {
+          position: relative;
+          z-index: 1;
+          margin:
+            5px
+            0
+            15px;
+          color: #fbbf24;
+          font-size: 40px;
+          font-weight: 900;
+          text-align: center;
+        }
 
+        .costRows {
+          position: relative;
+          z-index: 1;
+        }
+
+        .costRows > div {
+          display: flex;
+          justify-content: space-between;
           padding: 12px;
-        }
-
-        .quickButton span {
-          font-size: 32px;
-
-          margin-bottom: 7px;
-        }
-
-        .quickButton strong {
+          margin-top: 7px;
+          border-radius: 12px;
+          background:
+            rgba(255,255,255,.04);
+          color: #9ca7b5;
           font-size: 13px;
         }
 
-        .quickButton small {
-          margin-top: 3px;
-
-          font-size: 10px;
-
-          opacity: .65;
+        .costRows strong {
+          color: #fff;
         }
 
-        .quickButton.beer {
-          background:
-            linear-gradient(
-              135deg,
-              #b45309,
-              #f59e0b
-            );
-        }
-
-        .quickButton.challenge {
-          background:
-            linear-gradient(
-              135deg,
-              #be123c,
-              #f43f5e
-            );
-        }
-
-        .quickButton.ranking {
-          background:
-            linear-gradient(
-              135deg,
-              #7c3aed,
-              #a855f7
-            );
-        }
-
-        /* PARTY BANNER */
-
-        .partyBanner {
+        .challengeHero {
           display: flex;
-
           align-items: center;
-
-          justify-content:
-            space-between;
-
+          justify-content: space-between;
           gap: 15px;
-
-          padding: 18px;
-
-          margin-bottom: 12px;
-
-          border-radius: 21px;
-
+          margin-bottom: 14px;
+          padding: 22px;
+          border-radius: 23px;
           background:
             linear-gradient(
               135deg,
-              rgba(
-                236,
-                72,
-                153,
-                .16
-              ),
-              rgba(
-                124,
-                58,
-                237,
-                .12
-              )
+              rgba(245,158,11,.20),
+              rgba(239,68,68,.12)
             );
-
           border:
             1px solid
-            rgba(
-              255,
-              255,
-              255,
-              .07
-            );
+            rgba(245,158,11,.20);
         }
 
-        .partyBanner span {
-          display: block;
-
-          color: #f9a8d4;
-
-          font-size: 10px;
-          font-weight: 900;
+        .challengeHeroEmoji {
+          font-size: 30px;
         }
 
-        .partyBanner strong {
-          display: block;
-
-          margin-top: 5px;
-
-          font-size: 17px;
+        .challengeHero h2 {
+          margin:
+            4px
+            0;
+          font-size: 22px;
         }
 
-        .partyBanner small {
-          display: block;
-
-          margin-top: 3px;
-
-          color: #94a3b8;
-
-          font-size: 11px;
+        .challengeHero p {
+          margin: 0;
+          color: #8d98a7;
+          font-size: 12px;
         }
 
-        .partyBanner button {
+        .challengeHero button {
+          flex-shrink: 0;
           border: none;
-
+          border-radius: 13px;
           padding:
-            10px
-            12px;
-
-          border-radius: 12px;
-
+            12px
+            15px;
           background:
-            #f472b6;
-
-          color: #111827;
-
-          font-size: 11px;
-
+            #fbbf24;
+          color: #111;
           font-weight: 900;
-
-          white-space: nowrap;
+          cursor: pointer;
         }
 
-        /* FORMS */
+        .bottomNav {
+          position: sticky;
+          z-index: 20;
+          bottom: 12px;
+          display: grid;
+          grid-template-columns:
+            repeat(4, 1fr);
+          gap: 5px;
+          margin:
+            0
+            0
+            14px;
+          padding: 6px;
+          border:
+            1px solid
+            rgba(255,255,255,.08);
+          border-radius: 18px;
+          background:
+            rgba(12,16,22,.92);
+          backdrop-filter:
+            blur(18px);
+          box-shadow:
+            0 12px 40px
+            rgba(0,0,0,.4);
+        }
+
+        .navButton {
+          border: none;
+          border-radius: 13px;
+          padding:
+            8px
+            4px;
+          background:
+            transparent;
+          color: #687384;
+          font-size: 10px;
+          cursor: pointer;
+        }
+
+        .navButton span {
+          display: block;
+          margin-bottom: 2px;
+          font-size: 18px;
+        }
+
+        .navButton.active {
+          background:
+            rgba(245,158,11,.14);
+          color: #fbbf24;
+        }
 
         .formBox {
-          padding:
-            14px;
-
-          margin-bottom: 14px;
-
-          border-radius: 17px;
-
+          position: relative;
+          z-index: 1;
+          padding: 13px;
+          margin-bottom: 13px;
+          border-radius: 16px;
           background:
-            rgba(
-              0,
-              0,
-              0,
-              .2
-            );
-        }
-
-        .formBox input,
-        .formBox select {
-          margin-bottom: 8px;
+            rgba(0,0,0,.16);
         }
 
         .formGrid {
           display: grid;
-
           grid-template-columns:
-            repeat(
-              3,
-              1fr
-            );
-
+            repeat(3, 1fr);
           gap: 8px;
         }
 
-        .fullButton {
-          width: 100%;
-
-          border: none;
-
-          padding: 14px;
-
-          margin-top: 5px;
-
-          border-radius: 13px;
-
-          background:
-            linear-gradient(
-              135deg,
-              #fbbf24,
-              #f97316
-            );
-
-          color: #111827;
-
-          font-weight: 900;
+        .formBox input,
+        .formBox select,
+        .formBox textarea {
+          margin-bottom: 8px;
         }
 
-        /* DRINKS */
-
-        .drinkList {
-          display: flex;
-
-          flex-direction:
-            column;
-
-          gap: 8px;
-        }
-
-        .drinkItem {
+        .drinkRow {
           display: grid;
-
           grid-template-columns:
             42px
             1fr
-            auto;
-
+            auto
+            31px;
           gap: 10px;
-
           align-items: center;
-
           padding: 11px;
-
-          border-radius: 16px;
-
+          margin-top: 8px;
+          border-radius: 15px;
           background:
-            rgba(
-              255,
-              255,
-              255,
-              .045
-            );
+            rgba(255,255,255,.045);
         }
 
         .drinkIcon {
           width: 42px;
           height: 42px;
-
-          display: grid;
-
-          place-items: center;
-
+          display: flex;
+          align-items: center;
+          justify-content: center;
           border-radius: 13px;
-
           background:
-            rgba(
-              245,
-              158,
-              11,
-              .13
-            );
+            rgba(245,158,11,.12);
+          font-size: 21px;
+        }
 
-          font-size: 22px;
+        .drinkInfo {
+          min-width: 0;
         }
 
         .drinkInfo strong {
           display: block;
-
-          font-size: 13px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         .drinkInfo small {
           display: block;
-
           margin-top: 3px;
-
-          color: #64748b;
-
+          color: #7d8998;
           font-size: 10px;
         }
 
-        .drinkInfo .assigned {
+        .drinkPrice {
           color: #fbbf24;
-        }
-
-        .drinkRight {
-          display: flex;
-
-          flex-direction:
-            column;
-
-          align-items:
-            flex-end;
-
-          gap: 5px;
-        }
-
-        .drinkRight > strong {
+          font-weight: 900;
+          white-space: nowrap;
           font-size: 13px;
         }
 
-        .drinkRight select {
-          width: 105px;
+        .assignmentRow {
+          display: grid;
+          grid-template-columns:
+            1fr
+            1.2fr;
+          gap: 10px;
+          align-items: center;
+          padding: 10px;
+          margin-top: 8px;
+          border-radius: 14px;
+          background:
+            rgba(255,255,255,.04);
+        }
 
-          padding:
-            7px
-            8px;
+        .assignmentRow strong {
+          display: block;
+        }
 
+        .assignmentRow small {
+          display: block;
+          margin-top: 3px;
+          color: #778291;
           font-size: 10px;
+        }
 
+        .assignmentRow select {
           margin: 0;
         }
 
-        .deleteButton {
-          border: none;
-
+        .templateBox {
+          position: relative;
+          z-index: 1;
+          margin-bottom: 10px;
+          padding: 12px;
+          border-radius: 15px;
           background:
-            transparent;
-
-          padding: 3px;
-
-          opacity: .65;
-        }
-
-        .moneyCard {
-          padding: 20px;
-
-          text-align: center;
-
-          border-radius: 21px;
-
-          margin-bottom: 12px;
-
-          background:
-            linear-gradient(
-              135deg,
-              rgba(
-                34,
-                197,
-                94,
-                .12
-              ),
-              rgba(
-                16,
-                185,
-                129,
-                .05
-              )
-            );
-
+            rgba(245,158,11,.06);
           border:
             1px solid
-            rgba(
-              34,
-              197,
-              94,
-              .13
-            );
+            rgba(245,158,11,.10);
         }
 
-        .moneyCard span {
+        .templateBox label {
           display: block;
-
-          color: #86efac;
-
-          font-size: 10px;
-
-          font-weight: 900;
-        }
-
-        .moneyCard strong {
-          display: block;
-
-          margin:
-            5px
-            0;
-
-          font-size: 34px;
-        }
-
-        .moneyCard small {
-          color: #64748b;
-        }
-
-        /* CHALLENGES */
-
-        .challengeHero {
-          display: flex;
-
-          justify-content:
-            space-between;
-
-          align-items: center;
-
-          gap: 15px;
-
-          padding: 23px;
-
-          margin-bottom: 10px;
-
-          border-radius: 24px;
-
-          background:
-            linear-gradient(
-              135deg,
-              #881337,
-              #be123c
-            );
-        }
-
-        .challengeHero > div:first-child
-        {
-          flex: 1;
-        }
-
-        .challengeHero span {
-          font-size: 10px;
-
-          font-weight: 900;
-
-          letter-spacing:
-            1.2px;
-
-          color: #fda4af;
-        }
-
-        .challengeHero h2 {
-          margin:
-            7px
-            0
-            3px;
-
-          font-size: 27px;
-        }
-
-        .challengeHero p {
-          margin: 0;
-
-          color: #fecdd3;
-
+          margin-bottom: 7px;
+          color: #fbbf24;
           font-size: 12px;
+          font-weight: 900;
         }
 
-        .bigEmoji {
-          font-size: 55px;
+        .templateBox select {
+          margin-bottom: 8px;
         }
 
-        .challengeCreate {
-          margin-bottom: 12px;
-
-          background:
-            linear-gradient(
-              135deg,
-              #f43f5e,
-              #e11d48
-            );
-
-          color: white;
-        }
-
-        .formBox label,
-        .card label {
-          display: block;
-
-          margin:
-            5px
-            0;
-
-          color: #94a3b8;
-
-          font-size: 11px;
-
-          font-weight: 700;
+        .challengeList {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
         }
 
         .challengeCard {
+          position: relative;
+          overflow: hidden;
           padding: 18px;
-
-          margin-bottom: 11px;
-
-          border-radius: 22px;
-
-          background:
-            rgba(
-              255,
-              255,
-              255,
-              .045
-            );
-
           border:
             1px solid
-            rgba(
-              255,
-              255,
-              255,
-              .07
+            rgba(255,255,255,.08);
+          border-radius: 22px;
+          background:
+            linear-gradient(
+              145deg,
+              rgba(255,255,255,.065),
+              rgba(255,255,255,.025)
             );
         }
 
-        .challengeTop {
-          display: flex;
-
-          justify-content:
-            space-between;
-
-          gap: 15px;
+        .challengeCard.completed {
+          opacity: .8;
         }
 
-        .challengeStatus {
+        .challengeCardHeader {
+          display: flex;
+          justify-content: space-between;
+          gap: 10px;
+        }
+
+        .challengeCategory {
           display: inline-block;
-
           margin-bottom: 7px;
-
-          color: #fda4af;
-
-          font-size: 9px;
-
+          padding:
+            5px
+            9px;
+          border-radius: 20px;
+          background:
+            rgba(245,158,11,.12);
+          color: #fbbf24;
+          font-size: 10px;
           font-weight: 900;
         }
 
-        .challengeTop h3 {
+        .challengeCard h3 {
           margin: 0;
-
-          font-size: 18px;
+          font-size: 20px;
         }
 
-        .challengeTop p {
+        .challengeCard p {
           margin:
-            6px
-            0
+            7px
             0;
-
-          color: #94a3b8;
-
-          font-size: 12px;
+          color: #8c97a5;
+          font-size: 13px;
+          line-height: 1.4;
         }
 
         .pointsBadge {
-          min-width: 60px;
-
-          height: 60px;
-
-          display: grid;
-
-          place-items: center;
-
-          align-content: center;
-
-          border-radius: 16px;
-
+          flex-shrink: 0;
+          height: fit-content;
+          padding:
+            7px
+            9px;
+          border-radius: 10px;
           background:
-            rgba(
-              245,
-              158,
-              11,
-              .13
-            );
-
+            rgba(251,191,36,.13);
           color: #fbbf24;
-
-          font-size: 18px;
-
           font-weight: 900;
-        }
-
-        .pointsBadge small {
-          display: block;
-
-          font-size: 8px;
-
-          color: #94a3b8;
-        }
-
-        .voteInfo {
-          margin:
-            15px
-            0
-            8px;
-
-          color: #94a3b8;
-
           font-size: 11px;
         }
 
-        .optionList {
-          display: flex;
-
-          flex-direction:
-            column;
-
-          gap: 8px;
+        .challengeStatus {
+          margin-top: 9px;
+          color: #8893a1;
+          font-size: 11px;
         }
 
-        .voteOption {
-          padding: 11px;
-
-          border-radius: 14px;
-
+        .challengeAssigned {
+          margin-top: 9px;
+          padding: 10px;
+          border-radius: 12px;
           background:
-            rgba(
-              255,
-              255,
-              255,
-              .04
-            );
-        }
-
-        .voteOption.leader {
-          border:
-            1px solid
-            rgba(
-              245,
-              158,
-              11,
-              .3
-            );
-        }
-
-        .voteOptionTop {
-          display: flex;
-
-          justify-content:
-            space-between;
-
-          gap: 10px;
-
+            rgba(255,255,255,.04);
           font-size: 12px;
         }
 
-        .voteOptionTop span {
-          color: #fbbf24;
+        .challengeActions {
+          display: grid;
+          grid-template-columns:
+            repeat(2, 1fr);
+          gap: 7px;
+          margin-top: 12px;
+        }
 
+        .challengeActions button {
+          border: none;
+          border-radius: 11px;
+          padding: 11px;
+          background:
+            #222b37;
+          color: #fff;
+          cursor: pointer;
+          font-weight: 800;
+          font-size: 11px;
+        }
+
+        .challengeActions button:hover {
+          background:
+            #303b49;
+        }
+
+        .voteBox {
+          margin-top: 13px;
+          padding: 13px;
+          border-radius: 15px;
+          background:
+            rgba(0,0,0,.15);
+        }
+
+        .voteBox label {
+          display: block;
+          margin-bottom: 7px;
+          color: #8e99a7;
+          font-size: 11px;
+        }
+
+        .voteButtons {
+          display: grid;
+          grid-template-columns:
+            1fr
+            1fr;
+          gap: 8px;
+          margin-top: 8px;
+        }
+
+        .voteButtons button {
+          border: none;
+          border-radius: 12px;
+          padding: 12px;
+          cursor: pointer;
           font-weight: 900;
         }
 
-        .progress {
-          height: 5px;
-
-          margin:
-            8px
-            0;
-
-          overflow: hidden;
-
-          border-radius: 99px;
-
+        .voteWinner {
           background:
-            rgba(
-              255,
-              255,
-              255,
-              .06
-            );
+            #166534 !important;
+          color: #fff;
         }
 
-        .progress div {
-          height: 100%;
-
-          border-radius: inherit;
-
+        .voteLoser {
           background:
-            linear-gradient(
-              90deg,
-              #fbbf24,
-              #f97316
-            );
-        }
-
-        .voteOption select {
-          margin: 0;
-
-          padding: 8px;
-
-          font-size: 10px;
+            #7f1d1d !important;
+          color: #fff;
         }
 
         .completeButton {
           width: 100%;
-
-          margin-top: 12px;
-
-          padding: 11px;
-
+          margin-top: 9px;
           border: none;
-
           border-radius: 12px;
-
-          background:
-            rgba(
-              34,
-              197,
-              94,
-              .12
-            );
-
-          color: #86efac;
-
-          font-weight: 900;
-        }
-
-        .winnerBox {
-          margin-top: 15px;
-
-          padding: 17px;
-
-          border-radius: 16px;
-
-          background:
-            rgba(
-              34,
-              197,
-              94,
-              .1
-            );
-
-          border:
-            1px solid
-            rgba(
-              34,
-              197,
-              94,
-              .18
-            );
-
-          text-align: center;
-        }
-
-        .winnerBox span {
-          display: block;
-
-          color: #86efac;
-
-          font-size: 9px;
-
-          font-weight: 900;
-        }
-
-        .winnerBox strong {
-          display: block;
-
-          margin:
-            7px
-            0;
-
-          font-size: 20px;
-        }
-
-        .winnerBox p {
-          margin: 0;
-
-          color: #94a3b8;
-
-          font-size: 11px;
-        }
-
-        /* RANKING */
-
-        .rankingHero {
-          padding: 25px;
-
-          margin-bottom: 12px;
-
-          border-radius: 24px;
-
-          text-align: center;
-
+          padding: 12px;
           background:
             linear-gradient(
               135deg,
-              #4c1d95,
-              #7c3aed
+              #fbbf24,
+              #f59e0b
             );
+          color: #111;
+          cursor: pointer;
+          font-weight: 900;
+        }
+
+        .cancelButton {
+          width: 100%;
+          margin-top: 8px;
+          border: none;
+          border-radius: 12px;
+          padding: 10px;
+          background:
+            #242c36;
+          color: #a6afbb;
+          cursor: pointer;
+          font-size: 11px;
+        }
+
+        .rankingHero {
+          margin-bottom: 14px;
+          padding: 28px 20px;
+          text-align: center;
+          border-radius: 24px;
+          background:
+            linear-gradient(
+              145deg,
+              rgba(251,191,36,.18),
+              rgba(245,158,11,.06)
+            );
+          border:
+            1px solid
+            rgba(251,191,36,.15);
         }
 
         .rankingHero span {
-          color: #ddd6fe;
-
-          font-size: 10px;
-
-          font-weight: 900;
-
-          letter-spacing:
-            1.4px;
+          font-size: 45px;
         }
 
         .rankingHero h2 {
           margin:
-            8px
+            6px
             0
-            5px;
-
-          font-size: 24px;
+            3px;
+          font-size: 28px;
         }
 
         .rankingHero p {
           margin: 0;
-
-          color: #ddd6fe;
-
-          font-size: 11px;
+          color: #8893a1;
+          font-size: 12px;
         }
 
-        .rankingList {
-          display: flex;
-
-          flex-direction:
-            column;
-
-          gap: 8px;
-
-          margin-bottom: 12px;
-        }
-
-        .rankCard {
+        .rankRow {
           display: grid;
-
           grid-template-columns:
-            35px
-            43px
+            38px
+            44px
             1fr
             auto;
-
-          gap: 9px;
-
+          gap: 10px;
           align-items: center;
-
-          padding: 11px;
-
-          border-radius: 17px;
-
+          padding: 12px;
+          margin-top: 8px;
+          border-radius: 16px;
           background:
-            rgba(
-              255,
-              255,
-              255,
-              .045
-            );
-
-          border:
-            1px solid
-            rgba(
-              255,
-              255,
-              255,
-              .06
-            );
+            rgba(255,255,255,.045);
         }
 
-        .rankCard.first {
+        .rankRow.first {
           background:
             linear-gradient(
               135deg,
-              rgba(
-                245,
-                158,
-                11,
-                .14
-              ),
-              rgba(
-                249,
-                115,
-                22,
-                .07
-              )
+              rgba(251,191,36,.15),
+              rgba(255,255,255,.04)
             );
-
-          border-color:
-            rgba(
-              245,
-              158,
-              11,
-              .22
-            );
+          border:
+            1px solid
+            rgba(251,191,36,.18);
         }
 
         .rankNumber {
           text-align: center;
-
-          font-size: 19px;
-
+          font-size: 18px;
           font-weight: 900;
         }
 
         .rankAvatar {
-          width: 43px;
-          height: 43px;
+          width: 44px;
+          height: 44px;
+          border-radius: 14px;
+        }
+
+        .rankInfo {
+          min-width: 0;
         }
 
         .rankInfo strong {
           display: block;
-
-          font-size: 14px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         .rankInfo span {
           display: block;
-
-          margin-top: 2px;
-
-          color: #fbbf24;
-
+          margin-top: 3px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          color: #8b96a4;
           font-size: 10px;
-
-          font-weight: 800;
-        }
-
-        .rankInfo small {
-          display: block;
-
-          margin-top: 4px;
-
-          color: #64748b;
-
-          font-size: 9px;
         }
 
         .rankPoints {
@@ -4339,348 +3792,148 @@ export default function Home() {
 
         .rankPoints strong {
           display: block;
-
           color: #fbbf24;
-
-          font-size: 20px;
+          font-size: 18px;
         }
 
         .rankPoints small {
-          color: #64748b;
-
-          font-size: 8px;
-        }
-
-        .pointsExplanation {
-          padding: 17px;
-
-          border-radius: 19px;
-
-          background:
-            rgba(
-              255,
-              255,
-              255,
-              .04
-            );
-        }
-
-        .pointsExplanation h3 {
-          margin:
-            0
-            0
-            10px;
-
-          font-size: 15px;
-        }
-
-        .pointsExplanation div {
-          display: flex;
-
-          align-items: center;
-
-          gap: 8px;
-
-          padding: 9px 0;
-
-          border-bottom:
-            1px solid
-            rgba(
-              255,
-              255,
-              255,
-              .05
-            );
-
-          font-size: 12px;
-        }
-
-        .pointsExplanation span {
-          flex: 1;
-        }
-
-        .pointsExplanation strong {
-          color: #fbbf24;
-        }
-
-        /* EMPTY */
-
-        .empty {
-          padding: 28px 15px;
-
-          text-align: center;
-
-          color: #64748b;
-        }
-
-        .empty span {
-          display: block;
-
-          font-size: 42px;
-
-          margin-bottom: 7px;
-        }
-
-        .empty p {
-          margin:
-            0
-            0
-            3px;
-
-          color: #94a3b8;
-
-          font-size: 13px;
-        }
-
-        .empty small {
-          font-size: 10px;
-        }
-
-        .bigEmpty {
-          padding: 50px 20px;
-        }
-
-        .bigEmpty h3 {
-          margin:
-            0
-            0
-            5px;
-
-          color: #cbd5e1;
-        }
-
-        /* LOADING */
-
-        .loading {
-          min-height: 100vh;
-
-          display: flex;
-
-          flex-direction:
-            column;
-
-          justify-content:
-            center;
-
-          align-items: center;
-
-          text-align: center;
-
-          padding: 20px;
-        }
-
-        .loadingEmoji {
-          font-size: 65px;
-
-          animation:
-            pulse 1.2s
-            infinite;
-        }
-
-        .loading h1 {
-          margin:
-            15px
-            0
-            5px;
-
-          font-size: 22px;
-        }
-
-        .loading p {
-          margin: 0;
-
-          color: #64748b;
-        }
-
-        @keyframes pulse {
-          0%,
-          100% {
-            transform:
-              scale(1)
-              rotate(-3deg);
-          }
-
-          50% {
-            transform:
-              scale(1.1)
-              rotate(3deg);
-          }
-        }
-
-        /* TOAST */
-
-        .toast {
-          position: fixed;
-
-          z-index: 100;
-
-          left: 50%;
-
-          bottom: 20px;
-
-          transform:
-            translateX(-50%);
-
-          width:
-            min(
-              calc(
-                100% - 30px
-              ),
-              600px
-            );
-
-          padding:
-            13px
-            16px;
-
-          border-radius: 15px;
-
-          background:
-            #161f2a;
-
-          border:
-            1px solid
-            rgba(
-              255,
-              255,
-              255,
-              .1
-            );
-
-          box-shadow:
-            0 15px 40px
-            rgba(
-              0,
-              0,
-              0,
-              .4
-            );
-
-          color: #fbbf24;
-
-          text-align: center;
-
-          font-size: 12px;
-
-          font-weight: 700;
-        }
-
-        /* FOOTER */
-
-        .footer {
-          padding:
-            30px
-            10px
-            10px;
-
-          text-align: center;
-
-          color: #475569;
-        }
-
-        .footer div {
-          font-size: 25px;
-        }
-
-        .footer strong {
-          display: block;
-
-          margin-top: 5px;
-
-          font-size: 11px;
-        }
-
-        .footer small {
-          display: block;
-
-          margin-top: 3px;
-
+          color: #737e8c;
           font-size: 9px;
         }
 
-        /* MOBILE */
+        .empty {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 28px 10px;
+          text-align: center;
+          color: #8994a3;
+        }
 
-        @media (
-          max-width: 650px
-        ) {
+        .empty span {
+          margin-bottom: 8px;
+          font-size: 35px;
+        }
+
+        .empty strong {
+          color: #dbe0e7;
+          font-size: 14px;
+        }
+
+        .empty small {
+          margin-top: 4px;
+          font-size: 11px;
+        }
+
+        .message {
+          position: fixed;
+          z-index: 100;
+          left: 50%;
+          bottom: 20px;
+          width:
+            min(
+              calc(100% - 30px),
+              600px
+            );
+          transform:
+            translateX(-50%);
+          padding:
+            13px
+            16px;
+          border-radius: 15px;
+          text-align: center;
+          font-weight: 800;
+          font-size: 12px;
+          box-shadow:
+            0 15px 45px
+            rgba(0,0,0,.4);
+          backdrop-filter:
+            blur(15px);
+        }
+
+        .message.success {
+          background:
+            rgba(22,101,52,.94);
+          border:
+            1px solid
+            rgba(74,222,128,.25);
+        }
+
+        .message.error {
+          background:
+            rgba(127,29,29,.96);
+          border:
+            1px solid
+            rgba(248,113,113,.25);
+        }
+
+        .message.info {
+          background:
+            rgba(31,41,55,.96);
+          border:
+            1px solid
+            rgba(255,255,255,.10);
+        }
+
+        footer {
+          padding:
+            35px
+            10px
+            10px;
+          text-align: center;
+          color: #4f5a68;
+        }
+
+        footer div {
+          margin-bottom: 5px;
+          font-size: 24px;
+        }
+
+        footer strong {
+          display: block;
+          color: #697585;
+          font-size: 12px;
+        }
+
+        footer small {
+          display: block;
+          margin-top: 4px;
+          font-size: 9px;
+        }
+
+        @media(max-width: 650px) {
 
           .app {
             padding:
+              14px
               12px
-              12px
-              35px;
+              70px;
           }
 
-          .header {
-            padding-bottom: 15px;
+          .hero {
+            gap: 12px;
           }
 
-          .brandIcon {
-            width: 50px;
-            height: 50px;
-
-            font-size: 25px;
-          }
-
-          .brand h1 {
-            font-size: 18px;
-          }
-
-          .brand p {
-            font-size: 10px;
-          }
-
-          .headerBadge {
-            font-size: 9px;
-          }
-
-          .eventHero {
-            padding: 18px;
-          }
-
-          .eventHero h2 {
-            font-size: 23px;
-          }
-
-          .beerEmoji {
-            font-size: 42px;
+          .heroIcon {
+            width: 58px;
+            height: 58px;
+            border-radius: 17px;
+            font-size: 30px;
           }
 
           .statsGrid {
             grid-template-columns:
-              repeat(
-                2,
-                1fr
-              );
+              repeat(2, 1fr);
           }
 
-          .peopleGrid {
+          .inputRow {
             grid-template-columns:
               1fr;
           }
 
-          .quickGrid {
-            grid-template-columns:
-              repeat(
-                3,
-                1fr
-              );
-          }
-
-          .quickButton {
-            min-height: 105px;
-          }
-
-          .quickButton span {
-            font-size: 27px;
-          }
-
-          .quickButton strong {
-            font-size: 11px;
-          }
-
-          .quickButton small {
-            font-size: 9px;
+          .inputRow .primaryButton {
+            width: 100%;
           }
 
           .formGrid {
@@ -4688,66 +3941,424 @@ export default function Home() {
               1fr;
           }
 
-          .drinkItem {
+          .assignmentRow {
             grid-template-columns:
-              38px
               1fr;
           }
 
-          .drinkRight {
-            grid-column:
-              2;
-            align-items:
-              flex-start;
-          }
-
-          .drinkRight select {
-            width: 100%;
-          }
-
-          .rankCard {
+          .drinkRow {
             grid-template-columns:
-              30px
-              38px
+              39px
               1fr
               auto;
           }
 
-          .rankAvatar {
-            width: 38px;
-            height: 38px;
+          .drinkRow .smallDanger {
+            grid-column: 3;
+            grid-row: 1;
           }
 
-          .rankInfo small {
-            font-size: 8px;
+          .drinkPrice {
+            grid-column: 2;
+            grid-row: 2;
+            text-align: left;
           }
 
           .challengeHero {
-            padding: 19px;
+            align-items: flex-start;
+            flex-direction: column;
           }
 
-          .challengeHero h2 {
-            font-size: 23px;
-          }
-
-          .bigEmoji {
-            font-size: 45px;
-          }
-
-          .partyBanner {
-            align-items:
-              flex-start;
-            flex-direction:
-              column;
-          }
-
-          .partyBanner button {
+          .challengeHero button {
             width: 100%;
           }
+
+          .rankRow {
+            grid-template-columns:
+              32px
+              40px
+              1fr
+              auto;
+            gap: 7px;
+          }
+
+          .rankAvatar {
+            width: 40px;
+            height: 40px;
+          }
+
+          .rankInfo strong {
+            font-size: 13px;
+          }
+
+          .rankPoints strong {
+            font-size: 15px;
+          }
+
         }
 
       `}</style>
-
     </main>
+  );
+}
+
+
+/* ============================================================
+   CHALLENGE CARD
+   ============================================================ */
+
+type ChallengeCardProps = {
+  challenge: Challenge;
+  profiles: Profile[];
+  currentProfileId: string;
+  targetProfile: string;
+  onTargetChange: (
+    value: string
+  ) => void;
+  onVote: (
+    challenge: Challenge,
+    targetProfileId: string,
+    vote: "winner" | "loser"
+  ) => void;
+  onRandom: (
+    challenge: Challenge
+  ) => void;
+  onComplete: (
+    challenge: Challenge,
+    winnerProfileId: string
+  ) => void;
+  onCancel: (
+    challengeId: string
+  ) => void;
+  onParticipant: (
+    challengeId: string,
+    profileId: string
+  ) => void;
+  profileName: (
+    profileId?: string | null
+  ) => string;
+};
+
+function ChallengeCard({
+  challenge,
+  profiles,
+  currentProfileId,
+  targetProfile,
+  onTargetChange,
+  onVote,
+  onRandom,
+  onComplete,
+  onCancel,
+  onParticipant,
+  profileName,
+}: ChallengeCardProps) {
+  const [winner, setWinner] =
+    useState(
+      challenge.winner_profile_id ||
+        ""
+    );
+
+  const [participant, setParticipant] =
+    useState(
+      challenge.assigned_profile_id ||
+        ""
+    );
+
+  const [showVoting, setShowVoting] =
+    useState(false);
+
+  return (
+    <article
+      className={
+        challenge.status ===
+        "completed"
+          ? "challengeCard completed"
+          : "challengeCard"
+      }
+    >
+
+      <div className="challengeCardHeader">
+
+        <div>
+
+          <span className="challengeCategory">
+            {challenge.category ||
+              "Quatsch"}
+          </span>
+
+          <h3>
+            {challenge.title}
+          </h3>
+
+          {challenge.description && (
+            <p>
+              {
+                challenge.description
+              }
+            </p>
+          )}
+
+        </div>
+
+        <div className="pointsBadge">
+          +{challenge.points}
+        </div>
+
+      </div>
+
+
+      <div className="challengeStatus">
+        {challenge.status ===
+        "completed"
+          ? "🏆 Abgeschlossen"
+          : challenge.status ===
+            "cancelled"
+          ? "❌ Beendet"
+          : "🔥 Aktiv"}
+      </div>
+
+
+      {challenge.assigned_profile_id && (
+        <div className="challengeAssigned">
+          🎯 Aufgabe für:{" "}
+          <strong>
+            {profileName(
+              challenge.assigned_profile_id
+            )}
+          </strong>
+        </div>
+      )}
+
+
+      {challenge.status ===
+        "open" && (
+        <>
+
+          <div className="challengeActions">
+
+            <button
+              onClick={() =>
+                onRandom(
+                  challenge
+                )
+              }
+            >
+              🎲 Zufällig
+              vergeben
+            </button>
+
+            <button
+              onClick={() =>
+                setShowVoting(
+                  !showVoting
+                )
+              }
+            >
+              🗳️ Abstimmen
+            </button>
+
+          </div>
+
+
+          <div className="voteBox">
+
+            <label>
+              👤 Challenge-Teilnehmer
+            </label>
+
+            <select
+              value={participant}
+              onChange={(e) => {
+                setParticipant(
+                  e.target.value
+                );
+
+                onParticipant(
+                  challenge.id,
+                  e.target.value
+                );
+              }}
+            >
+              <option value="">
+                Person auswählen
+              </option>
+
+              {profiles.map(
+                (profile) => (
+                  <option
+                    key={
+                      profile.id
+                    }
+                    value={
+                      profile.id
+                    }
+                  >
+                    {
+                      profile.username
+                    }
+                  </option>
+                )
+              )}
+
+            </select>
+
+          </div>
+
+
+          {showVoting && (
+            <div className="voteBox">
+
+              <label>
+                🗳️ Wen soll die
+                Gruppe bestimmen?
+              </label>
+
+              <select
+                value={
+                  targetProfile
+                }
+                onChange={(e) =>
+                  onTargetChange(
+                    e.target.value
+                  )
+                }
+              >
+                <option value="">
+                  Person auswählen
+                </option>
+
+                {profiles.map(
+                  (profile) => (
+                    <option
+                      key={
+                        profile.id
+                      }
+                      value={
+                        profile.id
+                      }
+                    >
+                      {
+                        profile.username
+                      }
+                    </option>
+                  )
+                )}
+
+              </select>
+
+
+              <div className="voteButtons">
+
+                <button
+                  className="voteWinner"
+                  onClick={() =>
+                    onVote(
+                      challenge,
+                      targetProfile,
+                      "winner"
+                    )
+                  }
+                  disabled={
+                    !currentProfileId ||
+                    !targetProfile
+                  }
+                >
+                  👍 Dafür
+                </button>
+
+                <button
+                  className="voteLoser"
+                  onClick={() =>
+                    onVote(
+                      challenge,
+                      targetProfile,
+                      "loser"
+                    )
+                  }
+                  disabled={
+                    !currentProfileId ||
+                    !targetProfile
+                  }
+                >
+                  👎 Dagegen
+                </button>
+
+              </div>
+
+            </div>
+          )}
+
+
+          <div className="voteBox">
+
+            <label>
+              🏆 Gewinner festlegen
+            </label>
+
+            <select
+              value={winner}
+              onChange={(e) =>
+                setWinner(
+                  e.target.value
+                )
+              }
+            >
+              <option value="">
+                Gewinner auswählen
+              </option>
+
+              {profiles.map(
+                (profile) => (
+                  <option
+                    key={
+                      profile.id
+                    }
+                    value={
+                      profile.id
+                    }
+                  >
+                    {
+                      profile.username
+                    }
+                  </option>
+                )
+              )}
+
+            </select>
+
+            <button
+              className="completeButton"
+              onClick={() =>
+                onComplete(
+                  challenge,
+                  winner
+                )
+              }
+              disabled={!winner}
+            >
+              🏆 Challenge
+              abschließen · +
+              {challenge.points}
+              Punkte
+            </button>
+
+          </div>
+
+
+          <button
+            className="cancelButton"
+            onClick={() =>
+              onCancel(
+                challenge.id
+              )
+            }
+          >
+            Challenge beenden
+          </button>
+
+        </>
+      )}
+
+    </article>
   );
 }
