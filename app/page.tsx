@@ -40,32 +40,14 @@ type Payment = {
   status: "offen" | "bezahlt";
 };
 
-type Event = {
-  id: string;
-  title: string;
-  description?: string | null;
-  location?: string | null;
-  invite_code?: string | null;
-  start_date?: string | null;
-  end_date?: string | null;
-  is_active?: boolean | null;
-};
-
 export default function Home() {
-  const [events, setEvents] = useState<Event[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
   const [eventId, setEventId] = useState("");
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [drinks, setDrinks] = useState<Drink[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
-
-  const [showNewEvent, setShowNewEvent] = useState(false);
-  const [newEventTitle, setNewEventTitle] = useState("");
-  const [newEventDescription, setNewEventDescription] = useState("");
-  const [newEventLocation, setNewEventLocation] = useState("");
-  const [newEventStart, setNewEventStart] = useState("");
-  const [newEventEnd, setNewEventEnd] = useState("");
 
   const [drinkName, setDrinkName] = useState("");
   const [liters, setLiters] = useState("0.5");
@@ -74,6 +56,9 @@ export default function Home() {
 
   const [selectedProfile, setSelectedProfile] = useState("");
   const [message, setMessage] = useState("");
+
+  const [inviteCode, setInviteCode] = useState("");
+  const [joinCode, setJoinCode] = useState("");
 
   useEffect(() => {
     loadEvents();
@@ -88,14 +73,13 @@ export default function Home() {
     loadMembers();
     loadDrinks();
     loadPayments();
+    loadInviteCode();
   }, [eventId]);
 
   async function loadEvents() {
     const { data, error } = await supabase
       .from("events")
-      .select(
-        "id,title,description,location,invite_code,start_date,end_date,is_active"
-      )
+      .select("id,title,invite_code")
       .order("start_date", { ascending: false });
 
     if (error) {
@@ -105,62 +89,13 @@ export default function Home() {
 
     setEvents(data || []);
 
-    if (!data || data.length === 0) {
-      setEventId("");
-      return;
-    }
+    if (!data || data.length === 0) return;
 
     const saved = localStorage.getItem("guesten-active-event");
 
     const exists = data.some((event) => event.id === saved);
 
     setEventId(saved && exists ? saved : data[0].id);
-  }
-
-  async function createEvent() {
-    setMessage("");
-
-    if (!newEventTitle.trim()) {
-      setMessage("❌ Bitte einen Eventnamen eingeben.");
-      return;
-    }
-
-    const inviteCode =
-      Math.random().toString(36).substring(2, 8).toUpperCase();
-
-    const { data, error } = await supabase
-      .from("events")
-      .insert({
-        title: newEventTitle.trim(),
-        description: newEventDescription.trim() || null,
-        location: newEventLocation.trim() || null,
-        invite_code: inviteCode,
-        start_date: newEventStart || null,
-        end_date: newEventEnd || null,
-        is_active: true,
-      })
-      .select("id")
-      .single();
-
-    if (error) {
-      setMessage("❌ Event: " + error.message);
-      return;
-    }
-
-    setNewEventTitle("");
-    setNewEventDescription("");
-    setNewEventLocation("");
-    setNewEventStart("");
-    setNewEventEnd("");
-    setShowNewEvent(false);
-
-    await loadEvents();
-
-    if (data?.id) {
-      setEventId(data.id);
-    }
-
-    setMessage("✅ Event erfolgreich erstellt.");
   }
 
   async function loadProfiles() {
@@ -262,6 +197,125 @@ export default function Home() {
     setPayments(data || []);
   }
 
+  async function loadInviteCode() {
+    if (!eventId) return;
+
+    const { data, error } = await supabase
+      .from("events")
+      .select("invite_code")
+      .eq("id", eventId)
+      .single();
+
+    if (error) {
+      setMessage("❌ Einladungscode: " + error.message);
+      return;
+    }
+
+    setInviteCode(data?.invite_code || "");
+  }
+
+  async function createInviteCode() {
+    if (!eventId) return;
+
+    const code = Math.random()
+      .toString(36)
+      .substring(2, 8)
+      .toUpperCase();
+
+    const { error } = await supabase
+      .from("events")
+      .update({
+        invite_code: code,
+      })
+      .eq("id", eventId);
+
+    if (error) {
+      setMessage("❌ Code: " + error.message);
+      return;
+    }
+
+    setInviteCode(code);
+    setMessage("✅ Einladungscode erstellt.");
+    await loadEvents();
+  }
+
+  async function copyInviteCode() {
+    if (!inviteCode) return;
+
+    try {
+      await navigator.clipboard.writeText(inviteCode);
+      setMessage("✅ Einladungscode kopiert.");
+    } catch {
+      setMessage("ℹ️ Code: " + inviteCode);
+    }
+  }
+
+  async function joinEventWithCode() {
+    setMessage("");
+
+    const code = joinCode.trim().toUpperCase();
+
+    if (!code) {
+      setMessage("❌ Bitte Einladungscode eingeben.");
+      return;
+    }
+
+    const { data: event, error: eventError } = await supabase
+      .from("events")
+      .select("id,title,invite_code")
+      .eq("invite_code", code)
+      .single();
+
+    if (eventError || !event) {
+      setMessage("❌ Einladungscode ist ungültig.");
+      return;
+    }
+
+    const profile = profiles[0];
+
+    if (!profile) {
+      setMessage("❌ Kein Profil vorhanden.");
+      return;
+    }
+
+    const { data: existing } = await supabase
+      .from("event_members")
+      .select("id")
+      .eq("event_id", event.id)
+      .eq("profile_id", profile.id)
+      .maybeSingle();
+
+    if (existing) {
+      setEventId(event.id);
+      setJoinCode("");
+      setMessage("ℹ️ Du bist bereits Teilnehmer dieses Events.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("event_members")
+      .insert({
+        event_id: event.id,
+        profile_id: profile.id,
+        joined_at: new Date().toISOString(),
+        joined_via_code: code,
+      });
+
+    if (error) {
+      setMessage("❌ Beitreten: " + error.message);
+      return;
+    }
+
+    setEventId(event.id);
+    setJoinCode("");
+
+    await loadMembers();
+
+    setMessage(
+      `✅ Du bist dem Event „${event.title}“ beigetreten.`
+    );
+  }
+
   async function addParticipant() {
     setMessage("");
 
@@ -298,6 +352,7 @@ export default function Home() {
     }
 
     setSelectedProfile("");
+
     await loadMembers();
 
     setMessage("✅ Teilnehmer hinzugefügt.");
@@ -315,6 +370,7 @@ export default function Home() {
     }
 
     await loadMembers();
+
     setMessage("✅ Teilnehmer entfernt.");
   }
 
@@ -331,17 +387,19 @@ export default function Home() {
       return;
     }
 
-    const { error } = await supabase.from("drinks").insert({
-      event_id: eventId,
-      drink_name: drinkName.trim(),
-      getraenk: drinkName.trim(),
-      liters: Number(liters),
-      menge: Number(liters),
-      alcohol_percent: Number(alcohol),
-      alkohol: Number(alcohol),
-      preis: Number(price),
-      quantity: 1,
-    });
+    const { error } = await supabase
+      .from("drinks")
+      .insert({
+        event_id: eventId,
+        drink_name: drinkName.trim(),
+        getraenk: drinkName.trim(),
+        liters: Number(liters),
+        menge: Number(liters),
+        alcohol_percent: Number(alcohol),
+        alkohol: Number(alcohol),
+        preis: Number(price),
+        quantity: 1,
+      });
 
     if (error) {
       setMessage("❌ Getränk: " + error.message);
@@ -364,7 +422,9 @@ export default function Home() {
   ) {
     setMessage("⏳ Getränk wird zugeordnet...");
 
-    const drink = drinks.find((item) => item.id === drinkId);
+    const drink = drinks.find(
+      (item) => item.id === drinkId
+    );
 
     if (!drink) {
       setMessage("❌ Getränk nicht gefunden.");
@@ -372,17 +432,21 @@ export default function Home() {
     }
 
     if (drink.profile_id) {
-      setMessage("❌ Dieses Getränk ist bereits zugeordnet.");
+      setMessage(
+        "❌ Dieses Getränk ist bereits zugeordnet."
+      );
       return;
     }
 
-    const { error } = await supabase
+    const { error: drinkError } = await supabase
       .from("drinks")
-      .update({ profile_id: profileId })
+      .update({
+        profile_id: profileId,
+      })
       .eq("id", drinkId);
 
-    if (error) {
-      setMessage("❌ Zuordnung: " + error.message);
+    if (drinkError) {
+      setMessage("❌ Zuordnung: " + drinkError.message);
       return;
     }
 
@@ -397,7 +461,8 @@ export default function Home() {
         .from("profiles")
         .update({
           points: Number(profile.points || 0) + 10,
-          drinks_count: Number(profile.drinks_count || 0) + 1,
+          drinks_count:
+            Number(profile.drinks_count || 0) + 1,
         })
         .eq("id", profileId);
     }
@@ -427,7 +492,9 @@ export default function Home() {
     );
 
     const newStatus =
-      existing?.status === "bezahlt" ? "offen" : "bezahlt";
+      existing?.status === "bezahlt"
+        ? "offen"
+        : "bezahlt";
 
     if (existing) {
       const { error } = await supabase
@@ -472,41 +539,47 @@ export default function Home() {
 
   const totalLiters = drinks.reduce(
     (sum, drink) =>
-      sum + Number(drink.liters ?? drink.menge ?? 0),
+      sum +
+      Number(
+        drink.liters ?? drink.menge ?? 0
+      ),
     0
   );
 
   const totalCost = drinks.reduce(
-    (sum, drink) => sum + Number(drink.preis || 0),
+    (sum, drink) =>
+      sum + Number(drink.preis || 0),
     0
   );
 
   const totalPoints = members.reduce(
-    (sum, member) => sum + Number(member.points || 0),
+    (sum, member) =>
+      sum + Number(member.points || 0),
     0
   );
 
   const amountPerPerson =
-    members.length > 0 ? totalCost / members.length : 0;
+    members.length > 0
+      ? totalCost / members.length
+      : 0;
 
   const ranking = [...members].sort(
-    (a, b) => Number(b.points) - Number(a.points)
+    (a, b) =>
+      Number(b.points) - Number(a.points)
   );
 
-  const paidCount = members.filter((member) =>
-    payments.some(
-      (payment) =>
-        payment.event_id === eventId &&
-        payment.profile_id === member.profile_id &&
-        payment.status === "bezahlt"
-    )
+  const paidCount = members.filter(
+    (member) =>
+      payments.some(
+        (payment) =>
+          payment.event_id === eventId &&
+          payment.profile_id === member.profile_id &&
+          payment.status === "bezahlt"
+      )
   ).length;
 
-  const openCount = members.length - paidCount;
-
-  const activeEvent = events.find(
-    (event) => event.id === eventId
-  );
+  const openCount =
+    members.length - paidCount;
 
   return (
     <main className="page">
@@ -526,105 +599,79 @@ export default function Home() {
 
           <select
             value={eventId}
-            onChange={(e) => setEventId(e.target.value)}
+            onChange={(e) =>
+              setEventId(e.target.value)
+            }
           >
-            <option value="">Wähle dein Event</option>
+            <option value="">
+              Event auswählen
+            </option>
 
             {events.map((event) => (
-              <option key={event.id} value={event.id}>
+              <option
+                key={event.id}
+                value={event.id}
+              >
                 {event.title}
               </option>
             ))}
           </select>
 
-          <button
-            className="newEventButton"
-            onClick={() => setShowNewEvent(!showNewEvent)}
-          >
-            ➕ Neues Event
-          </button>
+          {eventId && (
+            <div className="inviteBox">
 
-          {showNewEvent && (
-            <div className="newEvent">
+              <h3>🔗 Freunde einladen</h3>
 
-              <input
-                placeholder="Eventname *"
-                value={newEventTitle}
-                onChange={(e) =>
-                  setNewEventTitle(e.target.value)
-                }
-              />
+              <p>
+                Teile diesen Code mit deinen Freunden:
+              </p>
 
-              <input
-                placeholder="Beschreibung"
-                value={newEventDescription}
-                onChange={(e) =>
-                  setNewEventDescription(e.target.value)
-                }
-              />
+              <div className="codeRow">
+                <strong>
+                  {inviteCode || "------"}
+                </strong>
 
-              <input
-                placeholder="Ort"
-                value={newEventLocation}
-                onChange={(e) =>
-                  setNewEventLocation(e.target.value)
-                }
-              />
-
-              <label>Beginn</label>
-
-              <input
-                type="datetime-local"
-                value={newEventStart}
-                onChange={(e) =>
-                  setNewEventStart(e.target.value)
-                }
-              />
-
-              <label>Ende</label>
-
-              <input
-                type="datetime-local"
-                value={newEventEnd}
-                onChange={(e) =>
-                  setNewEventEnd(e.target.value)
-                }
-              />
+                <button onClick={copyInviteCode}>
+                  📋 Kopieren
+                </button>
+              </div>
 
               <button
-                className="save"
-                onClick={createEvent}
+                className="newCode"
+                onClick={createInviteCode}
               >
-                🍻 Event erstellen
+                🔄 Neuen Code erstellen
               </button>
 
             </div>
           )}
+        </section>
 
-          {activeEvent && (
-            <div className="eventInfo">
-              <strong>🍻 {activeEvent.title}</strong>
+        <section className="card">
+          <h2>👥 Event beitreten</h2>
 
-              {activeEvent.location && (
-                <small>
-                  📍 {activeEvent.location}
-                </small>
-              )}
+          <p>
+            Hast du einen Einladungscode?
+          </p>
 
-              {activeEvent.description && (
-                <small>
-                  {activeEvent.description}
-                </small>
-              )}
+          <div className="joinBox">
 
-              {activeEvent.invite_code && (
-                <small>
-                  🔗 Einladungscode:{" "}
-                  <strong>{activeEvent.invite_code}</strong>
-                </small>
-              )}
-            </div>
-          )}
+            <input
+              value={joinCode}
+              onChange={(e) =>
+                setJoinCode(
+                  e.target.value.toUpperCase()
+                )
+              }
+              placeholder="z.B. A7K9P2"
+              maxLength={6}
+            />
+
+            <button onClick={joinEventWithCode}>
+              🚀 Event beitreten
+            </button>
+
+          </div>
         </section>
 
         <div className="stats">
@@ -637,13 +684,17 @@ export default function Home() {
 
           <div className="stat">
             <span>💧</span>
-            <strong>{totalLiters.toFixed(1)}</strong>
+            <strong>
+              {totalLiters.toFixed(1)}
+            </strong>
             <small>Liter</small>
           </div>
 
           <div className="stat">
             <span>💶</span>
-            <strong>{totalCost.toFixed(2)} €</strong>
+            <strong>
+              {totalCost.toFixed(2)} €
+            </strong>
             <small>Kosten</small>
           </div>
 
@@ -659,7 +710,9 @@ export default function Home() {
 
           <h2>👥 Teilnehmer</h2>
 
-          <p>Wer ist beim Event dabei?</p>
+          <p>
+            Wer ist beim Event dabei?
+          </p>
 
           {profiles.filter(
             (profile) =>
@@ -674,7 +727,9 @@ export default function Home() {
               <select
                 value={selectedProfile}
                 onChange={(e) =>
-                  setSelectedProfile(e.target.value)
+                  setSelectedProfile(
+                    e.target.value
+                  )
                 }
               >
                 <option value="">
@@ -694,12 +749,15 @@ export default function Home() {
                       key={profile.id}
                       value={profile.id}
                     >
-                      {profile.username || "Unbenannt"}
+                      {profile.username ||
+                        "Unbenannt"}
                     </option>
                   ))}
               </select>
 
-              <button onClick={addParticipant}>
+              <button
+                onClick={addParticipant}
+              >
                 ➕ Hinzufügen
               </button>
 
@@ -712,17 +770,26 @@ export default function Home() {
           )}
 
           {members.map((member) => (
-            <div className="member" key={member.id}>
+            <div
+              className="member"
+              key={member.id}
+            >
 
               <div className="avatar">
-                {member.username.charAt(0).toUpperCase()}
+                {member.username
+                  .charAt(0)
+                  .toUpperCase()}
               </div>
 
               <div>
-                <strong>{member.username}</strong>
+                <strong>
+                  {member.username}
+                </strong>
 
                 <small>
-                  🍺 {member.drinks} · 🏆 {member.points} Punkte
+                  🍺 {member.drinks}
+                  {" · "}
+                  🏆 {member.points} Punkte
                 </small>
               </div>
 
@@ -757,7 +824,6 @@ export default function Home() {
             <input
               type="number"
               step="0.1"
-              placeholder="Liter"
               value={liters}
               onChange={(e) =>
                 setLiters(e.target.value)
@@ -766,7 +832,6 @@ export default function Home() {
 
             <input
               type="number"
-              placeholder="Alkohol %"
               value={alcohol}
               onChange={(e) =>
                 setAlcohol(e.target.value)
@@ -776,7 +841,6 @@ export default function Home() {
             <input
               type="number"
               step="0.01"
-              placeholder="Preis €"
               value={price}
               onChange={(e) =>
                 setPrice(e.target.value)
@@ -785,7 +849,10 @@ export default function Home() {
 
           </div>
 
-          <button className="save" onClick={saveDrink}>
+          <button
+            className="save"
+            onClick={saveDrink}
+          >
             🍻 Getränk speichern
           </button>
 
@@ -796,10 +863,15 @@ export default function Home() {
           <h2>🔗 Getränk zuordnen</h2>
 
           {members.length === 0 ? (
-            <p>👥 Zuerst Teilnehmer hinzufügen.</p>
+            <p>
+              👥 Zuerst Teilnehmer hinzufügen.
+            </p>
           ) : (
             members.map((member) => (
-              <div className="assign" key={member.id}>
+              <div
+                className="assign"
+                key={member.id}
+              >
 
                 <strong>
                   👤 {member.username}
@@ -839,7 +911,9 @@ export default function Home() {
                           0
                       ).toFixed(1)}
                       L
-                      {drink.profile_id ? " ✓" : ""}
+                      {drink.profile_id
+                        ? " ✓"
+                        : ""}
                     </option>
                   ))}
 
@@ -857,15 +931,22 @@ export default function Home() {
 
           {drinks.map((drink) => {
 
-            const member = members.find(
-              (item) =>
-                item.profile_id === drink.profile_id
-            );
+            const member =
+              members.find(
+                (item) =>
+                  item.profile_id ===
+                  drink.profile_id
+              );
 
             return (
-              <div className="drink" key={drink.id}>
+              <div
+                className="drink"
+                key={drink.id}
+              >
 
-                <div className="drinkIcon">🍺</div>
+                <div className="drinkIcon">
+                  🍺
+                </div>
 
                 <div>
                   <strong>
@@ -897,7 +978,10 @@ export default function Home() {
                 </div>
 
                 <strong className="price">
-                  {Number(drink.preis || 0).toFixed(2)}€
+                  {Number(
+                    drink.preis || 0
+                  ).toFixed(2)}
+                  €
                 </strong>
 
               </div>
@@ -925,7 +1009,9 @@ export default function Home() {
 
           <div className="row">
             <span>💶 Pro Person</span>
-            <strong>{amountPerPerson.toFixed(2)} €</strong>
+            <strong>
+              {amountPerPerson.toFixed(2)} €
+            </strong>
           </div>
 
           <div className="paymentSummary">
@@ -948,13 +1034,16 @@ export default function Home() {
 
           {members.map((member) => {
 
-            const payment = payments.find(
-              (item) =>
-                item.event_id === eventId &&
-                item.profile_id === member.profile_id
-            );
+            const payment =
+              payments.find(
+                (item) =>
+                  item.event_id === eventId &&
+                  item.profile_id ===
+                    member.profile_id
+              );
 
-            const isPaid = payment?.status === "bezahlt";
+            const isPaid =
+              payment?.status === "bezahlt";
 
             return (
               <div
@@ -967,14 +1056,19 @@ export default function Home() {
               >
 
                 <div className="paymentAvatar">
-                  {member.username.charAt(0).toUpperCase()}
+                  {member.username
+                    .charAt(0)
+                    .toUpperCase()}
                 </div>
 
                 <div className="paymentInfo">
-                  <strong>{member.username}</strong>
+                  <strong>
+                    {member.username}
+                  </strong>
 
                   <small>
-                    Anteil: {amountPerPerson.toFixed(2)} €
+                    Anteil:{" "}
+                    {amountPerPerson.toFixed(2)} €
                   </small>
                 </div>
 
@@ -984,9 +1078,13 @@ export default function Home() {
                       ? "paidButton"
                       : "openButton"
                   }
-                  onClick={() => togglePayment(member)}
+                  onClick={() =>
+                    togglePayment(member)
+                  }
                 >
-                  {isPaid ? "✅ Bezahlt" : "⏳ Offen"}
+                  {isPaid
+                    ? "✅ Bezahlt"
+                    : "⏳ Offen"}
                 </button>
 
               </div>
@@ -999,32 +1097,41 @@ export default function Home() {
 
           <h2>🏆 Ranking</h2>
 
-          {ranking.map((member, index) => (
-            <div className="ranking" key={member.id}>
+          {ranking.map(
+            (member, index) => (
+              <div
+                className="ranking"
+                key={member.id}
+              >
 
-              <span className="rank">
-                {index === 0
-                  ? "🥇"
-                  : index === 1
-                  ? "🥈"
-                  : index === 2
-                  ? "🥉"
-                  : index + 1}
-              </span>
+                <span className="rank">
+                  {index === 0
+                    ? "🥇"
+                    : index === 1
+                    ? "🥈"
+                    : index === 2
+                    ? "🥉"
+                    : index + 1}
+                </span>
 
-              <div>
-                <strong>{member.username}</strong>
+                <div>
+                  <strong>
+                    {member.username}
+                  </strong>
 
-                <small>🍺 {member.drinks}</small>
+                  <small>
+                    🍺 {member.drinks}
+                  </small>
+                </div>
+
+                <div className="points">
+                  {member.points}
+                  <small>Punkte</small>
+                </div>
+
               </div>
-
-              <div className="points">
-                {member.points}
-                <small>Punkte</small>
-              </div>
-
-            </div>
-          ))}
+            )
+          )}
 
           <div className="totalPoints">
             🏆 Gesamtpunkte: {totalPoints}
@@ -1039,7 +1146,10 @@ export default function Home() {
         )}
 
         <footer>
-          <strong>🍻 Güstener Zapfhahn Zentrale</strong>
+          <strong>
+            🍻 Güstener Zapfhahn Zentrale
+          </strong>
+
           <small>
             Dein Event. Deine Getränke. Deine Runde.
           </small>
@@ -1117,6 +1227,53 @@ export default function Home() {
           border: 1px solid rgba(255,255,255,.08);
         }
 
+        .inviteBox {
+          margin-top: 15px;
+          padding: 16px;
+          border-radius: 16px;
+          background: rgba(245,158,11,.08);
+          border: 1px solid rgba(245,158,11,.25);
+        }
+
+        .inviteBox h3 {
+          margin: 0;
+        }
+
+        .codeRow {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 10px;
+          align-items: center;
+        }
+
+        .codeRow strong {
+          padding: 14px;
+          border-radius: 12px;
+          text-align: center;
+          font-size: 26px;
+          letter-spacing: 6px;
+          background: #111923;
+          color: #fbbf24;
+        }
+
+        .newCode {
+          margin-top: 10px;
+          background: #334155;
+          color: white;
+        }
+
+        .joinBox {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 8px;
+        }
+
+        .joinBox input {
+          margin: 0;
+          text-transform: uppercase;
+          letter-spacing: 3px;
+        }
+
         .stats {
           display: grid;
           grid-template-columns: repeat(4,1fr);
@@ -1162,36 +1319,6 @@ export default function Home() {
           color: #111;
           font-weight: bold;
           cursor: pointer;
-        }
-
-        .newEventButton {
-          width: 100%;
-          margin-top: 4px;
-        }
-
-        .newEvent {
-          margin-top: 15px;
-          padding-top: 15px;
-          border-top: 1px solid rgba(255,255,255,.1);
-        }
-
-        .newEvent label {
-          display: block;
-          margin: 5px 0;
-          color: #94a3b8;
-          font-size: 13px;
-        }
-
-        .eventInfo {
-          margin-top: 12px;
-          padding: 13px;
-          border-radius: 14px;
-          background: rgba(245,158,11,.08);
-          border: 1px solid rgba(245,158,11,.2);
-        }
-
-        .eventInfo strong {
-          color: #fbbf24;
         }
 
         .addParticipant {
@@ -1340,10 +1467,11 @@ export default function Home() {
           margin-top: 8px;
           border-radius: 15px;
           background: rgba(255,255,255,.05);
+          border: 1px solid transparent;
         }
 
         .paidRow {
-          border: 1px solid rgba(34,197,94,.4);
+          border-color: rgba(34,197,94,.4);
           background: rgba(34,197,94,.08);
         }
 
@@ -1388,8 +1516,8 @@ export default function Home() {
         }
 
         .totalPoints {
-          margin-top: 12px;
-          padding: 14px;
+          margin-top: 15px;
+          padding: 15px;
           text-align: center;
           border-radius: 14px;
           background: rgba(245,158,11,.1);
@@ -1437,6 +1565,18 @@ export default function Home() {
           .paymentPerson button {
             grid-column: 1 / -1;
             width: 100%;
+          }
+
+          .joinBox {
+            grid-template-columns: 1fr;
+          }
+
+          .codeRow {
+            grid-template-columns: 1fr;
+          }
+
+          .codeRow strong {
+            font-size: 22px;
           }
 
         }
