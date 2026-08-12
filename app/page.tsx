@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
+type EventItem = {
+  id: string;
+  title: string;
+  start_date?: string | null;
+  end_date?: string | null;
+};
+
 type Profile = {
   id: string;
   username: string | null;
@@ -41,7 +48,7 @@ type Payment = {
 };
 
 export default function Home() {
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<EventItem[]>([]);
   const [eventId, setEventId] = useState("");
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -57,41 +64,10 @@ export default function Home() {
   const [selectedProfile, setSelectedProfile] = useState("");
   const [message, setMessage] = useState("");
 
-  const totalLiters = drinks.reduce(
-    (sum, drink) =>
-      sum + Number(drink.liters ?? drink.menge ?? 0),
-    0
-  );
-
-  const totalCost = drinks.reduce(
-    (sum, drink) => sum + Number(drink.preis || 0),
-    0
-  );
-
-  const amountPerPerson =
-    members.length > 0
-      ? totalCost / members.length
-      : 0;
-
-  const totalPoints = members.reduce(
-    (sum, member) => sum + Number(member.points || 0),
-    0
-  );
-
-  const ranking = [...members].sort(
-    (a, b) => Number(b.points) - Number(a.points)
-  );
-
-  const paidCount = members.filter((member) =>
-    payments.some(
-      (payment) =>
-        payment.event_id === eventId &&
-        payment.profile_id === member.profile_id &&
-        payment.status === "bezahlt"
-    )
-  ).length;
-
-  const openCount = members.length - paidCount;
+  const [showCreateEvent, setShowCreateEvent] = useState(false);
+  const [newEventTitle, setNewEventTitle] = useState("");
+  const [newEventStart, setNewEventStart] = useState("");
+  const [newEventEnd, setNewEventEnd] = useState("");
 
   useEffect(() => {
     loadEvents();
@@ -101,10 +77,7 @@ export default function Home() {
   useEffect(() => {
     if (!eventId) return;
 
-    localStorage.setItem(
-      "guesten-active-event",
-      eventId
-    );
+    localStorage.setItem("guesten-active-event", eventId);
 
     loadMembers();
     loadDrinks();
@@ -114,10 +87,8 @@ export default function Home() {
   async function loadEvents() {
     const { data, error } = await supabase
       .from("events")
-      .select("id,title")
-      .order("start_date", {
-        ascending: false,
-      });
+      .select("id,title,start_date,end_date")
+      .order("start_date", { ascending: false });
 
     if (error) {
       setMessage("❌ Events: " + error.message);
@@ -128,35 +99,56 @@ export default function Home() {
 
     if (!data || data.length === 0) return;
 
-    const saved = localStorage.getItem(
-      "guesten-active-event"
-    );
+    const saved = localStorage.getItem("guesten-active-event");
 
-    const exists = data.some(
-      (event) => event.id === saved
-    );
+    const exists = data.some((event) => event.id === saved);
 
-    setEventId(
-      saved && exists
-        ? saved
-        : data[0].id
-    );
+    setEventId(saved && exists ? saved : data[0].id);
+  }
+
+  async function createEvent() {
+    setMessage("");
+
+    if (!newEventTitle.trim()) {
+      setMessage("❌ Bitte einen Eventnamen eingeben.");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("events")
+      .insert({
+        title: newEventTitle.trim(),
+        start_date: newEventStart || null,
+        end_date: newEventEnd || null,
+        is_active: true,
+      })
+      .select("id,title,start_date,end_date")
+      .single();
+
+    if (error) {
+      setMessage("❌ Event: " + error.message);
+      return;
+    }
+
+    setEvents((current) => [data, ...current]);
+    setEventId(data.id);
+
+    setNewEventTitle("");
+    setNewEventStart("");
+    setNewEventEnd("");
+    setShowCreateEvent(false);
+
+    setMessage("✅ Event wurde erstellt.");
   }
 
   async function loadProfiles() {
     const { data, error } = await supabase
       .from("profiles")
-      .select(
-        "id,username,points,drinks_count"
-      )
-      .order("username", {
-        ascending: true,
-      });
+      .select("id,username,points,drinks_count")
+      .order("username", { ascending: true });
 
     if (error) {
-      setMessage(
-        "❌ Profile: " + error.message
-      );
+      setMessage("❌ Profile: " + error.message);
       return;
     }
 
@@ -181,34 +173,23 @@ export default function Home() {
       .eq("event_id", eventId);
 
     if (error) {
-      setMessage(
-        "❌ Teilnehmer: " +
-          error.message
-      );
+      setMessage("❌ Teilnehmer: " + error.message);
       return;
     }
 
-    const result: Member[] =
-      (data || []).map((row: any) => {
-        const profile =
-          Array.isArray(row.profiles)
-            ? row.profiles[0]
-            : row.profiles;
+    const result: Member[] = (data || []).map((row: any) => {
+      const profile = Array.isArray(row.profiles)
+        ? row.profiles[0]
+        : row.profiles;
 
-        return {
-          id: row.id,
-          profile_id: row.profile_id,
-          username:
-            profile?.username ||
-            "Teilnehmer",
-          points: Number(
-            profile?.points || 0
-          ),
-          drinks: Number(
-            profile?.drinks_count || 0
-          ),
-        };
-      });
+      return {
+        id: row.id,
+        profile_id: row.profile_id,
+        username: profile?.username || "Teilnehmer",
+        points: Number(profile?.points || 0),
+        drinks: Number(profile?.drinks_count || 0),
+      };
+    });
 
     setMembers(result);
   }
@@ -231,15 +212,10 @@ export default function Home() {
         profile_id
       `)
       .eq("event_id", eventId)
-      .order("created_at", {
-        ascending: false,
-      });
+      .order("created_at", { ascending: false });
 
     if (error) {
-      setMessage(
-        "❌ Getränke: " +
-          error.message
-      );
+      setMessage("❌ Getränke: " + error.message);
       return;
     }
 
@@ -257,45 +233,32 @@ export default function Home() {
       .eq("event_id", eventId);
 
     if (error) {
-      setMessage(
-        "❌ Zahlungen: " +
-          error.message
-      );
+      setMessage("❌ Zahlungen: " + error.message);
       return;
     }
 
-    setPayments(
-      (data || []) as Payment[]
-    );
+    setPayments(data || []);
   }
 
   async function addParticipant() {
     setMessage("");
 
     if (!eventId) {
-      setMessage(
-        "❌ Kein Event ausgewählt."
-      );
+      setMessage("❌ Kein Event ausgewählt.");
       return;
     }
 
     if (!selectedProfile) {
-      setMessage(
-        "❌ Bitte Teilnehmer auswählen."
-      );
+      setMessage("❌ Bitte Teilnehmer auswählen.");
       return;
     }
 
     if (
       members.some(
-        (member) =>
-          member.profile_id ===
-          selectedProfile
+        (member) => member.profile_id === selectedProfile
       )
     ) {
-      setMessage(
-        "❌ Teilnehmer ist bereits dabei."
-      );
+      setMessage("❌ Teilnehmer ist bereits dabei.");
       return;
     }
 
@@ -304,64 +267,45 @@ export default function Home() {
       .insert({
         event_id: eventId,
         profile_id: selectedProfile,
-        joined_at:
-          new Date().toISOString(),
+        joined_at: new Date().toISOString(),
       });
 
     if (error) {
-      setMessage(
-        "❌ Teilnehmer: " +
-          error.message
-      );
+      setMessage("❌ Teilnehmer: " + error.message);
       return;
     }
 
     setSelectedProfile("");
-
     await loadMembers();
 
-    setMessage(
-      "✅ Teilnehmer hinzugefügt."
-    );
+    setMessage("✅ Teilnehmer hinzugefügt.");
   }
 
-  async function removeParticipant(
-    memberId: string
-  ) {
+  async function removeParticipant(memberId: string) {
     const { error } = await supabase
       .from("event_members")
       .delete()
       .eq("id", memberId);
 
     if (error) {
-      setMessage(
-        "❌ Entfernen: " +
-          error.message
-      );
+      setMessage("❌ Entfernen: " + error.message);
       return;
     }
 
     await loadMembers();
-
-    setMessage(
-      "✅ Teilnehmer entfernt."
-    );
+    setMessage("✅ Teilnehmer entfernt.");
   }
 
   async function saveDrink() {
     setMessage("");
 
     if (!eventId) {
-      setMessage(
-        "❌ Kein Event ausgewählt."
-      );
+      setMessage("❌ Kein Event ausgewählt.");
       return;
     }
 
     if (!drinkName.trim()) {
-      setMessage(
-        "❌ Bitte Getränk eingeben."
-      );
+      setMessage("❌ Bitte Getränk eingeben.");
       return;
     }
 
@@ -380,10 +324,7 @@ export default function Home() {
       });
 
     if (error) {
-      setMessage(
-        "❌ Getränk: " +
-          error.message
-      );
+      setMessage("❌ Getränk: " + error.message);
       return;
     }
 
@@ -394,73 +335,49 @@ export default function Home() {
 
     await loadDrinks();
 
-    setMessage(
-      "✅ Getränk gespeichert."
-    );
+    setMessage("✅ Getränk gespeichert.");
   }
 
   async function assignDrink(
     profileId: string,
     drinkId: string
   ) {
-    setMessage(
-      "⏳ Getränk wird zugeordnet..."
-    );
+    setMessage("⏳ Getränk wird zugeordnet...");
 
-    const drink = drinks.find(
-      (item) => item.id === drinkId
-    );
+    const drink = drinks.find((item) => item.id === drinkId);
 
     if (!drink) {
-      setMessage(
-        "❌ Getränk nicht gefunden."
-      );
+      setMessage("❌ Getränk nicht gefunden.");
       return;
     }
 
     if (drink.profile_id) {
-      setMessage(
-        "❌ Dieses Getränk ist bereits zugeordnet."
-      );
+      setMessage("❌ Dieses Getränk ist bereits zugeordnet.");
       return;
     }
 
-    const { error: drinkError } =
-      await supabase
-        .from("drinks")
-        .update({
-          profile_id: profileId,
-        })
-        .eq("id", drinkId);
+    const { error: drinkError } = await supabase
+      .from("drinks")
+      .update({ profile_id: profileId })
+      .eq("id", drinkId);
 
     if (drinkError) {
-      setMessage(
-        "❌ Zuordnung: " +
-          drinkError.message
-      );
+      setMessage("❌ Zuordnung: " + drinkError.message);
       return;
     }
 
-    const { data: profile } =
-      await supabase
-        .from("profiles")
-        .select(
-          "points,drinks_count"
-        )
-        .eq("id", profileId)
-        .single();
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("points,drinks_count")
+      .eq("id", profileId)
+      .single();
 
     if (profile) {
       await supabase
         .from("profiles")
         .update({
-          points:
-            Number(profile.points || 0) +
-            10,
-          drinks_count:
-            Number(
-              profile.drinks_count || 0
-            ) + 1,
+          points: Number(profile.points || 0) + 10,
+          drinks_count: Number(profile.drinks_count || 0) + 1,
         })
         .eq("id", profileId);
     }
@@ -470,101 +387,56 @@ export default function Home() {
     await loadDrinks();
 
     const member = members.find(
-      (item) =>
-        item.profile_id ===
-        profileId
+      (item) => item.profile_id === profileId
     );
 
     setMessage(
       `🍺 Getränk zugeordnet! ${
-        member?.username ||
-        "Teilnehmer"
+        member?.username || "Teilnehmer"
       } +10 Punkte`
     );
   }
 
-  async function togglePayment(
-    member: Member
-  ) {
-    setMessage(
-      "⏳ Zahlung wird gespeichert..."
+  async function togglePayment(member: Member) {
+    setMessage("⏳ Zahlung wird gespeichert...");
+
+    const existing = payments.find(
+      (payment) =>
+        payment.event_id === eventId &&
+        payment.profile_id === member.profile_id
     );
 
-    /*
-      WICHTIG:
-      Hier wird ausschließlich die UUID
-      des Profils verwendet.
-
-      member.profile_id =
-      z.B.
-      60e68d8e-535d-45ac-aaea-7652cbed6f8b
-
-      Niemals der Name "Philipp".
-    */
-
-    const profileId =
-      String(member.profile_id);
-
-    if (!profileId) {
-      setMessage(
-        "❌ Keine Profil-ID vorhanden."
-      );
-      return;
-    }
-
-    const existingPayment =
-      payments.find(
-        (payment) =>
-          payment.event_id === eventId &&
-          payment.profile_id ===
-            profileId
-      );
-
     const newStatus =
-      existingPayment?.status ===
-      "bezahlt"
-        ? "offen"
-        : "bezahlt";
+      existing?.status === "bezahlt" ? "offen" : "bezahlt";
 
-    if (existingPayment) {
-      const { error } =
-        await supabase
-          .from("payments")
-          .update({
-            status: newStatus,
-            betrag: amountPerPerson,
-            profile_id: profileId,
-            bezahlt_von: profileId,
-          })
-          .eq(
-            "id",
-            existingPayment.id
-          );
+    if (existing) {
+      const { error } = await supabase
+        .from("payments")
+        .update({
+          status: newStatus,
+          betrag: amountPerPerson,
+          bezahlt_von: member.profile_id,
+          profile_id: member.profile_id,
+        })
+        .eq("id", existing.id);
 
       if (error) {
-        setMessage(
-          "❌ Zahlung: " +
-            error.message
-        );
+        setMessage("❌ Zahlung: " + error.message);
         return;
       }
     } else {
-      const { error } =
-        await supabase
-          .from("payments")
-          .insert({
-            event_id: eventId,
-            profile_id: profileId,
-            bezahlt_von: profileId,
-            betrag: amountPerPerson,
-            status: newStatus,
-          });
+      const { error } = await supabase
+        .from("payments")
+        .insert({
+          event_id: eventId,
+          profile_id: member.profile_id,
+          bezahlt_von: member.profile_id,
+          betrag: amountPerPerson,
+          status: newStatus,
+        });
 
       if (error) {
-        setMessage(
-          "❌ Zahlung: " +
-            error.message
-        );
+        setMessage("❌ Zahlung: " + error.message);
         return;
       }
     }
@@ -578,130 +450,168 @@ export default function Home() {
     );
   }
 
+  const totalLiters = drinks.reduce(
+    (sum, drink) =>
+      sum + Number(drink.liters ?? drink.menge ?? 0),
+    0
+  );
+
+  const totalCost = drinks.reduce(
+    (sum, drink) => sum + Number(drink.preis || 0),
+    0
+  );
+
+  const totalPoints = members.reduce(
+    (sum, member) => sum + Number(member.points || 0),
+    0
+  );
+
+  const amountPerPerson =
+    members.length > 0 ? totalCost / members.length : 0;
+
+  const ranking = [...members].sort(
+    (a, b) => Number(b.points) - Number(a.points)
+  );
+
+  const paidCount = members.filter((member) =>
+    payments.some(
+      (payment) =>
+        payment.event_id === eventId &&
+        payment.profile_id === member.profile_id &&
+        payment.status === "bezahlt"
+    )
+  ).length;
+
+  const openCount = members.length - paidCount;
+
   return (
     <main className="page">
       <div className="container">
 
         <header className="header">
-          <div className="logo">
-            🍻
-          </div>
-
+          <div className="logo">🍻</div>
           <div>
-            <h1>
-              Güstener Zapfhahn Zentrale
-            </h1>
-
-            <p>
-              Events · Getränke · Kosten · Rankings
-            </p>
+            <h1>Güstener Zapfhahn Zentrale</h1>
+            <p>Events · Getränke · Kosten · Rankings</p>
           </div>
         </header>
 
         <section className="card">
-          <h2>
-            📅 Aktuelles Event
-          </h2>
+          <div className="eventTop">
+            <div>
+              <h2>📅 Aktuelles Event</h2>
+              <p>Wähle dein Event</p>
+            </div>
+
+            <button
+              className="createButton"
+              onClick={() => setShowCreateEvent(!showCreateEvent)}
+            >
+              ➕ Neues Event
+            </button>
+          </div>
+
+          {showCreateEvent && (
+            <div className="createEvent">
+              <input
+                placeholder="Name des Events"
+                value={newEventTitle}
+                onChange={(e) =>
+                  setNewEventTitle(e.target.value)
+                }
+              />
+
+              <div className="three">
+                <div>
+                  <label>Start</label>
+                  <input
+                    type="datetime-local"
+                    value={newEventStart}
+                    onChange={(e) =>
+                      setNewEventStart(e.target.value)
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label>Ende</label>
+                  <input
+                    type="datetime-local"
+                    value={newEventEnd}
+                    onChange={(e) =>
+                      setNewEventEnd(e.target.value)
+                    }
+                  />
+                </div>
+              </div>
+
+              <button
+                className="save"
+                onClick={createEvent}
+              >
+                🚀 Event erstellen
+              </button>
+            </div>
+          )}
 
           <select
             value={eventId}
-            onChange={(e) =>
-              setEventId(
-                e.target.value
-              )
-            }
+            onChange={(e) => setEventId(e.target.value)}
           >
-            <option value="">
-              Event auswählen
-            </option>
+            <option value="">Event auswählen</option>
 
-            {events.map(
-              (event) => (
-                <option
-                  key={event.id}
-                  value={event.id}
-                >
-                  {event.title}
-                </option>
-              )
-            )}
+            {events.map((event) => (
+              <option key={event.id} value={event.id}>
+                {event.title}
+              </option>
+            ))}
           </select>
         </section>
 
         <div className="stats">
-
           <div className="stat">
             <span>🍺</span>
-            <strong>
-              {drinks.length}
-            </strong>
-            <small>
-              Getränke
-            </small>
+            <strong>{drinks.length}</strong>
+            <small>Getränke</small>
           </div>
 
           <div className="stat">
             <span>💧</span>
-            <strong>
-              {totalLiters.toFixed(1)}
-            </strong>
-            <small>
-              Liter
-            </small>
+            <strong>{totalLiters.toFixed(1)}</strong>
+            <small>Liter</small>
           </div>
 
           <div className="stat">
             <span>💶</span>
-            <strong>
-              {totalCost.toFixed(2)} €
-            </strong>
-            <small>
-              Kosten
-            </small>
+            <strong>{totalCost.toFixed(2)} €</strong>
+            <small>Kosten</small>
           </div>
 
           <div className="stat">
             <span>👥</span>
-            <strong>
-              {members.length}
-            </strong>
-            <small>
-              Teilnehmer
-            </small>
+            <strong>{members.length}</strong>
+            <small>Teilnehmer</small>
           </div>
-
         </div>
 
         <section className="card">
-
-          <h2>
-            👥 Teilnehmer
-          </h2>
-
-          <p>
-            Wer ist beim Event dabei?
-          </p>
+          <h2>👥 Teilnehmer</h2>
+          <p>Wer ist beim Event dabei?</p>
 
           {profiles.filter(
             (profile) =>
               !members.some(
                 (member) =>
-                  member.profile_id ===
-                  profile.id
+                  member.profile_id === profile.id
               )
           ).length > 0 ? (
-
             <div className="addParticipant">
-
               <select
                 value={selectedProfile}
                 onChange={(e) =>
-                  setSelectedProfile(
-                    e.target.value
-                  )
+                  setSelectedProfile(e.target.value)
                 }
               >
-
                 <option value="">
                   Teilnehmer auswählen
                 </option>
@@ -711,337 +621,202 @@ export default function Home() {
                     (profile) =>
                       !members.some(
                         (member) =>
-                          member.profile_id ===
-                          profile.id
+                          member.profile_id === profile.id
                       )
                   )
-                  .map(
-                    (profile) => (
-                      <option
-                        key={
-                          profile.id
-                        }
-                        value={
-                          profile.id
-                        }
-                      >
-                        {profile.username ||
-                          "Unbenannt"}
-                      </option>
-                    )
-                  )}
-
+                  .map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.username || "Unbenannt"}
+                    </option>
+                  ))}
               </select>
 
-              <button
-                onClick={
-                  addParticipant
-                }
-              >
+              <button onClick={addParticipant}>
                 ➕ Hinzufügen
               </button>
-
             </div>
-
           ) : (
             <div className="successBox">
-              ✅ Alle vorhandenen
-              Profile sind bereits
-              dabei.
+              ✅ Alle vorhandenen Profile sind bereits dabei.
             </div>
           )}
 
-          {members.map(
-            (member) => (
-              <div
-                className="member"
-                key={member.id}
-              >
-
-                <div className="avatar">
-                  {member.username
-                    .charAt(0)
-                    .toUpperCase()}
-                </div>
-
-                <div>
-                  <strong>
-                    {member.username}
-                  </strong>
-
-                  <small>
-                    🍺 {member.drinks}
-                    {" · "}
-                    🏆 {member.points}
-                    {" Punkte"}
-                  </small>
-                </div>
-
-                <button
-                  className="remove"
-                  onClick={() =>
-                    removeParticipant(
-                      member.id
-                    )
-                  }
-                >
-                  ×
-                </button>
-
+          {members.map((member) => (
+            <div className="member" key={member.id}>
+              <div className="avatar">
+                {member.username.charAt(0).toUpperCase()}
               </div>
-            )
-          )}
 
+              <div>
+                <strong>{member.username}</strong>
+                <small>
+                  🍺 {member.drinks} · 🏆 {member.points} Punkte
+                </small>
+              </div>
+
+              <button
+                className="remove"
+                onClick={() =>
+                  removeParticipant(member.id)
+                }
+              >
+                ×
+              </button>
+            </div>
+          ))}
         </section>
 
         <section className="card">
-
-          <h2>
-            🍺 Getränk hinzufügen
-          </h2>
+          <h2>🍺 Getränk hinzufügen</h2>
+          <p>Getränk für das Event erfassen</p>
 
           <input
             placeholder="Getränk"
             value={drinkName}
             onChange={(e) =>
-              setDrinkName(
-                e.target.value
-              )
+              setDrinkName(e.target.value)
             }
           />
 
           <div className="three">
-
             <input
               type="number"
               step="0.1"
+              placeholder="Liter"
               value={liters}
               onChange={(e) =>
-                setLiters(
-                  e.target.value
-                )
+                setLiters(e.target.value)
               }
             />
 
             <input
               type="number"
+              placeholder="Alkohol %"
               value={alcohol}
               onChange={(e) =>
-                setAlcohol(
-                  e.target.value
-                )
+                setAlcohol(e.target.value)
               }
             />
 
             <input
               type="number"
               step="0.01"
+              placeholder="Preis €"
               value={price}
               onChange={(e) =>
-                setPrice(
-                  e.target.value
-                )
+                setPrice(e.target.value)
               }
             />
-
           </div>
 
-          <button
-            className="save"
-            onClick={
-              saveDrink
-            }
-          >
+          <button className="save" onClick={saveDrink}>
             🍻 Getränk speichern
           </button>
-
         </section>
 
         <section className="card">
+          <h2>🔗 Getränk zuordnen</h2>
 
-          <h2>
-            🔗 Getränk zuordnen
-          </h2>
-
-          {members.length ===
-          0 ? (
-            <p>
-              👥 Zuerst Teilnehmer
-              hinzufügen.
-            </p>
+          {members.length === 0 ? (
+            <p>👥 Zuerst Teilnehmer hinzufügen.</p>
           ) : (
-            members.map(
-              (member) => (
-                <div
-                  className="assign"
-                  key={
-                    member.id
-                  }
+            members.map((member) => (
+              <div className="assign" key={member.id}>
+                <strong>👤 {member.username}</strong>
+
+                <select
+                  defaultValue=""
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+
+                    assignDrink(
+                      member.profile_id,
+                      e.target.value
+                    );
+
+                    e.target.value = "";
+                  }}
                 >
+                  <option value="">
+                    🍺 Getränk auswählen
+                  </option>
 
-                  <strong>
-                    👤{" "}
-                    {member.username}
-                  </strong>
-
-                  <select
-                    defaultValue=""
-                    onChange={(
-                      e
-                    ) => {
-
-                      if (
-                        !e.target.value
-                      )
-                        return;
-
-                      assignDrink(
-                        member.profile_id,
-                        e.target.value
-                      );
-
-                      e.target.value =
-                        "";
-
-                    }}
-                  >
-
-                    <option value="">
-                      🍺 Getränk auswählen
-                    </option>
-
-                    {drinks.map(
-                      (drink) => (
-                        <option
-                          key={
-                            drink.id
-                          }
-                          value={
-                            drink.id
-                          }
-                          disabled={
-                            !!drink.profile_id
-                          }
-                        >
-                          {drink.drink_name ||
-                            drink.getraenk ||
-                            "Getränk"}
-                          {" · "}
-                          {Number(
-                            drink.liters ??
-                              drink.menge ??
-                              0
-                          ).toFixed(
-                            1
-                          )}
-                          L
-                          {drink.profile_id
-                            ? " ✓"
-                            : ""}
-                        </option>
-                      )
-                    )}
-
-                  </select>
-
-                </div>
-              )
-            )
-          )}
-
-        </section>
-
-        <section className="card">
-
-          <h2>
-            🍺 Getränke
-          </h2>
-
-          {drinks.map(
-            (drink) => {
-
-              const member =
-                members.find(
-                  (item) =>
-                    item.profile_id ===
-                    drink.profile_id
-                );
-
-              return (
-                <div
-                  className="drink"
-                  key={
-                    drink.id
-                  }
-                >
-
-                  <div className="drinkIcon">
-                    🍺
-                  </div>
-
-                  <div>
-
-                    <strong>
+                  {drinks.map((drink) => (
+                    <option
+                      key={drink.id}
+                      value={drink.id}
+                      disabled={!!drink.profile_id}
+                    >
                       {drink.drink_name ||
                         drink.getraenk ||
-                        "Getränk"}
-                    </strong>
-
-                    <small>
+                        "Getränk"}{" "}
+                      ·{" "}
                       {Number(
-                        drink.liters ??
-                          drink.menge ??
-                          0
-                      ).toFixed(
-                        1
-                      )}
-                      {" Liter · "}
-                      {Number(
-                        drink.alcohol_percent ??
-                          drink.alkohol ??
-                          0
-                      ).toFixed(
-                        1
-                      )}
-                      %
-                    </small>
-
-                    {member && (
-                      <small className="assigned">
-                        👤{" "}
-                        {member.username}
-                      </small>
-                    )}
-
-                  </div>
-
-                  <strong className="price">
-                    {Number(
-                      drink.preis ||
-                        0
-                    ).toFixed(
-                      2
-                    )}
-                    €
-                  </strong>
-
-                </div>
-              );
-            }
+                        drink.liters ?? drink.menge ?? 0
+                      ).toFixed(1)}
+                      L
+                      {drink.profile_id ? " ✓" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))
           )}
-
         </section>
 
         <section className="card">
+          <h2>🍺 Getränke</h2>
 
-          <h2>
-            💶 Kostenaufteilung
-          </h2>
+          {drinks.map((drink) => {
+            const member = members.find(
+              (item) =>
+                item.profile_id === drink.profile_id
+            );
+
+            return (
+              <div className="drink" key={drink.id}>
+                <div className="drinkIcon">🍺</div>
+
+                <div>
+                  <strong>
+                    {drink.drink_name ||
+                      drink.getraenk ||
+                      "Getränk"}
+                  </strong>
+
+                  <small>
+                    {Number(
+                      drink.liters ?? drink.menge ?? 0
+                    ).toFixed(1)}
+                    {" Liter · "}
+                    {Number(
+                      drink.alcohol_percent ??
+                        drink.alkohol ??
+                        0
+                    ).toFixed(1)}
+                    %
+                  </small>
+
+                  {member && (
+                    <small className="assigned">
+                      👤 {member.username}
+                    </small>
+                  )}
+                </div>
+
+                <strong className="price">
+                  {Number(drink.preis || 0).toFixed(2)}€
+                </strong>
+              </div>
+            );
+          })}
+        </section>
+
+        <section className="card">
+          <h2>💶 Kostenaufteilung</h2>
 
           <div className="total">
-            {totalCost.toFixed(
-              2
-            )} €
+            {totalCost.toFixed(2)} €
           </div>
 
           <p className="center">
@@ -1049,196 +824,111 @@ export default function Home() {
           </p>
 
           <div className="row">
-            <span>
-              👥 Teilnehmer
-            </span>
-
-            <strong>
-              {members.length}
-            </strong>
+            <span>👥 Teilnehmer</span>
+            <strong>{members.length}</strong>
           </div>
 
           <div className="row">
-            <span>
-              💶 Pro Person
-            </span>
-
+            <span>💶 Pro Person</span>
             <strong>
-              {amountPerPerson.toFixed(
-                2
-              )} €
+              {amountPerPerson.toFixed(2)} €
             </strong>
           </div>
 
           <div className="paymentSummary">
-
             <div className="paymentBox paid">
-              <span>
-                ✅
-              </span>
-
-              <strong>
-                {paidCount}
-              </strong>
-
-              <small>
-                Bezahlt
-              </small>
+              <span>✅</span>
+              <strong>{paidCount}</strong>
+              <small>Bezahlt</small>
             </div>
 
             <div className="paymentBox open">
-              <span>
-                ⏳
-              </span>
-
-              <strong>
-                {openCount}
-              </strong>
-
-              <small>
-                Offen
-              </small>
+              <span>⏳</span>
+              <strong>{openCount}</strong>
+              <small>Offen</small>
             </div>
-
           </div>
 
-          <h3>
-            💶 Zahlungen
-          </h3>
+          <h3>💶 Zahlungen</h3>
 
-          {members.map(
-            (member) => {
+          {members.map((member) => {
+            const payment = payments.find(
+              (item) =>
+                item.event_id === eventId &&
+                item.profile_id === member.profile_id
+            );
 
-              const payment =
-                payments.find(
-                  (item) =>
-                    item.event_id ===
-                      eventId &&
-                    item.profile_id ===
-                      member.profile_id
-                );
+            const isPaid = payment?.status === "bezahlt";
 
-              const isPaid =
-                payment?.status ===
-                "bezahlt";
+            return (
+              <div
+                className={
+                  isPaid
+                    ? "paymentPerson paidRow"
+                    : "paymentPerson"
+                }
+                key={member.id}
+              >
+                <div className="paymentAvatar">
+                  {member.username.charAt(0).toUpperCase()}
+                </div>
 
-              return (
-                <div
+                <div className="paymentInfo">
+                  <strong>{member.username}</strong>
+                  <small>
+                    Anteil: {amountPerPerson.toFixed(2)} €
+                  </small>
+                </div>
+
+                <button
                   className={
-                    isPaid
-                      ? "paymentPerson paidRow"
-                      : "paymentPerson"
+                    isPaid ? "paidButton" : "openButton"
                   }
-                  key={
-                    member.id
+                  onClick={() =>
+                    togglePayment(member)
                   }
                 >
-
-                  <div className="paymentAvatar">
-                    {member.username
-                      .charAt(
-                        0
-                      )
-                      .toUpperCase()}
-                  </div>
-
-                  <div className="paymentInfo">
-
-                    <strong>
-                      {member.username}
-                    </strong>
-
-                    <small>
-                      Anteil:{" "}
-                      {amountPerPerson.toFixed(
-                        2
-                      )} €
-                    </small>
-
-                  </div>
-
-                  <button
-                    className={
-                      isPaid
-                        ? "paidButton"
-                        : "openButton"
-                    }
-                    onClick={() =>
-                      togglePayment(
-                        member
-                      )
-                    }
-                  >
-                    {isPaid
-                      ? "✅ Bezahlt"
-                      : "⏳ Offen"}
-                  </button>
-
-                </div>
-              );
-            }
-          )}
-
+                  {isPaid ? "✅ Bezahlt" : "⏳ Offen"}
+                </button>
+              </div>
+            );
+          })}
         </section>
 
         <section className="card">
+          <h2>🏆 Ranking</h2>
 
-          <h2>
-            🏆 Ranking
-          </h2>
-
-          {ranking.map(
-            (
-              member,
-              index
-            ) => (
-              <div
-                className="ranking"
-                key={
-                  member.id
-                }
-              >
-
+          {ranking.length === 0 ? (
+            <p>Noch keine Teilnehmer.</p>
+          ) : (
+            ranking.map((member, index) => (
+              <div className="ranking" key={member.id}>
                 <span className="rank">
-                  {index ===
-                  0
+                  {index === 0
                     ? "🥇"
-                    : index ===
-                      1
+                    : index === 1
                     ? "🥈"
-                    : index ===
-                      2
+                    : index === 2
                     ? "🥉"
                     : index + 1}
                 </span>
 
                 <div>
-
-                  <strong>
-                    {member.username}
-                  </strong>
-
-                  <small>
-                    🍺{" "}
-                    {member.drinks}
-                  </small>
-
+                  <strong>{member.username}</strong>
+                  <small>🍺 {member.drinks}</small>
                 </div>
 
                 <div className="points">
-
                   {member.points}
-
-                  <small>
-                    Punkte
-                  </small>
-
+                  <small>Punkte</small>
                 </div>
-
               </div>
-            )
+            ))
           )}
 
+          <div className="rankingTotal">
+            🏆 Gesamtpunkte: <strong>{totalPoints}</strong>
+          </div>
         </section>
 
         {message && (
@@ -1248,21 +938,14 @@ export default function Home() {
         )}
 
         <footer>
-          <strong>
-            🍻 Güstener Zapfhahn
-            Zentrale
-          </strong>
-
+          <strong>🍻 Güstener Zapfhahn Zentrale</strong>
           <small>
-            Dein Event. Deine Getränke.
-            Deine Runde.
+            Dein Event. Deine Getränke. Deine Runde.
           </small>
         </footer>
-
       </div>
 
       <style jsx>{`
-
         * {
           box-sizing: border-box;
         }
@@ -1271,17 +954,9 @@ export default function Home() {
           min-height: 100vh;
           padding: 16px;
           color: white;
-          font-family:
-            Arial,
-            Helvetica,
-            sans-serif;
-
+          font-family: Arial, Helvetica, sans-serif;
           background:
-            radial-gradient(
-              circle at top,
-              #29445d 0%,
-              #0a0f16 62%
-            );
+            radial-gradient(circle at top, #29445d 0%, #0a0f16 62%);
         }
 
         .container {
@@ -1293,23 +968,14 @@ export default function Home() {
           display: flex;
           align-items: center;
           gap: 14px;
-          padding:
-            10px
-            4px
-            25px;
+          padding: 10px 4px 25px;
         }
 
         .logo {
           font-size: 38px;
           padding: 12px;
           border-radius: 18px;
-          background:
-            rgba(
-              255,
-              255,
-              255,
-              .07
-            );
+          background: rgba(255,255,255,.07);
         }
 
         h1 {
@@ -1318,18 +984,12 @@ export default function Home() {
         }
 
         h2 {
-          margin:
-            0
-            0
-            8px;
+          margin: 0 0 8px;
           font-size: 20px;
         }
 
         h3 {
-          margin:
-            20px
-            0
-            10px;
+          margin: 20px 0 10px;
         }
 
         p {
@@ -1346,51 +1006,50 @@ export default function Home() {
           padding: 18px;
           margin-bottom: 15px;
           border-radius: 20px;
+          background: rgba(255,255,255,.06);
+          border: 1px solid rgba(255,255,255,.08);
+        }
 
-          background:
-            rgba(
-              255,
-              255,
-              255,
-              .06
-            );
+        .eventTop {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          margin-bottom: 10px;
+        }
 
-          border:
-            1px solid
-            rgba(
-              255,
-              255,
-              255,
-              .08
-            );
+        .createButton {
+          background: #22c55e;
+          color: white;
+        }
+
+        .createEvent {
+          padding: 15px;
+          margin: 10px 0 15px;
+          border-radius: 16px;
+          background: rgba(34,197,94,.08);
+          border: 1px solid rgba(34,197,94,.25);
+        }
+
+        label {
+          display: block;
+          color: #94a3b8;
+          font-size: 13px;
+          margin-bottom: 5px;
         }
 
         .stats {
           display: grid;
-          grid-template-columns:
-            repeat(
-              4,
-              1fr
-            );
+          grid-template-columns: repeat(4,1fr);
           gap: 10px;
           margin-bottom: 15px;
         }
 
         .stat {
           text-align: center;
-          padding:
-            14px
-            5px;
-
+          padding: 14px 5px;
           border-radius: 16px;
-
-          background:
-            rgba(
-              255,
-              255,
-              255,
-              .06
-            );
+          background: rgba(255,255,255,.06);
         }
 
         .stat span {
@@ -1410,61 +1069,37 @@ export default function Home() {
           padding: 13px;
           margin-bottom: 10px;
           border-radius: 12px;
-          border:
-            1px solid
-            #344252;
-
+          border: 1px solid #344252;
           background: #121a23;
           color: white;
           font-size: 15px;
         }
 
         button {
-          padding:
-            13px
-            17px;
-
+          padding: 13px 17px;
           border: 0;
           border-radius: 12px;
-
           background: #f59e0b;
           color: #111;
-
           font-weight: bold;
           cursor: pointer;
         }
 
         .addParticipant {
           display: grid;
-          grid-template-columns:
-            1fr
-            auto;
+          grid-template-columns: 1fr auto;
           gap: 8px;
         }
 
         .member {
           display: grid;
-
-          grid-template-columns:
-            40px
-            1fr
-            auto;
-
+          grid-template-columns: 40px 1fr auto;
           align-items: center;
           gap: 10px;
-
           padding: 11px;
           margin-top: 8px;
-
           border-radius: 14px;
-
-          background:
-            rgba(
-              255,
-              255,
-              255,
-              .05
-            );
+          background: rgba(255,255,255,.05);
         }
 
         .avatar,
@@ -1472,33 +1107,22 @@ export default function Home() {
           width: 38px;
           height: 38px;
           border-radius: 50%;
-
           display: flex;
           align-items: center;
           justify-content: center;
-
           background: #334155;
           font-weight: bold;
         }
 
         .remove {
-          padding:
-            6px
-            11px;
-
+          padding: 6px 11px;
           background: #303b48;
           color: white;
         }
 
         .three {
           display: grid;
-
-          grid-template-columns:
-            repeat(
-              3,
-              1fr
-            );
-
+          grid-template-columns: repeat(3,1fr);
           gap: 8px;
         }
 
@@ -1508,45 +1132,21 @@ export default function Home() {
 
         .assign {
           display: grid;
-
-          grid-template-columns:
-            1fr
-            1.5fr;
-
+          grid-template-columns: 1fr 1.5fr;
           gap: 12px;
           align-items: center;
-
-          padding:
-            10px
-            0;
-
-          border-bottom:
-            1px solid
-            rgba(
-              255,
-              255,
-              255,
-              .07
-            );
+          padding: 10px 0;
+          border-bottom: 1px solid rgba(255,255,255,.07);
         }
 
         .drink {
           display: flex;
           align-items: center;
           gap: 12px;
-
           padding: 12px;
           margin-top: 8px;
-
           border-radius: 14px;
-
-          background:
-            rgba(
-              255,
-              255,
-              255,
-              .05
-            );
+          background: rgba(255,255,255,.05);
         }
 
         .drinkIcon {
@@ -1564,17 +1164,8 @@ export default function Home() {
         .successBox {
           padding: 12px;
           margin-bottom: 10px;
-
           border-radius: 12px;
-
-          background:
-            rgba(
-              34,
-              197,
-              94,
-              .10
-            );
-
+          background: rgba(34,197,94,.10);
           color: #4ade80;
         }
 
@@ -1592,28 +1183,15 @@ export default function Home() {
         .row {
           display: flex;
           justify-content: space-between;
-
           padding: 13px;
           margin-top: 8px;
-
           border-radius: 12px;
-
-          background:
-            rgba(
-              255,
-              255,
-              255,
-              .05
-            );
+          background: rgba(255,255,255,.05);
         }
 
         .paymentSummary {
           display: grid;
-
-          grid-template-columns:
-            1fr
-            1fr;
-
+          grid-template-columns: 1fr 1fr;
           gap: 10px;
           margin-top: 15px;
         }
@@ -1621,16 +1199,8 @@ export default function Home() {
         .paymentBox {
           text-align: center;
           padding: 15px;
-
           border-radius: 15px;
-
-          background:
-            rgba(
-              255,
-              255,
-              255,
-              .05
-            );
+          background: rgba(255,255,255,.05);
         }
 
         .paymentBox span {
@@ -1645,72 +1215,28 @@ export default function Home() {
         }
 
         .paymentBox.paid {
-          border:
-            1px solid
-            rgba(
-              34,
-              197,
-              94,
-              .35
-            );
+          border: 1px solid rgba(34,197,94,.35);
         }
 
         .paymentBox.open {
-          border:
-            1px solid
-            rgba(
-              245,
-              158,
-              11,
-              .35
-            );
+          border: 1px solid rgba(245,158,11,.35);
         }
 
         .paymentPerson {
           display: grid;
-
-          grid-template-columns:
-            40px
-            1fr
-            auto;
-
+          grid-template-columns: 40px 1fr auto;
           align-items: center;
           gap: 10px;
-
           padding: 12px;
           margin-top: 8px;
-
           border-radius: 15px;
-
-          background:
-            rgba(
-              255,
-              255,
-              255,
-              .05
-            );
-
-          border:
-            1px solid
-            transparent;
+          background: rgba(255,255,255,.05);
+          border: 1px solid transparent;
         }
 
         .paidRow {
-          border-color:
-            rgba(
-              34,
-              197,
-              94,
-              .4
-            );
-
-          background:
-            rgba(
-              34,
-              197,
-              94,
-              .08
-            );
+          border-color: rgba(34,197,94,.4);
+          background: rgba(34,197,94,.08);
         }
 
         .paymentInfo {
@@ -1729,27 +1255,13 @@ export default function Home() {
 
         .ranking {
           display: grid;
-
-          grid-template-columns:
-            45px
-            1fr
-            auto;
-
+          grid-template-columns: 45px 1fr auto;
           align-items: center;
           gap: 10px;
-
           padding: 13px;
           margin-top: 8px;
-
           border-radius: 14px;
-
-          background:
-            rgba(
-              255,
-              255,
-              255,
-              .05
-            );
+          background: rgba(255,255,255,.05);
         }
 
         .rank {
@@ -1767,13 +1279,20 @@ export default function Home() {
           font-weight: normal;
         }
 
+        .rankingTotal {
+          margin-top: 12px;
+          padding: 13px;
+          border-radius: 12px;
+          text-align: center;
+          background: rgba(245,158,11,.08);
+          color: #fbbf24;
+        }
+
         .message {
           padding: 14px;
           margin-bottom: 15px;
           text-align: center;
-
           border-radius: 13px;
-
           background: #172535;
           color: #fbbf24;
         }
@@ -1785,47 +1304,41 @@ export default function Home() {
         }
 
         @media(max-width:650px) {
-
           .stats {
-            grid-template-columns:
-              repeat(
-                2,
-                1fr
-              );
+            grid-template-columns: repeat(2,1fr);
           }
 
           .three {
-            grid-template-columns:
-              1fr;
+            grid-template-columns: 1fr;
           }
 
           .addParticipant {
-            grid-template-columns:
-              1fr;
+            grid-template-columns: 1fr;
           }
 
           .assign {
-            grid-template-columns:
-              1fr;
+            grid-template-columns: 1fr;
           }
 
           .paymentPerson {
-            grid-template-columns:
-              40px
-              1fr;
+            grid-template-columns: 40px 1fr;
           }
 
           .paymentPerson button {
-            grid-column:
-              1 / -1;
-
+            grid-column: 1 / -1;
             width: 100%;
           }
 
+          .eventTop {
+            align-items: stretch;
+            flex-direction: column;
+          }
+
+          .createButton {
+            width: 100%;
+          }
         }
-
       `}</style>
-
     </main>
   );
 }
