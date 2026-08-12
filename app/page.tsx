@@ -3,6 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 
+/* =========================================================
+   TYPEN
+========================================================= */
+
 type Event = {
   id: string;
   title: string;
@@ -10,19 +14,25 @@ type Event = {
 
   cost_overview_enabled: boolean;
   auto_split_costs: boolean;
+
   ranking_enabled: boolean;
   show_points: boolean;
   show_ranking: boolean;
+
   show_promille: boolean;
   show_statistics: boolean;
   show_drink_amounts: boolean;
   show_costs: boolean;
+
   team_mode: boolean;
+
   show_photos: boolean;
   photo_required: boolean;
   ai_recognition_enabled: boolean;
   manual_entry_allowed: boolean;
+
   privacy_mode: boolean;
+
   created_by_profile_id: string | null;
 };
 
@@ -31,6 +41,7 @@ type Profile = {
   username: string | null;
   points: number | null;
   drinks_count: number | null;
+
   gewicht_kg: number | null;
   alter: number | null;
   geschlecht: string | null;
@@ -39,9 +50,12 @@ type Profile = {
 type Member = {
   id: string;
   profile_id: string;
+
   username: string;
+
   points: number;
   drinks: number;
+
   gewicht_kg: number;
   alter: number;
   geschlecht: string;
@@ -50,13 +64,19 @@ type Member = {
 type Drink = {
   id: string;
   event_id: string;
+
   drink_name: string | null;
   getraenk: string | null;
+
   liters: number | null;
   menge: number | null;
+
   alcohol_percent: number | null;
   alkohol: number | null;
+
   preis: number | null;
+
+  quantity?: number | null;
 };
 
 type Consumption = {
@@ -70,9 +90,12 @@ type Consumption = {
 type Payment = {
   id: string;
   event_id: string;
+
   profile_id: string | null;
   bezahlt_von: string | null;
+
   betrag: number | null;
+
   status: "offen" | "bezahlt";
 };
 
@@ -93,66 +116,130 @@ type SettingKey =
   | "manual_entry_allowed"
   | "privacy_mode";
 
+/* =========================================================
+   HAUPTKOMPONENTE
+========================================================= */
+
 export default function Home() {
+  /* =======================================================
+     EVENTS
+  ======================================================= */
+
   const [events, setEvents] = useState<Event[]>([]);
   const [eventId, setEventId] = useState("");
+
+  /* =======================================================
+     DATEN
+  ======================================================= */
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [drinks, setDrinks] = useState<Drink[]>([]);
-  const [consumptions, setConsumptions] = useState<Consumption[]>([]);
+  const [consumptions, setConsumptions] = useState<
+    Consumption[]
+  >([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+
+  /* =======================================================
+     GETRÄNK
+  ======================================================= */
 
   const [drinkName, setDrinkName] = useState("");
   const [liters, setLiters] = useState("0.5");
   const [alcohol, setAlcohol] = useState("5");
   const [price, setPrice] = useState("0");
 
-  const [selectedProfile, setSelectedProfile] = useState("");
-  const [currentProfileId, setCurrentProfileId] = useState("");
+  /* =======================================================
+     TEILNEHMER
+  ======================================================= */
+
+  const [selectedProfile, setSelectedProfile] =
+    useState("");
+
+  const [currentProfileId, setCurrentProfileId] =
+    useState("");
+
+  /* =======================================================
+     EINLADUNG
+  ======================================================= */
 
   const [joinCode, setJoinCode] = useState("");
   const [inviteCode, setInviteCode] = useState("");
 
+  /* =======================================================
+     UI
+  ======================================================= */
+
   const [message, setMessage] = useState("");
+
   const [now, setNow] = useState(Date.now());
 
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] =
+    useState(false);
+
   const [savingSetting, setSavingSetting] =
     useState<SettingKey | null>(null);
 
-  const currentEvent = useMemo(
-    () =>
-      events.find((event) => event.id === eventId) ||
-      null,
-    [events, eventId]
-  );
+  const [loading, setLoading] = useState(false);
+
+  /* =======================================================
+     EVENT
+  ======================================================= */
+
+  const currentEvent = useMemo(() => {
+    return (
+      events.find(
+        (event) => event.id === eventId
+      ) || null
+    );
+  }, [events, eventId]);
+
+  /* =======================================================
+     ERSTELLER
+  ======================================================= */
 
   const isEventCreator =
     !!currentEvent &&
     !!currentProfileId &&
-    currentEvent.created_by_profile_id === currentProfileId;
+    currentEvent.created_by_profile_id ===
+      currentProfileId;
+
+  /* =======================================================
+     INITIALISIERUNG
+  ======================================================= */
 
   useEffect(() => {
     loadProfiles();
     loadEvents();
 
-    const savedProfile = localStorage.getItem(
-      "guesten-current-profile"
-    );
+    const savedProfile =
+      localStorage.getItem(
+        "guesten-current-profile"
+      );
 
     if (savedProfile) {
       setCurrentProfileId(savedProfile);
     }
   }, []);
 
+  /* =======================================================
+     EVENT WECHSEL
+  ======================================================= */
+
   useEffect(() => {
     if (!eventId) return;
 
-    localStorage.setItem("guesten-active-event", eventId);
+    localStorage.setItem(
+      "guesten-active-event",
+      eventId
+    );
 
     refreshEvent();
   }, [eventId]);
+
+  /* =======================================================
+     UHR / PROMILLE AKTUALISIERUNG
+  ======================================================= */
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -162,7 +249,13 @@ export default function Home() {
     return () => clearInterval(timer);
   }, []);
 
+  /* =======================================================
+     DATEN AKTUALISIEREN
+  ======================================================= */
+
   async function refreshEvent() {
+    if (!eventId) return;
+
     await Promise.all([
       loadMembers(),
       loadDrinks(),
@@ -171,6 +264,10 @@ export default function Home() {
       loadInviteCode(),
     ]);
   }
+
+  /* =======================================================
+     EVENTS LADEN
+  ======================================================= */
 
   async function loadEvents() {
     const { data, error } = await supabase
@@ -201,7 +298,9 @@ export default function Home() {
       });
 
     if (error) {
-      setMessage("❌ Events: " + error.message);
+      setMessage(
+        "❌ Events: " + error.message
+      );
       return;
     }
 
@@ -210,13 +309,13 @@ export default function Home() {
     setEvents(result);
 
     if (!result.length) {
-      setEventId("");
       return;
     }
 
-    const saved = localStorage.getItem(
-      "guesten-active-event"
-    );
+    const saved =
+      localStorage.getItem(
+        "guesten-active-event"
+      );
 
     const exists = result.some(
       (event) => event.id === saved
@@ -229,16 +328,28 @@ export default function Home() {
     );
   }
 
+  /* =======================================================
+     PROFILE LADEN
+  ======================================================= */
+
   async function loadProfiles() {
     const { data, error } = await supabase
       .from("profiles")
-      .select(
-        "id,username,points,drinks_count,gewicht_kg,alter,geschlecht"
-      )
+      .select(`
+        id,
+        username,
+        points,
+        drinks_count,
+        gewicht_kg,
+        alter,
+        geschlecht
+      `)
       .order("username");
 
     if (error) {
-      setMessage("❌ Profile: " + error.message);
+      setMessage(
+        "❌ Profile: " + error.message
+      );
       return;
     }
 
@@ -246,15 +357,19 @@ export default function Home() {
 
     setProfiles(result);
 
-    const saved = localStorage.getItem(
-      "guesten-current-profile"
-    );
+    const saved =
+      localStorage.getItem(
+        "guesten-current-profile"
+      );
 
     const validSaved = result.some(
       (profile) => profile.id === saved
     );
 
-    if (!currentProfileId && result.length) {
+    if (
+      !currentProfileId &&
+      result.length
+    ) {
       const id =
         saved && validSaved
           ? saved
@@ -268,6 +383,10 @@ export default function Home() {
       );
     }
   }
+
+  /* =======================================================
+     EVENT-MITGLIEDER
+  ======================================================= */
 
   async function loadMembers() {
     if (!eventId) return;
@@ -291,44 +410,63 @@ export default function Home() {
 
     if (error) {
       setMessage(
-        "❌ Teilnehmer: " + error.message
+        "❌ Teilnehmer: " +
+          error.message
       );
       return;
     }
 
     const result: Member[] =
-      (data || []).map((row: any) => {
-        const profile =
-          Array.isArray(row.profiles)
-            ? row.profiles[0]
-            : row.profiles;
+      (data || []).map(
+        (row: any) => {
+          const profile =
+            Array.isArray(
+              row.profiles
+            )
+              ? row.profiles[0]
+              : row.profiles;
 
-        return {
-          id: row.id,
-          profile_id: row.profile_id,
-          username:
-            profile?.username ||
-            "Teilnehmer",
-          points: Number(
-            profile?.points || 0
-          ),
-          drinks: Number(
-            profile?.drinks_count || 0
-          ),
-          gewicht_kg: Number(
-            profile?.gewicht_kg || 82
-          ),
-          alter: Number(
-            profile?.alter || 33
-          ),
-          geschlecht:
-            profile?.geschlecht ||
-            "männlich",
-        };
-      });
+          return {
+            id: row.id,
+
+            profile_id:
+              row.profile_id,
+
+            username:
+              profile?.username ||
+              "Teilnehmer",
+
+            points: Number(
+              profile?.points || 0
+            ),
+
+            drinks: Number(
+              profile?.drinks_count || 0
+            ),
+
+            gewicht_kg:
+              Number(
+                profile?.gewicht_kg
+              ) || 82,
+
+            alter:
+              Number(
+                profile?.alter
+              ) || 33,
+
+            geschlecht:
+              profile?.geschlecht ||
+              "männlich",
+          };
+        }
+      );
 
     setMembers(result);
   }
+
+  /* =======================================================
+     GETRÄNKE LADEN
+  ======================================================= */
 
   async function loadDrinks() {
     if (!eventId) return;
@@ -344,7 +482,8 @@ export default function Home() {
         menge,
         alcohol_percent,
         alkohol,
-        preis
+        preis,
+        quantity
       `)
       .eq("event_id", eventId)
       .order("created_at", {
@@ -353,7 +492,8 @@ export default function Home() {
 
     if (error) {
       setMessage(
-        "❌ Getränke: " + error.message
+        "❌ Getränke: " +
+          error.message
       );
       return;
     }
@@ -361,18 +501,27 @@ export default function Home() {
     setDrinks(data || []);
   }
 
+  /* =======================================================
+     TRINKVORGÄNGE
+  ======================================================= */
+
   async function loadConsumptions() {
     if (!eventId) return;
 
-    const { data, error } = await supabase
-      .from("drink_consumptions")
-      .select(
-        "id,event_id,drink_id,profile_id,created_at"
-      )
-      .eq("event_id", eventId)
-      .order("created_at", {
-        ascending: false,
-      });
+    const { data, error } =
+      await supabase
+        .from("drink_consumptions")
+        .select(`
+          id,
+          event_id,
+          drink_id,
+          profile_id,
+          created_at
+        `)
+        .eq("event_id", eventId)
+        .order("created_at", {
+          ascending: false,
+        });
 
     if (error) {
       setMessage(
@@ -385,15 +534,25 @@ export default function Home() {
     setConsumptions(data || []);
   }
 
+  /* =======================================================
+     ZAHLUNGEN
+  ======================================================= */
+
   async function loadPayments() {
     if (!eventId) return;
 
-    const { data, error } = await supabase
-      .from("payments")
-      .select(
-        "id,event_id,profile_id,bezahlt_von,betrag,status"
-      )
-      .eq("event_id", eventId);
+    const { data, error } =
+      await supabase
+        .from("payments")
+        .select(`
+          id,
+          event_id,
+          profile_id,
+          bezahlt_von,
+          betrag,
+          status
+        `)
+        .eq("event_id", eventId);
 
     if (error) {
       setMessage(
@@ -405,6 +564,10 @@ export default function Home() {
 
     setPayments(data || []);
   }
+
+  /* =======================================================
+     EINLADUNGSCODE LADEN
+  ======================================================= */
 
   async function loadInviteCode() {
     if (!eventId) return;
@@ -419,6 +582,10 @@ export default function Home() {
       data?.invite_code || ""
     );
   }
+
+  /* =======================================================
+     EINLADUNGSCODE ERSTELLEN
+  ======================================================= */
 
   async function createInviteCode() {
     if (!eventId) return;
@@ -437,16 +604,18 @@ export default function Home() {
         .substring(2, 8)
         .toUpperCase();
 
-    const { error } = await supabase
-      .from("events")
-      .update({
-        invite_code: code,
-      })
-      .eq("id", eventId);
+    const { error } =
+      await supabase
+        .from("events")
+        .update({
+          invite_code: code,
+        })
+        .eq("id", eventId);
 
     if (error) {
       setMessage(
-        "❌ Code: " + error.message
+        "❌ Code: " +
+          error.message
       );
       return;
     }
@@ -459,6 +628,10 @@ export default function Home() {
       "✅ Neuer Einladungscode erstellt."
     );
   }
+
+  /* =======================================================
+     CODE KOPIEREN
+  ======================================================= */
 
   async function copyInviteCode() {
     if (!inviteCode) return;
@@ -478,12 +651,17 @@ export default function Home() {
     }
   }
 
+  /* =======================================================
+     EVENT BEITRETEN
+  ======================================================= */
+
   async function joinEventWithCode() {
     setMessage("");
 
-    const code = joinCode
-      .trim()
-      .toUpperCase();
+    const code =
+      joinCode
+        .trim()
+        .toUpperCase();
 
     if (!code) {
       setMessage(
@@ -514,7 +692,8 @@ export default function Home() {
     const profile =
       profiles.find(
         (item) =>
-          item.id === currentProfileId
+          item.id ===
+          currentProfileId
       ) || profiles[0];
 
     if (!profile) {
@@ -543,11 +722,17 @@ export default function Home() {
         await supabase
           .from("event_members")
           .insert({
-            event_id: event.id,
-            profile_id: profile.id,
+            event_id:
+              event.id,
+
+            profile_id:
+              profile.id,
+
             joined_at:
               new Date().toISOString(),
-            joined_via_code: code,
+
+            joined_via_code:
+              code,
           });
 
       if (error) {
@@ -559,7 +744,17 @@ export default function Home() {
       }
     }
 
+    setCurrentProfileId(
+      profile.id
+    );
+
+    localStorage.setItem(
+      "guesten-current-profile",
+      profile.id
+    );
+
     setEventId(event.id);
+
     setJoinCode("");
 
     await loadMembers();
@@ -568,6 +763,10 @@ export default function Home() {
       `✅ Du bist dem Event „${event.title}“ beigetreten.`
     );
   }
+
+  /* =======================================================
+     TEILNEHMER HINZUFÜGEN
+  ======================================================= */
 
   async function addParticipant() {
     if (
@@ -604,9 +803,12 @@ export default function Home() {
       await supabase
         .from("event_members")
         .insert({
-          event_id: eventId,
+          event_id:
+            eventId,
+
           profile_id:
             selectedProfile,
+
           joined_at:
             new Date().toISOString(),
         });
@@ -627,6 +829,10 @@ export default function Home() {
       "✅ Teilnehmer hinzugefügt."
     );
   }
+
+  /* =======================================================
+     TEILNEHMER ENTFERNEN
+  ======================================================= */
 
   async function removeParticipant(
     memberId: string
@@ -662,7 +868,13 @@ export default function Home() {
     );
   }
 
+  /* =======================================================
+     GETRÄNK SPEICHERN
+  ======================================================= */
+
   async function saveDrink() {
+    setMessage("");
+
     if (!eventId) {
       setMessage(
         "❌ Kein Event ausgewählt."
@@ -687,23 +899,32 @@ export default function Home() {
       return;
     }
 
-    const drinkLiters = Number(liters);
-    const drinkAlcohol = Number(alcohol);
-    const drinkPrice = Number(price);
+    const literValue =
+      Number(liters);
+
+    const alcoholValue =
+      Number(alcohol);
+
+    const priceValue =
+      Number(price);
 
     if (
-      !Number.isFinite(drinkLiters) ||
-      drinkLiters <= 0
+      !Number.isFinite(
+        literValue
+      ) ||
+      literValue <= 0
     ) {
       setMessage(
-        "❌ Bitte eine gültige Literzahl eingeben."
+        "❌ Bitte eine gültige Literangabe eingeben."
       );
       return;
     }
 
     if (
-      !Number.isFinite(drinkAlcohol) ||
-      drinkAlcohol < 0
+      !Number.isFinite(
+        alcoholValue
+      ) ||
+      alcoholValue < 0
     ) {
       setMessage(
         "❌ Bitte einen gültigen Alkoholwert eingeben."
@@ -712,8 +933,10 @@ export default function Home() {
     }
 
     if (
-      !Number.isFinite(drinkPrice) ||
-      drinkPrice < 0
+      !Number.isFinite(
+        priceValue
+      ) ||
+      priceValue < 0
     ) {
       setMessage(
         "❌ Bitte einen gültigen Preis eingeben."
@@ -721,25 +944,40 @@ export default function Home() {
       return;
     }
 
-    const name =
-      drinkName.trim();
+    setLoading(true);
 
     const { error } =
       await supabase
         .from("drinks")
         .insert({
-          event_id: eventId,
-          drink_name: name,
-          getraenk: name,
-          liters: drinkLiters,
-          menge: drinkLiters,
+          event_id:
+            eventId,
+
+          drink_name:
+            drinkName.trim(),
+
+          getraenk:
+            drinkName.trim(),
+
+          liters:
+            literValue,
+
+          menge:
+            literValue,
+
           alcohol_percent:
-            drinkAlcohol,
+            alcoholValue,
+
           alkohol:
-            drinkAlcohol,
-          preis: drinkPrice,
+            alcoholValue,
+
+          preis:
+            priceValue,
+
           quantity: 1,
         });
+
+    setLoading(false);
 
     if (error) {
       setMessage(
@@ -760,6 +998,10 @@ export default function Home() {
       "✅ Getränk gespeichert."
     );
   }
+
+  /* =======================================================
+     EVENT EINSTELLUNG ÄNDERN
+  ======================================================= */
 
   async function toggleEventSetting(
     key: SettingKey
@@ -815,6 +1057,10 @@ export default function Home() {
       "✅ Event-Einstellung geändert."
     );
   }
+
+  /* =======================================================
+     HILFSFUNKTIONEN
+  ======================================================= */
 
   function getDrinkName(
     drink: Drink
@@ -874,13 +1120,20 @@ export default function Home() {
     );
   }
 
+  /* =======================================================
+     PERSÖNLICHE KOSTEN
+  ======================================================= */
+
   function getMemberCost(
     profileId: string
   ) {
     return getMemberConsumptions(
       profileId
     ).reduce(
-      (sum, consumption) => {
+      (
+        sum,
+        consumption
+      ) => {
         const drink =
           drinks.find(
             (item) =>
@@ -899,6 +1152,10 @@ export default function Home() {
     );
   }
 
+  /* =======================================================
+     PROMILLE SCHÄTZUNG
+  ======================================================= */
+
   function calculatePromille(
     profileId: string
   ) {
@@ -909,7 +1166,9 @@ export default function Home() {
           profileId
       );
 
-    if (!member) return 0;
+    if (!member) {
+      return 0;
+    }
 
     const personal =
       getMemberConsumptions(
@@ -987,9 +1246,15 @@ export default function Home() {
     );
   }
 
+  /* =======================================================
+     GETRÄNK TRINKEN
+  ======================================================= */
+
   async function drinkNow(
     drinkId: string
   ) {
+    setMessage("");
+
     if (!eventId) {
       setMessage(
         "❌ Kein Event ausgewählt."
@@ -1017,12 +1282,31 @@ export default function Home() {
       return;
     }
 
+    const drink =
+      drinks.find(
+        (item) =>
+          item.id === drinkId
+      );
+
+    if (!drink) {
+      setMessage(
+        "❌ Getränk wurde nicht gefunden."
+      );
+      return;
+    }
+
     const { error } =
       await supabase
-        .from("drink_consumptions")
+        .from(
+          "drink_consumptions"
+        )
         .insert({
-          event_id: eventId,
-          drink_id: drinkId,
+          event_id:
+            eventId,
+
+          drink_id:
+            drinkId,
+
           profile_id:
             currentProfileId,
         });
@@ -1035,20 +1319,22 @@ export default function Home() {
       return;
     }
 
-    await refreshEvent();
+    /*
+     * Punkte und drinks_count
+     * des Profils synchronisieren.
+     */
 
     const newCount =
-      consumptions.filter(
-        (item) =>
-          item.profile_id ===
-          currentProfileId
-      ).length + 1;
+      getMemberDrinkCount(
+        currentProfileId
+      ) + 1;
 
     await supabase
       .from("profiles")
       .update({
         drinks_count:
           newCount,
+
         points:
           newCount * 10,
       })
@@ -1057,12 +1343,52 @@ export default function Home() {
         currentProfileId
       );
 
+    /*
+     * Offene Zahlung aktualisieren.
+     */
+
+    const existingPayment =
+      payments.find(
+        (payment) =>
+          payment.profile_id ===
+            currentProfileId &&
+          payment.status ===
+            "offen"
+      );
+
+    if (existingPayment) {
+      const newCost =
+        getMemberCost(
+          currentProfileId
+        ) +
+        Number(
+          drink.preis || 0
+        );
+
+      await supabase
+        .from("payments")
+        .update({
+          betrag:
+            newCost,
+        })
+        .eq(
+          "id",
+          existingPayment.id
+        );
+    }
+
     await refreshEvent();
 
     setMessage(
-      "🍺 Getränk hinzugefügt. +10 Punkte"
+      `🍺 ${getDrinkName(
+        drink
+      )} hinzugefügt. +10 Punkte`
     );
   }
+
+  /* =======================================================
+     TRINKVORGANG ENTFERNEN
+  ======================================================= */
 
   async function removeConsumption(
     consumption: Consumption
@@ -1086,7 +1412,9 @@ export default function Home() {
 
     const { error } =
       await supabase
-        .from("drink_consumptions")
+        .from(
+          "drink_consumptions"
+        )
         .delete()
         .eq(
           "id",
@@ -1114,6 +1442,7 @@ export default function Home() {
       .update({
         drinks_count:
           remaining,
+
         points:
           remaining * 10,
       })
@@ -1122,18 +1451,20 @@ export default function Home() {
         consumption.profile_id
       );
 
+    /*
+     * Offene Zahlung aktualisieren.
+     */
+
     const payment =
       payments.find(
         (item) =>
           item.profile_id ===
-          consumption.profile_id
+          consumption.profile_id &&
+          item.status ===
+            "offen"
       );
 
-    if (
-      payment &&
-      payment.status ===
-        "offen"
-    ) {
+    if (payment) {
       const newCost =
         Math.max(
           0,
@@ -1164,6 +1495,10 @@ export default function Home() {
     );
   }
 
+  /* =======================================================
+     ZAHLUNG UMSCHALTEN
+  ======================================================= */
+
   async function togglePayment(
     member: Member
   ) {
@@ -1185,6 +1520,10 @@ export default function Home() {
           member.profile_id
       );
 
+    /*
+     * Noch keine Zahlung vorhanden.
+     */
+
     if (!existing) {
       const { error } =
         await supabase
@@ -1192,14 +1531,20 @@ export default function Home() {
           .insert({
             event_id:
               eventId,
+
             profile_id:
               member.profile_id,
+
             bezahlt_von:
               member.profile_id,
+
             betrag:
               personalCost,
+
             status:
-              "bezahlt",
+              personalCost === 0
+                ? "bezahlt"
+                : "offen",
           });
 
       if (error) {
@@ -1213,13 +1558,19 @@ export default function Home() {
       await loadPayments();
 
       setMessage(
-        `✅ ${member.username} hat ${personalCost.toFixed(
-          2
-        )} € bezahlt.`
+        personalCost === 0
+          ? `✅ ${member.username} muss nichts bezahlen.`
+          : `⏳ ${member.username}: ${personalCost.toFixed(
+              2
+            )} € offen.`
       );
 
       return;
     }
+
+    /*
+     * Status umschalten.
+     */
 
     const newStatus =
       existing.status ===
@@ -1233,8 +1584,10 @@ export default function Home() {
         .update({
           status:
             newStatus,
+
           betrag:
             personalCost,
+
           bezahlt_von:
             member.profile_id,
         })
@@ -1262,6 +1615,84 @@ export default function Home() {
     );
   }
 
+  /* =======================================================
+     ZERO-KOSTEN AUTOMATISCH BEZAHLT
+  ======================================================= */
+
+  async function markZeroCostsAsPaid() {
+    if (!eventId) return;
+
+    const zeroCostMembers =
+      members.filter(
+        (member) =>
+          getMemberCost(
+            member.profile_id
+          ) === 0 &&
+          !payments.some(
+            (payment) =>
+              payment.profile_id ===
+                member.profile_id &&
+              payment.status ===
+                "bezahlt"
+          )
+      );
+
+    for (
+      const member of zeroCostMembers
+    ) {
+      const existing =
+        payments.find(
+          (payment) =>
+            payment.profile_id ===
+            member.profile_id
+        );
+
+      if (existing) {
+        await supabase
+          .from("payments")
+          .update({
+            betrag: 0,
+            status:
+              "bezahlt",
+            bezahlt_von:
+              member.profile_id,
+          })
+          .eq(
+            "id",
+            existing.id
+          );
+      } else {
+        await supabase
+          .from("payments")
+          .insert({
+            event_id:
+              eventId,
+
+            profile_id:
+              member.profile_id,
+
+            bezahlt_von:
+              member.profile_id,
+
+            betrag: 0,
+
+            status:
+              "bezahlt",
+          });
+      }
+    }
+
+    await loadPayments();
+
+    setMessage(
+      "✅ Teilnehmer ohne Kosten wurden automatisch als bezahlt markiert."
+    );
+  }
+
+  /* =======================================================
+     GETRÄNKE NACH VERBRAUCH SORTIEREN
+  ======================================================= */
+
   const drinkUsage =
     useMemo(() => {
       const result: Record<
@@ -1273,77 +1704,99 @@ export default function Home() {
         const item of consumptions
       ) {
         result[item.drink_id] =
-          (result[item.drink_id] ||
-            0) + 1;
+          (result[
+            item.drink_id
+          ] || 0) + 1;
       }
 
       return result;
     }, [consumptions]);
 
   const sortedDrinks =
-    useMemo(
-      () =>
-        [...drinks].sort(
-          (a, b) =>
-            (drinkUsage[
-              b.id
-            ] || 0) -
-            (drinkUsage[
-              a.id
-            ] || 0)
-        ),
-      [drinks, drinkUsage]
-    );
+    useMemo(() => {
+      return [...drinks].sort(
+        (a, b) =>
+          (drinkUsage[
+            b.id
+          ] || 0) -
+          (drinkUsage[
+            a.id
+          ] || 0)
+      );
+    }, [
+      drinks,
+      drinkUsage,
+    ]);
+
+  /* =======================================================
+     GESAMTKOSTEN
+  ======================================================= */
 
   const totalCost =
-    useMemo(
-      () =>
-        consumptions.reduce(
-          (sum, consumption) => {
-            const drink =
-              drinks.find(
-                (item) =>
-                  item.id ===
-                  consumption.drink_id
-              );
-
-            return (
-              sum +
-              Number(
-                drink?.preis || 0
-              )
+    useMemo(() => {
+      return consumptions.reduce(
+        (
+          sum,
+          consumption
+        ) => {
+          const drink =
+            drinks.find(
+              (item) =>
+                item.id ===
+                consumption.drink_id
             );
-          },
-          0
-        ),
-      [consumptions, drinks]
-    );
+
+          return (
+            sum +
+            Number(
+              drink?.preis || 0
+            )
+          );
+        },
+        0
+      );
+    }, [
+      consumptions,
+      drinks,
+    ]);
+
+  /* =======================================================
+     GESAMTLITER
+  ======================================================= */
 
   const totalLiters =
-    useMemo(
-      () =>
-        consumptions.reduce(
-          (sum, consumption) => {
-            const drink =
-              drinks.find(
-                (item) =>
-                  item.id ===
-                  consumption.drink_id
-              );
-
-            return (
-              sum +
-              (drink
-                ? getDrinkLiters(
-                    drink
-                  )
-                : 0)
+    useMemo(() => {
+      return consumptions.reduce(
+        (
+          sum,
+          consumption
+        ) => {
+          const drink =
+            drinks.find(
+              (item) =>
+                item.id ===
+                consumption.drink_id
             );
-          },
-          0
-        ),
-      [consumptions, drinks]
-    );
+
+          return (
+            sum +
+            (drink
+              ? getDrinkLiters(
+                  drink
+                )
+              : 0)
+          );
+        },
+        0
+      );
+    }, [
+      consumptions,
+      drinks,
+    ]);
+
+  /* =======================================================
+     KOSTEN JE MITGLIED
+  ======================================================= */
 
   const memberCosts =
     useMemo(() => {
@@ -1357,9 +1810,10 @@ export default function Home() {
       ) {
         result[
           member.profile_id
-        ] = getMemberCost(
-          member.profile_id
-        );
+        ] =
+          getMemberCost(
+            member.profile_id
+          );
       }
 
       return result;
@@ -1369,6 +1823,10 @@ export default function Home() {
       drinks,
     ]);
 
+  /* =======================================================
+     BEZAHLT
+  ======================================================= */
+
   const paidAmount =
     payments
       .filter(
@@ -1377,13 +1835,20 @@ export default function Home() {
           "bezahlt"
       )
       .reduce(
-        (sum, payment) =>
+        (
+          sum,
+          payment
+        ) =>
           sum +
           Number(
             payment.betrag || 0
           ),
         0
       );
+
+  /* =======================================================
+     OFFEN
+  ======================================================= */
 
   const openAmount =
     Math.max(
@@ -1392,15 +1857,26 @@ export default function Home() {
         paidAmount
     );
 
+  /* =======================================================
+     PUNKTE
+  ======================================================= */
+
   const totalPoints =
     members.reduce(
-      (sum, member) =>
+      (
+        sum,
+        member
+      ) =>
         sum +
         getMemberPoints(
           member.profile_id
         ),
       0
     );
+
+  /* =======================================================
+     RANKING
+  ======================================================= */
 
   const ranking =
     [...members].sort(
@@ -1412,6 +1888,10 @@ export default function Home() {
           a.profile_id
         )
     );
+
+  /* =======================================================
+     ZAHLUNGSSTATUS
+  ======================================================= */
 
   const paidCount =
     members.filter(
@@ -1426,8 +1906,15 @@ export default function Home() {
     ).length;
 
   const openCount =
-    members.length -
-    paidCount;
+    Math.max(
+      0,
+      members.length -
+        paidCount
+    );
+
+  /* =======================================================
+     AKTIVER TEILNEHMER
+  ======================================================= */
 
   const currentMember =
     members.find(
@@ -1436,6 +1923,10 @@ export default function Home() {
         currentProfileId
     );
 
+  /* =======================================================
+     EIGENE GETRÄNKE
+  ======================================================= */
+
   const currentConsumptions =
     consumptions.filter(
       (item) =>
@@ -1443,12 +1934,20 @@ export default function Home() {
         currentProfileId
     );
 
+  /* =======================================================
+     AKTUELLE PROMILLE
+  ======================================================= */
+
   const currentPromille =
     currentMember
       ? calculatePromille(
           currentProfileId
         )
       : 0;
+
+  /* =======================================================
+     EINSTELLUNGEN
+  ======================================================= */
 
   function settingLabel(
     key: SettingKey
@@ -1459,32 +1958,46 @@ export default function Home() {
     > = {
       cost_overview_enabled:
         "💶 Kostenberechnung",
+
       auto_split_costs:
         "➗ Kosten automatisch teilen",
+
       ranking_enabled:
         "🏆 Ranking",
+
       show_points:
         "⭐ Punkte",
+
       show_ranking:
         "🏆 Rangliste",
+
       show_promille:
         "🍷 Promille",
+
       show_statistics:
         "📊 Statistiken",
+
       show_drink_amounts:
         "🍺 Trinkmengen",
+
       show_costs:
         "💰 Getränkepreise",
+
       team_mode:
         "👥 Team-Modus",
+
       show_photos:
         "📸 Fotos",
+
       photo_required:
         "📷 Foto erforderlich",
+
       ai_recognition_enabled:
         "🤖 KI-Erkennung",
+
       manual_entry_allowed:
         "✍️ Manuelle Eingabe",
+
       privacy_mode:
         "🔒 Privatsphäre-Modus",
     };
@@ -1501,32 +2014,46 @@ export default function Home() {
     > = {
       cost_overview_enabled:
         "Kostenaufteilung und Zahlungen anzeigen.",
+
       auto_split_costs:
         "Kostenberechnung nach tatsächlichem Verbrauch aktivieren.",
+
       ranking_enabled:
         "Das komplette Ranking aktivieren.",
+
       show_points:
         "Punkte bei Teilnehmern anzeigen.",
+
       show_ranking:
         "Die Rangliste anzeigen.",
+
       show_promille:
         "Promilleanzeige anzeigen.",
+
       show_statistics:
         "Statistikbereich anzeigen.",
+
       show_drink_amounts:
         "Getrunkene Mengen anzeigen.",
+
       show_costs:
         "Preise der Getränke anzeigen.",
+
       team_mode:
         "Teilnehmer in Teams organisieren.",
+
       show_photos:
         "Fotos bei Getränken erlauben.",
+
       photo_required:
         "Bei jedem Getränk ein Foto verlangen.",
+
       ai_recognition_enabled:
         "KI-Erkennung für Getränke aktivieren.",
+
       manual_entry_allowed:
         "Getränke manuell eingeben erlauben.",
+
       privacy_mode:
         "Persönliche Daten stärker ausblenden.",
     };
@@ -1552,9 +2079,17 @@ export default function Home() {
     "privacy_mode",
   ];
 
+  /* =======================================================
+     RENDER
+  ======================================================= */
+
   return (
     <main className="page">
       <div className="container">
+
+        {/* =================================================
+            HEADER
+        ================================================= */}
 
         <header className="header">
           <div className="logo">
@@ -1572,7 +2107,12 @@ export default function Home() {
           </div>
         </header>
 
+        {/* =================================================
+            EVENT
+        ================================================= */}
+
         <section className="card">
+
           <h2>
             📅 Aktuelles Event
           </h2>
@@ -1601,8 +2141,11 @@ export default function Home() {
             )}
           </select>
 
+          {/* EINLADUNG */}
+
           {eventId && (
             <div className="inviteBox">
+
               <h3>
                 🔗 Freunde einladen
               </h3>
@@ -1612,6 +2155,7 @@ export default function Home() {
               </p>
 
               <div className="codeRow">
+
                 <strong>
                   {inviteCode ||
                     "------"}
@@ -1624,6 +2168,7 @@ export default function Home() {
                 >
                   📋 Kopieren
                 </button>
+
               </div>
 
               {isEventCreator && (
@@ -1636,8 +2181,11 @@ export default function Home() {
                   🔄 Neuen Code erstellen
                 </button>
               )}
+
             </div>
           )}
+
+          {/* EVENT-VERWALTUNG */}
 
           {currentEvent && (
             <div className="management">
@@ -1657,6 +2205,7 @@ export default function Home() {
                     ? "▲"
                     : "▼"}
                 </span>
+
               </button>
 
               {settingsOpen && (
@@ -1670,6 +2219,7 @@ export default function Home() {
 
                   {settings.map(
                     (key) => {
+
                       const enabled =
                         !!currentEvent[
                           key
@@ -1680,7 +2230,9 @@ export default function Home() {
                           className="setting"
                           key={key}
                         >
+
                           <div className="settingText">
+
                             <strong>
                               {settingLabel(
                                 key
@@ -1692,6 +2244,7 @@ export default function Home() {
                                 key
                               )}
                             </small>
+
                           </div>
 
                           <button
@@ -1715,17 +2268,26 @@ export default function Home() {
                               ? "🟢 AN"
                               : "⚫ AUS"}
                           </button>
+
                         </div>
                       );
                     }
                   )}
+
                 </div>
               )}
+
             </div>
           )}
+
         </section>
 
+        {/* =================================================
+            EVENT BEITRETEN
+        ================================================= */}
+
         <section className="card">
+
           <h2>
             👥 Event beitreten
           </h2>
@@ -1735,11 +2297,13 @@ export default function Home() {
           </p>
 
           <div className="joinBox">
+
             <input
               value={joinCode}
               onChange={(e) =>
                 setJoinCode(
-                  e.target.value.toUpperCase()
+                  e.target.value
+                    .toUpperCase()
                 )
               }
               placeholder="z.B. GZ-F4B4D4"
@@ -1753,8 +2317,14 @@ export default function Home() {
             >
               🚀 Beitreten
             </button>
+
           </div>
+
         </section>
+
+        {/* =================================================
+            STATISTIKEN
+        ================================================= */}
 
         {(!currentEvent ||
           currentEvent.show_statistics) && (
@@ -1789,6 +2359,7 @@ export default function Home() {
             {(!currentEvent ||
               currentEvent.show_costs) && (
               <div className="stat">
+
                 <span>💶</span>
 
                 <strong>
@@ -1800,10 +2371,12 @@ export default function Home() {
                 <small>
                   Tatsächlich getrunken
                 </small>
+
               </div>
             )}
 
             <div className="stat">
+
               <span>👥</span>
 
               <strong>
@@ -1813,10 +2386,15 @@ export default function Home() {
               <small>
                 Teilnehmer
               </small>
+
             </div>
 
           </div>
         )}
+
+        {/* =================================================
+            TEILNEHMER
+        ================================================= */}
 
         <section className="card">
 
@@ -1835,17 +2413,19 @@ export default function Home() {
                 currentProfileId
               }
               onChange={(e) => {
-                const id =
-                  e.target.value;
 
-                setCurrentProfileId(id);
+                setCurrentProfileId(
+                  e.target.value
+                );
 
                 localStorage.setItem(
                   "guesten-current-profile",
-                  id
+                  e.target.value
                 );
+
               }}
             >
+
               <option value="">
                 Teilnehmer auswählen
               </option>
@@ -1864,8 +2444,12 @@ export default function Home() {
                   </option>
                 )
               )}
+
             </select>
+
           </div>
+
+          {/* TEILNEHMER HINZUFÜGEN */}
 
           {isEventCreator &&
             profiles.filter(
@@ -1889,6 +2473,7 @@ export default function Home() {
                     )
                   }
                 >
+
                   <option value="">
                     Teilnehmer auswählen
                   </option>
@@ -1917,6 +2502,7 @@ export default function Home() {
                         </option>
                       )
                     )}
+
                 </select>
 
                 <button
@@ -1926,15 +2512,20 @@ export default function Home() {
                 >
                   ➕ Hinzufügen
                 </button>
+
               </div>
             )}
 
+          {/* MITGLIEDER */}
+
           {members.map(
             (member) => (
+
               <div
                 className="member"
                 key={member.id}
               >
+
                 <div className="avatar">
                   {member.username
                     .charAt(0)
@@ -1942,6 +2533,7 @@ export default function Home() {
                 </div>
 
                 <div>
+
                   <strong>
                     {member.username}
                   </strong>
@@ -1974,7 +2566,7 @@ export default function Home() {
                       {getMemberCost(
                         member.profile_id
                       ).toFixed(2)}
-                      {" €"}
+                      €
                     </small>
                   )}
 
@@ -1985,9 +2577,10 @@ export default function Home() {
                       {calculatePromille(
                         member.profile_id
                       ).toFixed(2)}
-                      {" ‰"}
+                      ‰
                     </small>
                   )}
+
                 </div>
 
                 {isEventCreator && (
@@ -2002,13 +2595,20 @@ export default function Home() {
                     ×
                   </button>
                 )}
+
               </div>
             )
           )}
+
         </section>
+
+        {/* =================================================
+            GETRÄNK HINZUFÜGEN
+        ================================================= */}
 
         {(!currentEvent ||
           currentEvent.manual_entry_allowed) && (
+
           <section className="card">
 
             <h2>
@@ -2041,6 +2641,7 @@ export default function Home() {
 
               <input
                 type="number"
+                step="0.1"
                 value={alcohol}
                 onChange={(e) =>
                   setAlcohol(
@@ -2066,15 +2667,22 @@ export default function Home() {
 
             <button
               className="save"
+              disabled={loading}
               onClick={
                 saveDrink
               }
             >
-              🍻 Getränk speichern
+              {loading
+                ? "⏳ Speichert..."
+                : "🍻 Getränk speichern"}
             </button>
 
           </section>
         )}
+
+        {/* =================================================
+            GETRÄNKE
+        ================================================= */}
 
         <section className="card">
 
@@ -2083,17 +2691,21 @@ export default function Home() {
           </h2>
 
           <p>
-            Getränk anklicken, um es
-            selbst zu trinken.
+            Klicke auf ein Getränk,
+            um es für den aktiven
+            Teilnehmer zu erfassen.
           </p>
 
           {sortedDrinks.length ===
           0 ? (
+
             <div className="empty">
               Noch keine Getränke
               vorhanden.
             </div>
+
           ) : (
+
             sortedDrinks.map(
               (drink) => {
 
@@ -2103,9 +2715,12 @@ export default function Home() {
                   ] || 0;
 
                 return (
+
                   <div
                     className="drink"
-                    key={drink.id}
+                    key={
+                      drink.id
+                    }
                   >
 
                     <div className="drinkMain">
@@ -2125,31 +2740,38 @@ export default function Home() {
                         {(!currentEvent ||
                           currentEvent.show_drink_amounts) && (
                           <small>
+
                             {getDrinkLiters(
                               drink
                             ).toFixed(1)}
                             {" L · "}
+
                             {getDrinkAlcohol(
                               drink
                             ).toFixed(1)}
                             {" % · "}
+
                             {usage}
                             × getrunken
+
                           </small>
                         )}
 
                         {(!currentEvent ||
                           currentEvent.show_costs) && (
                           <small>
+
                             {Number(
                               drink.preis ||
                                 0
                             ).toFixed(2)}
                             € pro Getränk
+
                           </small>
                         )}
 
                       </div>
+
                     </div>
 
                     <button
@@ -2175,7 +2797,12 @@ export default function Home() {
               }
             )
           )}
+
         </section>
+
+        {/* =================================================
+            MEINE GETRÄNKE
+        ================================================= */}
 
         <section className="card">
 
@@ -2191,11 +2818,14 @@ export default function Home() {
 
           {currentConsumptions.length ===
           0 ? (
+
             <div className="empty">
               Noch keine Getränke
               getrunken.
             </div>
+
           ) : (
+
             currentConsumptions.map(
               (consumption) => {
 
@@ -2207,6 +2837,7 @@ export default function Home() {
                   );
 
                 return (
+
                   <div
                     className="consumption"
                     key={
@@ -2215,6 +2846,7 @@ export default function Home() {
                   >
 
                     <div>
+
                       <strong>
                         🍺{" "}
                         {drink
@@ -2225,6 +2857,7 @@ export default function Home() {
                       </strong>
 
                       <small>
+
                         {drink
                           ? Number(
                               drink.preis ||
@@ -2232,6 +2865,7 @@ export default function Home() {
                             ).toFixed(2)
                           : "0.00"}
                         {" € · "}
+
                         {new Date(
                           consumption.created_at
                         ).toLocaleTimeString(
@@ -2243,7 +2877,9 @@ export default function Home() {
                               "2-digit",
                           }
                         )}
+
                       </small>
+
                     </div>
 
                     <button
@@ -2262,10 +2898,16 @@ export default function Home() {
               }
             )
           )}
+
         </section>
+
+        {/* =================================================
+            PROMILLE
+        ================================================= */}
 
         {(!currentEvent ||
           currentEvent.show_promille) && (
+
           <section className="card promilleCard">
 
             <h2>
@@ -2274,6 +2916,7 @@ export default function Home() {
 
             {currentMember ? (
               <>
+
                 <h3>
                   {currentMember.username}
                 </h3>
@@ -2283,7 +2926,7 @@ export default function Home() {
                   {
                     currentMember.gewicht_kg
                   }
-                  {" kg · Alter: "}
+                  kg · Alter:{" "}
                   {
                     currentMember.alter
                   }
@@ -2293,7 +2936,7 @@ export default function Home() {
                   {currentPromille.toFixed(
                     2
                   )}
-                  {" ‰"}
+                  ‰
                 </div>
 
                 <div className="promilleInfo">
@@ -2303,9 +2946,10 @@ export default function Home() {
                   </strong>
 
                   <small>
-                    Die Berechnung ist nur
-                    eine rechnerische
-                    Schätzung.
+                    Die Anzeige ist eine
+                    rechnerische Schätzung
+                    anhand der erfassten
+                    Getränke und Zeiten.
                   </small>
 
                   <small>
@@ -2327,24 +2971,33 @@ export default function Home() {
 
                 <p className="warning">
                   ⚠️ Die Promilleanzeige
-                  darf nicht zur
-                  Beurteilung der
-                  Fahrtüchtigkeit
-                  verwendet werden.
+                  ist nur eine rechnerische
+                  Schätzung und darf nicht
+                  zur Beurteilung der
+                  Fahrtüchtigkeit verwendet
+                  werden.
                 </p>
+
               </>
             ) : (
+
               <p>
                 Bitte zuerst einen
                 Teilnehmer auswählen.
               </p>
+
             )}
 
           </section>
         )}
 
+        {/* =================================================
+            TRINKVERLAUF
+        ================================================= */}
+
         {(!currentEvent ||
           currentEvent.show_statistics) && (
+
           <section className="card">
 
             <h2>
@@ -2353,10 +3006,13 @@ export default function Home() {
 
             {consumptions.length ===
             0 ? (
+
               <p>
                 Noch keine Getränke.
               </p>
+
             ) : (
+
               consumptions.map(
                 (consumption) => {
 
@@ -2375,6 +3031,7 @@ export default function Home() {
                     );
 
                   return (
+
                     <div
                       className="history"
                       key={
@@ -2391,19 +3048,24 @@ export default function Home() {
                         </strong>
 
                         <small>
+
                           {drink
                             ? getDrinkName(
                                 drink
                               )
                             : "Getränk"}
+
                           {" · "}
+
                           {drink
                             ? Number(
                                 drink.preis ||
                                   0
                               ).toFixed(2)
                             : "0.00"}
+
                           {" € · "}
+
                           {new Date(
                             consumption.created_at
                           ).toLocaleTimeString(
@@ -2415,6 +3077,7 @@ export default function Home() {
                                 "2-digit",
                             }
                           )}
+
                         </small>
 
                       </div>
@@ -2435,8 +3098,13 @@ export default function Home() {
           </section>
         )}
 
+        {/* =================================================
+            KOSTEN
+        ================================================= */}
+
         {(!currentEvent ||
           currentEvent.cost_overview_enabled) && (
+
           <section className="card costCard">
 
             <h2>
@@ -2462,9 +3130,8 @@ export default function Home() {
 
               <small>
                 Jeder Teilnehmer bezahlt
-                ausschließlich seine
-                eigenen getrunkenen
-                Getränke.
+                ausschließlich seine eigenen
+                getrunkenen Getränke.
               </small>
 
               <small>
@@ -2475,6 +3142,7 @@ export default function Home() {
             </div>
 
             <div className="row">
+
               <span>
                 🍺 Getrunken
               </span>
@@ -2482,9 +3150,11 @@ export default function Home() {
               <strong>
                 {consumptions.length}
               </strong>
+
             </div>
 
             <div className="row">
+
               <span>
                 👥 Teilnehmer
               </span>
@@ -2492,9 +3162,11 @@ export default function Home() {
               <strong>
                 {members.length}
               </strong>
+
             </div>
 
             <div className="row">
+
               <span>
                 💶 Bereits bezahlt
               </span>
@@ -2504,9 +3176,11 @@ export default function Home() {
                   2
                 )} €
               </strong>
+
             </div>
 
             <div className="row">
+
               <span>
                 ⏳ Noch offen
               </span>
@@ -2522,11 +3196,13 @@ export default function Home() {
                   2
                 )} €
               </strong>
+
             </div>
 
             <div className="paymentSummary">
 
               <div className="paymentBox paid">
+
                 <span>
                   ✅
                 </span>
@@ -2538,9 +3214,11 @@ export default function Home() {
                 <small>
                   Bezahlt
                 </small>
+
               </div>
 
               <div className="paymentBox open">
+
                 <span>
                   ⏳
                 </span>
@@ -2552,6 +3230,7 @@ export default function Home() {
                 <small>
                   Offen
                 </small>
+
               </div>
 
             </div>
@@ -2562,10 +3241,13 @@ export default function Home() {
 
             {members.length ===
             0 ? (
+
               <div className="empty">
                 Noch keine Teilnehmer.
               </div>
+
             ) : (
+
               members.map(
                 (member) => {
 
@@ -2586,13 +3268,16 @@ export default function Home() {
                     "bezahlt";
 
                   return (
+
                     <div
                       className={
                         isPaid
                           ? "paymentPerson paidRow"
                           : "paymentPerson"
                       }
-                      key={member.id}
+                      key={
+                        member.id
+                      }
                     >
 
                       <div className="paymentAvatar">
@@ -2654,7 +3339,25 @@ export default function Home() {
               )
             )}
 
+            {/* AUTOMATISCHE NULL-EURO-PRÜFUNG */}
+
             {members.length > 0 && (
+              <button
+                className="zeroButton"
+                onClick={
+                  markZeroCostsAsPaid
+                }
+              >
+                🎉 Teilnehmer ohne Kosten
+                automatisch als bezahlt
+                markieren
+              </button>
+            )}
+
+            {/* ABRECHNUNGSPRÜFUNG */}
+
+            {members.length > 0 && (
+
               <div className="paymentCheck">
 
                 <strong>
@@ -2738,10 +3441,15 @@ export default function Home() {
           </section>
         )}
 
+        {/* =================================================
+            RANKING
+        ================================================= */}
+
         {(!currentEvent ||
           currentEvent.ranking_enabled) &&
           (!currentEvent ||
             currentEvent.show_ranking) && (
+
           <section className="card">
 
             <h2>
@@ -2750,10 +3458,13 @@ export default function Home() {
 
             {ranking.length ===
             0 ? (
+
               <p>
                 Noch keine Teilnehmer.
               </p>
+
             ) : (
+
               ranking.map(
                 (
                   member,
@@ -2771,6 +3482,7 @@ export default function Home() {
                     );
 
                   return (
+
                     <div
                       className="ranking"
                       key={
@@ -2811,6 +3523,7 @@ export default function Home() {
 
                       {(!currentEvent ||
                         currentEvent.show_points) && (
+
                         <div className="points">
 
                           {points}
@@ -2830,20 +3543,30 @@ export default function Home() {
 
             {(!currentEvent ||
               currentEvent.show_points) && (
+
               <div className="totalPoints">
                 🏆 Gesamtpunkte:{" "}
                 {totalPoints}
               </div>
+
             )}
 
           </section>
         )}
+
+        {/* =================================================
+            MELDUNG
+        ================================================= */}
 
         {message && (
           <div className="message">
             {message}
           </div>
         )}
+
+        {/* =================================================
+            FOOTER
+        ================================================= */}
 
         <footer>
 
@@ -2860,7 +3583,12 @@ export default function Home() {
 
       </div>
 
+      {/* ===================================================
+          CSS
+      =================================================== */}
+
       <style jsx>{`
+
         * {
           box-sizing: border-box;
         }
@@ -2869,7 +3597,11 @@ export default function Home() {
           min-height: 100vh;
           padding: 16px;
           color: white;
-          font-family: Arial, Helvetica, sans-serif;
+          font-family:
+            Arial,
+            Helvetica,
+            sans-serif;
+
           background:
             radial-gradient(
               circle at top,
@@ -2887,14 +3619,24 @@ export default function Home() {
           display: flex;
           align-items: center;
           gap: 14px;
-          padding: 10px 4px 25px;
+          padding:
+            10px
+            4px
+            25px;
         }
 
         .logo {
           font-size: 38px;
           padding: 12px;
           border-radius: 18px;
-          background: rgba(255,255,255,.07);
+
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              .07
+            );
         }
 
         h1 {
@@ -2903,12 +3645,19 @@ export default function Home() {
         }
 
         h2 {
-          margin: 0 0 8px;
+          margin:
+            0
+            0
+            8px;
+
           font-size: 20px;
         }
 
         h3 {
-          margin: 20px 0 10px;
+          margin:
+            20px
+            0
+            10px;
         }
 
         p {
@@ -2925,16 +3674,48 @@ export default function Home() {
           padding: 18px;
           margin-bottom: 15px;
           border-radius: 20px;
-          background: rgba(255,255,255,.06);
-          border: 1px solid rgba(255,255,255,.08);
+
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              .06
+            );
+
+          border:
+            1px solid
+            rgba(
+              255,
+              255,
+              255,
+              .08
+            );
         }
+
+        /* EVENT */
 
         .inviteBox {
           margin-top: 15px;
           padding: 16px;
           border-radius: 16px;
-          background: rgba(245,158,11,.08);
-          border: 1px solid rgba(245,158,11,.25);
+
+          background:
+            rgba(
+              245,
+              158,
+              11,
+              .08
+            );
+
+          border:
+            1px solid
+            rgba(
+              245,
+              158,
+              11,
+              .25
+            );
         }
 
         .inviteBox h3 {
@@ -2945,7 +3726,9 @@ export default function Home() {
         .joinBox,
         .addParticipant {
           display: grid;
-          grid-template-columns: 1fr auto;
+          grid-template-columns:
+            1fr
+            auto;
           gap: 8px;
         }
 
@@ -2957,17 +3740,22 @@ export default function Home() {
           padding: 14px;
           border-radius: 12px;
           text-align: center;
+
           font-size: 26px;
           letter-spacing: 5px;
+
           background: #111923;
           color: #fbbf24;
         }
 
         .newCode {
           margin-top: 10px;
+
           background: #334155;
           color: white;
         }
+
+        /* VERWALTUNG */
 
         .management {
           margin-top: 15px;
@@ -2975,9 +3763,12 @@ export default function Home() {
 
         .managementButton {
           width: 100%;
+
           display: flex;
-          justify-content: space-between;
+          justify-content:
+            space-between;
           align-items: center;
+
           background: #334155;
           color: white;
         }
@@ -2986,26 +3777,56 @@ export default function Home() {
           margin-top: 10px;
           padding: 12px;
           border-radius: 16px;
-          background: rgba(0,0,0,.18);
+
+          background:
+            rgba(
+              0,
+              0,
+              0,
+              .18
+            );
         }
 
         .settingsInfo {
           padding: 10px;
-          margin: 0 0 10px;
+          margin:
+            0
+            0
+            10px;
+
           border-radius: 10px;
-          background: rgba(245,158,11,.08);
+
+          background:
+            rgba(
+              245,
+              158,
+              11,
+              .08
+            );
+
           font-size: 13px;
         }
 
         .setting {
           display: flex;
           align-items: center;
-          justify-content: space-between;
+          justify-content:
+            space-between;
+
           gap: 12px;
+
           padding: 13px;
           margin-top: 8px;
+
           border-radius: 14px;
-          background: rgba(255,255,255,.05);
+
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              .05
+            );
         }
 
         .settingText {
@@ -3019,7 +3840,9 @@ export default function Home() {
 
         .toggle {
           min-width: 78px;
-          padding: 10px 8px;
+          padding:
+            10px
+            8px;
         }
 
         .toggle.on {
@@ -3032,18 +3855,36 @@ export default function Home() {
           color: #cbd5e1;
         }
 
+        /* STATISTIKEN */
+
         .stats {
           display: grid;
-          grid-template-columns: repeat(4,1fr);
+
+          grid-template-columns:
+            repeat(
+              4,
+              1fr
+            );
+
           gap: 10px;
           margin-bottom: 15px;
         }
 
         .stat {
           text-align: center;
-          padding: 14px 5px;
+          padding:
+            14px
+            5px;
+
           border-radius: 16px;
-          background: rgba(255,255,255,.06);
+
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              .06
+            );
         }
 
         .stat span {
@@ -3057,24 +3898,36 @@ export default function Home() {
           margin-top: 4px;
         }
 
+        /* INPUTS */
+
         input,
         select {
           width: 100%;
           padding: 13px;
           margin-bottom: 10px;
+
           border-radius: 12px;
-          border: 1px solid #344252;
+          border:
+            1px solid
+            #344252;
+
           background: #121a23;
           color: white;
+
           font-size: 15px;
         }
 
         button {
-          padding: 13px 17px;
+          padding:
+            13px
+            17px;
+
           border: 0;
           border-radius: 12px;
+
           background: #f59e0b;
           color: #111;
+
           font-weight: bold;
           cursor: pointer;
         }
@@ -3084,6 +3937,8 @@ export default function Home() {
           cursor: not-allowed;
         }
 
+        /* PROFILE */
+
         .profileSelect {
           margin-bottom: 10px;
         }
@@ -3091,35 +3946,59 @@ export default function Home() {
         .profileSelect label {
           display: block;
           color: #94a3b8;
+
           margin-bottom: 6px;
+
           font-size: 13px;
         }
 
         .member {
           display: grid;
-          grid-template-columns: 40px 1fr auto;
+
+          grid-template-columns:
+            40px
+            1fr
+            auto;
+
           align-items: center;
+
           gap: 10px;
+
           padding: 11px;
           margin-top: 8px;
+
           border-radius: 14px;
-          background: rgba(255,255,255,.05);
+
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              .05
+            );
         }
 
         .avatar,
         .paymentAvatar {
           width: 38px;
           height: 38px;
+
           border-radius: 50%;
+
           display: flex;
           align-items: center;
           justify-content: center;
+
           background: #334155;
+
           font-weight: bold;
         }
 
         .remove {
-          padding: 6px 11px;
+          padding:
+            6px
+            11px;
+
           background: #303b48;
           color: white;
         }
@@ -3134,9 +4013,17 @@ export default function Home() {
           font-weight: bold;
         }
 
+        /* GETRÄNKE */
+
         .three {
           display: grid;
-          grid-template-columns: repeat(3,1fr);
+
+          grid-template-columns:
+            repeat(
+              3,
+              1fr
+            );
+
           gap: 8px;
         }
 
@@ -3146,19 +4033,33 @@ export default function Home() {
 
         .drink {
           display: flex;
+
           align-items: center;
-          justify-content: space-between;
+          justify-content:
+            space-between;
+
           gap: 12px;
+
           padding: 12px;
           margin-top: 8px;
+
           border-radius: 14px;
-          background: rgba(255,255,255,.05);
+
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              .05
+            );
         }
 
         .drinkMain {
           display: flex;
           align-items: center;
+
           gap: 12px;
+
           min-width: 0;
         }
 
@@ -3171,30 +4072,58 @@ export default function Home() {
           background: #f59e0b;
         }
 
+        /* MEINE GETRÄNKE */
+
         .consumption {
           display: flex;
-          justify-content: space-between;
+
+          justify-content:
+            space-between;
+
           align-items: center;
+
           gap: 10px;
+
           padding: 12px;
           margin-top: 8px;
+
           border-radius: 14px;
-          background: rgba(255,255,255,.05);
+
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              .05
+            );
         }
 
         .undo {
           background: #334155;
           color: white;
+
           white-space: nowrap;
         }
 
         .empty {
           padding: 15px;
+
           border-radius: 12px;
+
           text-align: center;
+
           color: #94a3b8;
-          background: rgba(255,255,255,.04);
+
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              .04
+            );
         }
+
+        /* PROMILLE */
 
         .promilleCard {
           text-align: center;
@@ -3203,15 +4132,35 @@ export default function Home() {
         .promille {
           font-size: 48px;
           font-weight: bold;
+
           color: #fbbf24;
-          margin: 10px 0;
+
+          margin:
+            10px
+            0;
         }
 
         .promilleInfo {
           padding: 12px;
+
           border-radius: 12px;
-          background: rgba(34,197,94,.08);
-          border: 1px solid rgba(34,197,94,.2);
+
+          background:
+            rgba(
+              34,
+              197,
+              94,
+              .08
+            );
+
+          border:
+            1px solid
+            rgba(
+              34,
+              197,
+              94,
+              .2
+            );
         }
 
         .promilleInfo strong {
@@ -3223,14 +4172,28 @@ export default function Home() {
           margin-top: 14px;
         }
 
+        /* VERLAUF */
+
         .history {
           display: flex;
-          justify-content: space-between;
+
+          justify-content:
+            space-between;
+
           align-items: center;
+
           padding: 12px;
           margin-top: 8px;
+
           border-radius: 14px;
-          background: rgba(255,255,255,.05);
+
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              .05
+            );
         }
 
         .history > span {
@@ -3238,14 +4201,25 @@ export default function Home() {
           font-weight: bold;
         }
 
+        /* KOSTEN */
+
         .costCard {
-          border: 1px solid rgba(245,158,11,.2);
+          border:
+            1px solid
+            rgba(
+              245,
+              158,
+              11,
+              .2
+            );
         }
 
         .total {
           text-align: center;
+
           font-size: 40px;
           font-weight: bold;
+
           color: #fbbf24;
         }
 
@@ -3254,11 +4228,30 @@ export default function Home() {
         }
 
         .costExplanation {
-          margin: 15px 0;
+          margin:
+            15px
+            0;
+
           padding: 14px;
+
           border-radius: 14px;
-          background: rgba(245,158,11,.08);
-          border: 1px solid rgba(245,158,11,.2);
+
+          background:
+            rgba(
+              245,
+              158,
+              11,
+              .08
+            );
+
+          border:
+            1px solid
+            rgba(
+              245,
+              158,
+              11,
+              .2
+            );
         }
 
         .costExplanation strong {
@@ -3267,11 +4260,22 @@ export default function Home() {
 
         .row {
           display: flex;
-          justify-content: space-between;
+
+          justify-content:
+            space-between;
+
           padding: 13px;
           margin-top: 8px;
+
           border-radius: 12px;
-          background: rgba(255,255,255,.05);
+
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              .05
+            );
         }
 
         .openMoney {
@@ -3284,16 +4288,30 @@ export default function Home() {
 
         .paymentSummary {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+
+          grid-template-columns:
+            1fr
+            1fr;
+
           gap: 10px;
+
           margin-top: 15px;
         }
 
         .paymentBox {
           text-align: center;
+
           padding: 15px;
+
           border-radius: 15px;
-          background: rgba(255,255,255,.05);
+
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              .05
+            );
         }
 
         .paymentBox span {
@@ -3308,27 +4326,70 @@ export default function Home() {
         }
 
         .paymentBox.paid {
-          border: 1px solid rgba(34,197,94,.35);
+          border:
+            1px solid
+            rgba(
+              34,
+              197,
+              94,
+              .35
+            );
         }
 
         .paymentBox.open {
-          border: 1px solid rgba(245,158,11,.35);
+          border:
+            1px solid
+            rgba(
+              245,
+              158,
+              11,
+              .35
+            );
         }
 
         .paymentPerson {
           display: grid;
-          grid-template-columns: 40px 1fr auto;
+
+          grid-template-columns:
+            40px
+            1fr
+            auto;
+
           align-items: center;
+
           gap: 10px;
+
           padding: 12px;
           margin-top: 8px;
+
           border-radius: 15px;
-          background: rgba(255,255,255,.05);
+
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              .05
+            );
         }
 
         .paidRow {
-          border: 1px solid rgba(34,197,94,.4);
-          background: rgba(34,197,94,.08);
+          border:
+            1px solid
+            rgba(
+              34,
+              197,
+              94,
+              .4
+            );
+
+          background:
+            rgba(
+              34,
+              197,
+              94,
+              .08
+            );
         }
 
         .paymentInfo {
@@ -3355,24 +4416,54 @@ export default function Home() {
           color: #111;
         }
 
+        .zeroButton {
+          width: 100%;
+          margin-top: 12px;
+
+          background: #334155;
+          color: white;
+        }
+
         .paymentCheck {
           margin-top: 18px;
+
           padding: 15px;
+
           border-radius: 15px;
-          background: rgba(255,255,255,.04);
-          border: 1px solid rgba(255,255,255,.08);
+
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              .04
+            );
+
+          border:
+            1px solid
+            rgba(
+              255,
+              255,
+              255,
+              .08
+            );
+
           text-align: center;
         }
 
         .paymentCheck strong {
           display: block;
+
           color: #fbbf24;
+
           margin-bottom: 8px;
         }
 
         .paymentCheck b {
           display: block;
+
           font-size: 20px;
+
           margin-bottom: 8px;
         }
 
@@ -3386,15 +4477,32 @@ export default function Home() {
           font-weight: bold;
         }
 
+        /* RANKING */
+
         .ranking {
           display: grid;
-          grid-template-columns: 45px 1fr auto;
+
+          grid-template-columns:
+            45px
+            1fr
+            auto;
+
           align-items: center;
+
           gap: 10px;
+
           padding: 13px;
           margin-top: 8px;
+
           border-radius: 14px;
-          background: rgba(255,255,255,.05);
+
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              .05
+            );
         }
 
         .rank {
@@ -3403,6 +4511,7 @@ export default function Home() {
 
         .points {
           text-align: right;
+
           font-weight: bold;
           font-size: 18px;
         }
@@ -3414,46 +4523,78 @@ export default function Home() {
 
         .totalPoints {
           margin-top: 15px;
+
           padding: 15px;
+
           text-align: center;
+
           border-radius: 14px;
-          background: rgba(245,158,11,.1);
+
+          background:
+            rgba(
+              245,
+              158,
+              11,
+              .1
+            );
+
           color: #fbbf24;
+
           font-weight: bold;
         }
 
+        /* MELDUNG */
+
         .message {
           padding: 14px;
+
           margin-bottom: 15px;
+
           text-align: center;
+
           border-radius: 13px;
+
           background: #172535;
+
           color: #fbbf24;
         }
 
+        /* FOOTER */
+
         footer {
           padding: 25px;
+
           text-align: center;
+
           color: #64748b;
         }
+
+        /* MOBILE */
 
         @media(max-width:650px) {
 
           .stats {
-            grid-template-columns: repeat(2,1fr);
+            grid-template-columns:
+              repeat(
+                2,
+                1fr
+              );
           }
 
           .three {
-            grid-template-columns: 1fr;
+            grid-template-columns:
+              1fr;
           }
 
           .addParticipant,
           .joinBox {
-            grid-template-columns: 1fr;
+            grid-template-columns:
+              1fr;
           }
 
           .codeRow {
-            grid-template-columns: 1fr;
+            grid-template-columns:
+              1fr;
           }
 
           .codeRow strong {
@@ -3461,7 +4602,8 @@ export default function Home() {
           }
 
           .setting {
-            align-items: flex-start;
+            align-items:
+              flex-start;
           }
 
           .settingText {
@@ -3473,8 +4615,11 @@ export default function Home() {
           }
 
           .drink {
-            align-items: stretch;
-            flex-direction: column;
+            align-items:
+              stretch;
+
+            flex-direction:
+              column;
           }
 
           .drinkButton {
@@ -3482,8 +4627,11 @@ export default function Home() {
           }
 
           .consumption {
-            align-items: stretch;
-            flex-direction: column;
+            align-items:
+              stretch;
+
+            flex-direction:
+              column;
           }
 
           .undo {
@@ -3491,15 +4639,23 @@ export default function Home() {
           }
 
           .paymentPerson {
-            grid-template-columns: 40px 1fr;
+            grid-template-columns:
+              40px
+              1fr;
           }
 
           .paymentPerson button {
-            grid-column: 1 / -1;
+            grid-column:
+              1 /
+              -1;
+
             width: 100%;
           }
+
         }
+
       `}</style>
+
     </main>
   );
 }
