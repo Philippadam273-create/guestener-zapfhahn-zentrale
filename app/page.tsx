@@ -7,6 +7,10 @@ type Event = {
   id: string;
   title: string;
   invite_code: string | null;
+  cost_overview_enabled: boolean;
+  ranking_enabled: boolean;
+  show_promille: boolean;
+  created_by_profile_id: string | null;
 };
 
 type Profile = {
@@ -81,9 +85,11 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [now, setNow] = useState(Date.now());
 
+  const [loading, setLoading] = useState(false);
+
   useEffect(() => {
-    loadEvents();
     loadProfiles();
+    loadEvents();
 
     const savedProfile = localStorage.getItem(
       "guesten-current-profile"
@@ -92,6 +98,12 @@ export default function Home() {
     if (savedProfile) {
       setCurrentProfileId(savedProfile);
     }
+
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 60000);
+
+    return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -104,14 +116,6 @@ export default function Home() {
 
     refreshEvent();
   }, [eventId]);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setNow(Date.now());
-    }, 60000);
-
-    return () => clearInterval(timer);
-  }, []);
 
   async function refreshEvent() {
     await Promise.all([
@@ -126,25 +130,54 @@ export default function Home() {
   async function loadEvents() {
     const { data, error } = await supabase
       .from("events")
-      .select("id,title,invite_code")
+      .select(`
+        id,
+        title,
+        invite_code,
+        cost_overview_enabled,
+        ranking_enabled,
+        show_promille,
+        created_by_profile_id
+      `)
       .order("start_date", {
         ascending: false,
       });
 
     if (error) {
-      setMessage("❌ Events: " + error.message);
+      setMessage(
+        "❌ Events: " + error.message
+      );
       return;
     }
 
-    const result = data || [];
+    const result: Event[] = (data || []).map(
+      (event: any) => ({
+        id: event.id,
+        title: event.title,
+        invite_code:
+          event.invite_code || null,
+        cost_overview_enabled:
+          event.cost_overview_enabled ?? true,
+        ranking_enabled:
+          event.ranking_enabled ?? true,
+        show_promille:
+          event.show_promille ?? true,
+        created_by_profile_id:
+          event.created_by_profile_id || null,
+      })
+    );
 
     setEvents(result);
 
-    if (!result.length) return;
+    if (!result.length) {
+      setEventId("");
+      return;
+    }
 
-    const saved = localStorage.getItem(
-      "guesten-active-event"
-    );
+    const saved =
+      localStorage.getItem(
+        "guesten-active-event"
+      );
 
     const exists = result.some(
       (event) => event.id === saved
@@ -161,12 +194,22 @@ export default function Home() {
     const { data, error } = await supabase
       .from("profiles")
       .select(
-        "id,username,points,drinks_count,gewicht_kg,alter,geschlecht"
+        `
+        id,
+        username,
+        points,
+        drinks_count,
+        gewicht_kg,
+        alter,
+        geschlecht
+        `
       )
       .order("username");
 
     if (error) {
-      setMessage("❌ Profile: " + error.message);
+      setMessage(
+        "❌ Profile: " + error.message
+      );
       return;
     }
 
@@ -174,9 +217,10 @@ export default function Home() {
 
     setProfiles(result);
 
-    const saved = localStorage.getItem(
-      "guesten-current-profile"
-    );
+    const saved =
+      localStorage.getItem(
+        "guesten-current-profile"
+      );
 
     const validSaved = result.some(
       (profile) => profile.id === saved
@@ -222,37 +266,43 @@ export default function Home() {
 
     if (error) {
       setMessage(
-        "❌ Teilnehmer: " + error.message
+        "❌ Teilnehmer: " +
+          error.message
       );
       return;
     }
 
-    const result: Member[] = (data || []).map(
-      (row: any) => {
-        const profile = Array.isArray(
-          row.profiles
-        )
+    const result: Member[] = (
+      data || []
+    ).map((row: any) => {
+      const profile =
+        Array.isArray(row.profiles)
           ? row.profiles[0]
           : row.profiles;
 
-        return {
-          id: row.id,
-          profile_id: row.profile_id,
-          username:
-            profile?.username || "Teilnehmer",
-          points: Number(profile?.points || 0),
-          drinks: Number(
-            profile?.drinks_count || 0
-          ),
-          gewicht_kg: Number(
-            profile?.gewicht_kg || 82
-          ),
-          alter: Number(profile?.alter || 33),
-          geschlecht:
-            profile?.geschlecht || "männlich",
-        };
-      }
-    );
+      return {
+        id: row.id,
+        profile_id: row.profile_id,
+        username:
+          profile?.username ||
+          "Teilnehmer",
+        points: Number(
+          profile?.points || 0
+        ),
+        drinks: Number(
+          profile?.drinks_count || 0
+        ),
+        gewicht_kg: Number(
+          profile?.gewicht_kg || 82
+        ),
+        alter: Number(
+          profile?.alter || 33
+        ),
+        geschlecht:
+          profile?.geschlecht ||
+          "männlich",
+      };
+    });
 
     setMembers(result);
   }
@@ -280,7 +330,8 @@ export default function Home() {
 
     if (error) {
       setMessage(
-        "❌ Getränke: " + error.message
+        "❌ Getränke: " +
+          error.message
       );
       return;
     }
@@ -294,7 +345,13 @@ export default function Home() {
     const { data, error } = await supabase
       .from("drink_consumptions")
       .select(
-        "id,event_id,drink_id,profile_id,created_at"
+        `
+        id,
+        event_id,
+        drink_id,
+        profile_id,
+        created_at
+        `
       )
       .eq("event_id", eventId)
       .order("created_at", {
@@ -303,7 +360,8 @@ export default function Home() {
 
     if (error) {
       setMessage(
-        "❌ Trinkverlauf: " + error.message
+        "❌ Trinkverlauf: " +
+          error.message
       );
       return;
     }
@@ -317,13 +375,21 @@ export default function Home() {
     const { data, error } = await supabase
       .from("payments")
       .select(
-        "id,event_id,profile_id,bezahlt_von,betrag,status"
+        `
+        id,
+        event_id,
+        profile_id,
+        bezahlt_von,
+        betrag,
+        status
+        `
       )
       .eq("event_id", eventId);
 
     if (error) {
       setMessage(
-        "❌ Zahlungen: " + error.message
+        "❌ Zahlungen: " +
+          error.message
       );
       return;
     }
@@ -334,17 +400,36 @@ export default function Home() {
   async function loadInviteCode() {
     if (!eventId) return;
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("events")
       .select("invite_code")
       .eq("id", eventId)
       .single();
 
-    setInviteCode(data?.invite_code || "");
+    if (!error) {
+      setInviteCode(
+        data?.invite_code || ""
+      );
+    }
   }
 
   async function createInviteCode() {
     if (!eventId) return;
+
+    const event = events.find(
+      (item) => item.id === eventId
+    );
+
+    if (
+      !event ||
+      event.created_by_profile_id !==
+        currentProfileId
+    ) {
+      setMessage(
+        "❌ Nur der Event-Ersteller darf den Einladungscode ändern."
+      );
+      return;
+    }
 
     const code = Math.random()
       .toString(36)
@@ -359,14 +444,28 @@ export default function Home() {
       .eq("id", eventId);
 
     if (error) {
-      setMessage("❌ Code: " + error.message);
+      setMessage(
+        "❌ Code: " + error.message
+      );
       return;
     }
 
     setInviteCode(code);
-    setMessage("✅ Einladungscode erstellt.");
 
-    await loadEvents();
+    setEvents((previous) =>
+      previous.map((item) =>
+        item.id === eventId
+          ? {
+              ...item,
+              invite_code: code,
+            }
+          : item
+      )
+    );
+
+    setMessage(
+      "✅ Neuer Einladungscode erstellt."
+    );
   }
 
   async function copyInviteCode() {
@@ -401,11 +500,27 @@ export default function Home() {
       return;
     }
 
-    const { data: event } = await supabase
-      .from("events")
-      .select("id,title,invite_code")
-      .eq("invite_code", code)
-      .maybeSingle();
+    const { data: event, error } =
+      await supabase
+        .from("events")
+        .select(`
+          id,
+          title,
+          invite_code,
+          cost_overview_enabled,
+          ranking_enabled,
+          show_promille,
+          created_by_profile_id
+        `)
+        .eq("invite_code", code)
+        .maybeSingle();
+
+    if (error) {
+      setMessage(
+        "❌ Event: " + error.message
+      );
+      return;
+    }
 
     if (!event) {
       setMessage(
@@ -417,7 +532,8 @@ export default function Home() {
     const profile =
       profiles.find(
         (item) =>
-          item.id === currentProfileId
+          item.id ===
+          currentProfileId
       ) || profiles[0];
 
     if (!profile) {
@@ -439,7 +555,7 @@ export default function Home() {
         .maybeSingle();
 
     if (!existing) {
-      const { error } =
+      const { error: insertError } =
         await supabase
           .from("event_members")
           .insert({
@@ -450,19 +566,60 @@ export default function Home() {
             joined_via_code: code,
           });
 
-      if (error) {
+      if (insertError) {
         setMessage(
           "❌ Beitreten: " +
-            error.message
+            insertError.message
         );
         return;
       }
     }
 
+    const normalized: Event = {
+      id: event.id,
+      title: event.title,
+      invite_code:
+        event.invite_code || null,
+      cost_overview_enabled:
+        event.cost_overview_enabled ??
+        true,
+      ranking_enabled:
+        event.ranking_enabled ??
+        true,
+      show_promille:
+        event.show_promille ??
+        true,
+      created_by_profile_id:
+        event.created_by_profile_id ||
+        null,
+    };
+
+    setEvents((previous) => {
+      const exists = previous.some(
+        (item) =>
+          item.id === normalized.id
+      );
+
+      return exists
+        ? previous.map((item) =>
+            item.id === normalized.id
+              ? normalized
+              : item
+          )
+        : [normalized, ...previous];
+    });
+
+    setCurrentProfileId(
+      profile.id
+    );
+
+    localStorage.setItem(
+      "guesten-current-profile",
+      profile.id
+    );
+
     setEventId(event.id);
     setJoinCode("");
-
-    await loadMembers();
 
     setMessage(
       `✅ Du bist dem Event „${event.title}“ beigetreten.`
@@ -495,7 +652,8 @@ export default function Home() {
         .from("event_members")
         .insert({
           event_id: eventId,
-          profile_id: selectedProfile,
+          profile_id:
+            selectedProfile,
           joined_at:
             new Date().toISOString(),
         });
@@ -509,6 +667,7 @@ export default function Home() {
     }
 
     setSelectedProfile("");
+
     await loadMembers();
 
     setMessage(
@@ -541,6 +700,8 @@ export default function Home() {
   }
 
   async function saveDrink() {
+    setMessage("");
+
     if (!eventId) {
       setMessage(
         "❌ Kein Event ausgewählt."
@@ -555,19 +716,67 @@ export default function Home() {
       return;
     }
 
+    const drinkLiters =
+      Number(liters);
+
+    const alcoholValue =
+      Number(alcohol);
+
+    const priceValue =
+      Number(price);
+
+    if (
+      !Number.isFinite(
+        drinkLiters
+      ) ||
+      drinkLiters <= 0
+    ) {
+      setMessage(
+        "❌ Bitte eine gültige Literzahl eingeben."
+      );
+      return;
+    }
+
+    if (
+      !Number.isFinite(
+        alcoholValue
+      ) ||
+      alcoholValue < 0
+    ) {
+      setMessage(
+        "❌ Bitte einen gültigen Alkoholwert eingeben."
+      );
+      return;
+    }
+
+    if (
+      !Number.isFinite(
+        priceValue
+      ) ||
+      priceValue < 0
+    ) {
+      setMessage(
+        "❌ Bitte einen gültigen Preis eingeben."
+      );
+      return;
+    }
+
     const { error } =
       await supabase
         .from("drinks")
         .insert({
           event_id: eventId,
-          drink_name: drinkName.trim(),
-          getraenk: drinkName.trim(),
-          liters: Number(liters),
-          menge: Number(liters),
+          drink_name:
+            drinkName.trim(),
+          getraenk:
+            drinkName.trim(),
+          liters: drinkLiters,
+          menge: drinkLiters,
           alcohol_percent:
-            Number(alcohol),
-          alkohol: Number(alcohol),
-          preis: Number(price),
+            alcoholValue,
+          alkohol:
+            alcoholValue,
+          preis: priceValue,
           quantity: 1,
         });
 
@@ -591,7 +800,9 @@ export default function Home() {
     );
   }
 
-  function getDrinkName(drink: Drink) {
+  function getDrinkName(
+    drink: Drink
+  ) {
     return (
       drink.drink_name ||
       drink.getraenk ||
@@ -599,7 +810,9 @@ export default function Home() {
     );
   }
 
-  function getDrinkLiters(drink: Drink) {
+  function getDrinkLiters(
+    drink: Drink
+  ) {
     return Number(
       drink.liters ??
         drink.menge ??
@@ -607,7 +820,9 @@ export default function Home() {
     );
   }
 
-  function getDrinkAlcohol(drink: Drink) {
+  function getDrinkAlcohol(
+    drink: Drink
+  ) {
     return Number(
       drink.alcohol_percent ??
         drink.alkohol ??
@@ -615,27 +830,13 @@ export default function Home() {
     );
   }
 
-  /*
-   * WICHTIG:
-   * Anzahl Getränke und Punkte werden NICHT
-   * mehr aus profiles.drinks_count / profiles.points
-   * genommen.
-   *
-   * Sie werden direkt aus den tatsächlich
-   * gespeicherten Trinkvorgängen berechnet.
-   *
-   * Dadurch können Daten wie:
-   * 10 Trinkvorgänge
-   * aber nur 4 Getränke / 40 Punkte
-   * nicht mehr entstehen.
-   */
-
   function getMemberConsumptions(
     profileId: string
   ) {
     return consumptions.filter(
       (item) =>
-        item.profile_id === profileId
+        item.profile_id ===
+        profileId
     );
   }
 
@@ -650,9 +851,11 @@ export default function Home() {
   function getMemberPoints(
     profileId: string
   ) {
-    return getMemberDrinkCount(
-      profileId
-    ) * 10;
+    return (
+      getMemberDrinkCount(
+        profileId
+      ) * 10
+    );
   }
 
   function calculatePromille(
@@ -743,9 +946,18 @@ export default function Home() {
   async function drinkNow(
     drinkId: string
   ) {
+    setMessage("");
+
     if (!currentProfileId) {
       setMessage(
         "❌ Bitte zuerst einen Teilnehmer auswählen."
+      );
+      return;
+    }
+
+    if (!eventId) {
+      setMessage(
+        "❌ Kein Event ausgewählt."
       );
       return;
     }
@@ -763,7 +975,9 @@ export default function Home() {
       return;
     }
 
-    const { error } =
+    setLoading(true);
+
+    const { data, error } =
       await supabase
         .from("drink_consumptions")
         .insert({
@@ -771,9 +985,21 @@ export default function Home() {
           drink_id: drinkId,
           profile_id:
             currentProfileId,
-        });
+        })
+        .select(
+          `
+          id,
+          event_id,
+          drink_id,
+          profile_id,
+          created_at
+          `
+        )
+        .single();
 
     if (error) {
+      setLoading(false);
+
       setMessage(
         "❌ Trinkvorgang: " +
           error.message
@@ -782,12 +1008,20 @@ export default function Home() {
     }
 
     /*
-     * Die Anzeige wird anschließend ausschließlich
-     * aus drink_consumptions berechnet.
-     *
-     * profiles.points und profiles.drinks_count
-     * werden trotzdem synchronisiert.
+     * Sofort lokalen Zustand aktualisieren.
+     * Dadurch entsteht nicht mehr das alte Problem,
+     * dass der neu hinzugefügte Trinkvorgang beim
+     * anschließenden Berechnen noch fehlt.
      */
+    if (data) {
+      setConsumptions(
+        (previous) => [
+          data as Consumption,
+          ...previous,
+        ]
+      );
+    }
+
     const newCount =
       getMemberDrinkCount(
         currentProfileId
@@ -807,8 +1041,9 @@ export default function Home() {
         currentProfileId
       );
 
-    await loadConsumptions();
     await loadMembers();
+
+    setLoading(false);
 
     setMessage(
       "🍺 Getränk hinzugefügt. +10 Punkte"
@@ -845,17 +1080,21 @@ export default function Home() {
       return;
     }
 
-    /*
-     * Nach dem Löschen werden Punkte und
-     * Getränkezähler aus den verbleibenden
-     * Trinkvorgängen neu synchronisiert.
-     */
-    await loadConsumptions();
+    const updated =
+      consumptions.filter(
+        (item) =>
+          item.id !==
+          consumption.id
+      );
+
+    setConsumptions(updated);
 
     const remaining =
-      getMemberDrinkCount(
-        consumption.profile_id
-      );
+      updated.filter(
+        (item) =>
+          item.profile_id ===
+          consumption.profile_id
+      ).length;
 
     await supabase
       .from("profiles")
@@ -970,6 +1209,72 @@ export default function Home() {
     );
   }
 
+  async function updateEventSetting(
+    setting:
+      | "cost_overview_enabled"
+      | "ranking_enabled"
+      | "show_promille",
+    value: boolean
+  ) {
+    if (!eventId) return;
+
+    const event = events.find(
+      (item) => item.id === eventId
+    );
+
+    if (!event) return;
+
+    if (
+      event.created_by_profile_id !==
+      currentProfileId
+    ) {
+      setMessage(
+        "❌ Nur der Ersteller des Events darf die Einstellungen ändern."
+      );
+      return;
+    }
+
+    const { error } = await supabase
+      .from("events")
+      .update({
+        [setting]: value,
+      })
+      .eq("id", eventId);
+
+    if (error) {
+      setMessage(
+        "❌ Einstellung: " +
+          error.message
+      );
+      return;
+    }
+
+    setEvents((previous) =>
+      previous.map((item) =>
+        item.id === eventId
+          ? {
+              ...item,
+              [setting]: value,
+            }
+          : item
+      )
+    );
+
+    setMessage(
+      "✅ Event-Einstellung geändert."
+    );
+  }
+
+  const activeEvent =
+    events.find(
+      (event) => event.id === eventId
+    );
+
+  const isEventCreator =
+    !!activeEvent &&
+    activeEvent.created_by_profile_id ===
+      currentProfileId;
+
   const drinkUsage =
     useMemo(() => {
       const result: Record<
@@ -979,8 +1284,8 @@ export default function Home() {
 
       for (const item of consumptions) {
         result[item.drink_id] =
-          (result[item.drink_id] || 0) +
-          1;
+          (result[item.drink_id] ||
+            0) + 1;
       }
 
       return result;
@@ -997,11 +1302,6 @@ export default function Home() {
       [drinks, drinkUsage]
     );
 
-  /*
-   * Kosten = tatsächlich getrunkene Getränke
-   * und NICHT die Anzahl der Getränke in der
-   * Getränkeliste.
-   */
   const totalCost =
     consumptions.reduce(
       (sum, consumption) => {
@@ -1126,7 +1426,9 @@ export default function Home() {
         </header>
 
         <section className="card">
-          <h2>📅 Aktuelles Event</h2>
+          <h2>
+            📅 Aktuelles Event
+          </h2>
 
           <select
             value={eventId}
@@ -1177,20 +1479,131 @@ export default function Home() {
                 </button>
               </div>
 
-              <button
-                className="newCode"
-                onClick={
-                  createInviteCode
-                }
-              >
-                🔄 Neuen Code erstellen
-              </button>
+              {isEventCreator && (
+                <button
+                  className="newCode"
+                  onClick={
+                    createInviteCode
+                  }
+                >
+                  🔄 Neuen Code erstellen
+                </button>
+              )}
             </div>
           )}
         </section>
 
+        {activeEvent &&
+          isEventCreator && (
+            <section className="card settingsCard">
+              <h2>
+                ⚙️ Event-Verwaltung
+              </h2>
+
+              <p>
+                Nur der Ersteller kann
+                diese Einstellungen ändern.
+              </p>
+
+              <div className="setting">
+                <div>
+                  <strong>
+                    💶 Kostenberechnung
+                  </strong>
+
+                  <small>
+                    Kostenaufteilung und
+                    Zahlungen anzeigen.
+                  </small>
+                </div>
+
+                <button
+                  className={
+                    activeEvent.cost_overview_enabled
+                      ? "toggle on"
+                      : "toggle off"
+                  }
+                  onClick={() =>
+                    updateEventSetting(
+                      "cost_overview_enabled",
+                      !activeEvent.cost_overview_enabled
+                    )
+                  }
+                >
+                  {activeEvent.cost_overview_enabled
+                    ? "🟢 AN"
+                    : "⚫ AUS"}
+                </button>
+              </div>
+
+              <div className="setting">
+                <div>
+                  <strong>
+                    🏆 Ranking
+                  </strong>
+
+                  <small>
+                    Punkte und Rangliste
+                    anzeigen.
+                  </small>
+                </div>
+
+                <button
+                  className={
+                    activeEvent.ranking_enabled
+                      ? "toggle on"
+                      : "toggle off"
+                  }
+                  onClick={() =>
+                    updateEventSetting(
+                      "ranking_enabled",
+                      !activeEvent.ranking_enabled
+                    )
+                  }
+                >
+                  {activeEvent.ranking_enabled
+                    ? "🟢 AN"
+                    : "⚫ AUS"}
+                </button>
+              </div>
+
+              <div className="setting">
+                <div>
+                  <strong>
+                    🍷 Promille
+                  </strong>
+
+                  <small>
+                    Promilleanzeige
+                    anzeigen.
+                  </small>
+                </div>
+
+                <button
+                  className={
+                    activeEvent.show_promille
+                      ? "toggle on"
+                      : "toggle off"
+                  }
+                  onClick={() =>
+                    updateEventSetting(
+                      "show_promille",
+                      !activeEvent.show_promille
+                    )
+                  }
+                >
+                  {activeEvent.show_promille
+                    ? "🟢 AN"
+                    : "⚫ AUS"}
+                </button>
+              </div>
+            </section>
+          )}
+
         <section className="card">
-          <h2>👥 Event beitreten</h2>
+          <h2>
+            👥 Event beitreten
+          </h2>
 
           <p>
             Einladungscode eingeben:
@@ -1222,9 +1635,11 @@ export default function Home() {
 
           <div className="stat">
             <span>🍺</span>
+
             <strong>
               {consumptions.length}
             </strong>
+
             <small>
               Getrunken
             </small>
@@ -1232,29 +1647,37 @@ export default function Home() {
 
           <div className="stat">
             <span>💧</span>
+
             <strong>
               {totalLiters.toFixed(1)}
             </strong>
+
             <small>
               Liter
             </small>
           </div>
 
-          <div className="stat">
-            <span>💶</span>
-            <strong>
-              {totalCost.toFixed(2)} €
-            </strong>
-            <small>
-              Tatsächlich getrunken
-            </small>
-          </div>
+          {activeEvent?.cost_overview_enabled && (
+            <div className="stat">
+              <span>💶</span>
+
+              <strong>
+                {totalCost.toFixed(2)} €
+              </strong>
+
+              <small>
+                Tatsächlich getrunken
+              </small>
+            </div>
+          )}
 
           <div className="stat">
             <span>👥</span>
+
             <strong>
               {members.length}
             </strong>
+
             <small>
               Teilnehmer
             </small>
@@ -1263,7 +1686,9 @@ export default function Home() {
         </div>
 
         <section className="card">
-          <h2>👥 Teilnehmer</h2>
+          <h2>
+            👥 Teilnehmer
+          </h2>
 
           <div className="profileSelect">
             <label>
@@ -1275,13 +1700,16 @@ export default function Home() {
                 currentProfileId
               }
               onChange={(e) => {
+                const id =
+                  e.target.value;
+
                 setCurrentProfileId(
-                  e.target.value
+                  id
                 );
 
                 localStorage.setItem(
                   "guesten-current-profile",
-                  e.target.value
+                  id
                 );
               }}
             >
@@ -1373,7 +1801,6 @@ export default function Home() {
                 className="member"
                 key={member.id}
               >
-
                 <div className="avatar">
                   {member.username
                     .charAt(0)
@@ -1398,13 +1825,15 @@ export default function Home() {
                     {" Punkte"}
                   </small>
 
-                  <small className="promilleSmall">
-                    🍷{" "}
-                    {calculatePromille(
-                      member.profile_id
-                    ).toFixed(2)}
-                    {" ‰"}
-                  </small>
+                  {activeEvent?.show_promille && (
+                    <small className="promilleSmall">
+                      🍷{" "}
+                      {calculatePromille(
+                        member.profile_id
+                      ).toFixed(2)}
+                      {" ‰"}
+                    </small>
+                  )}
                 </div>
 
                 <button
@@ -1417,11 +1846,9 @@ export default function Home() {
                 >
                   ×
                 </button>
-
               </div>
             )
           )}
-
         </section>
 
         <section className="card">
@@ -1444,6 +1871,7 @@ export default function Home() {
             <input
               type="number"
               step="0.1"
+              min="0.01"
               value={liters}
               onChange={(e) =>
                 setLiters(
@@ -1455,6 +1883,8 @@ export default function Home() {
 
             <input
               type="number"
+              step="0.1"
+              min="0"
               value={alcohol}
               onChange={(e) =>
                 setAlcohol(
@@ -1467,6 +1897,7 @@ export default function Home() {
             <input
               type="number"
               step="0.01"
+              min="0"
               value={price}
               onChange={(e) =>
                 setPrice(
@@ -1489,8 +1920,9 @@ export default function Home() {
         </section>
 
         <section className="card">
-
-          <h2>🍺 Getränke</h2>
+          <h2>
+            🍺 Getränke
+          </h2>
 
           <p>
             Getränk anklicken, um es
@@ -1510,7 +1942,6 @@ export default function Home() {
                   className="drink"
                   key={drink.id}
                 >
-
                   <div className="drinkMain">
 
                     <div className="drinkIcon">
@@ -1537,20 +1968,22 @@ export default function Home() {
                         × getrunken
                       </small>
 
-                      <small>
-                        {Number(
-                          drink.preis || 0
-                        ).toFixed(2)}
-                        € pro Getränk
-                      </small>
+                      {activeEvent?.cost_overview_enabled && (
+                        <small>
+                          {Number(
+                            drink.preis || 0
+                          ).toFixed(2)}
+                          € pro Getränk
+                        </small>
+                      )}
                     </div>
-
                   </div>
 
                   <button
                     className="drinkButton"
                     disabled={
-                      !currentProfileId
+                      !currentProfileId ||
+                      loading
                     }
                     onClick={() =>
                       drinkNow(
@@ -1563,16 +1996,13 @@ export default function Home() {
                       "Teilnehmer"}{" "}
                     +1
                   </button>
-
                 </div>
               );
             }
           )}
-
         </section>
 
         <section className="card">
-
           <h2>
             🍻 Meine Getränke
           </h2>
@@ -1606,7 +2036,6 @@ export default function Home() {
                       consumption.id
                     }
                   >
-
                     <div>
                       <strong>
                         🍺{" "}
@@ -1641,83 +2070,81 @@ export default function Home() {
                     >
                       ↩️ Entfernen
                     </button>
-
                   </div>
                 );
               }
             )
           )}
-
         </section>
 
-        <section className="card promilleCard">
+        {activeEvent?.show_promille && (
+          <section className="card promilleCard">
 
-          <h2>
-            🍷 Aktuelle Promille
-          </h2>
+            <h2>
+              🍷 Aktuelle Promille
+            </h2>
 
-          {currentMember ? (
-            <>
-              <h3>
-                {currentMember.username}
-              </h3>
+            {currentMember ? (
+              <>
+                <h3>
+                  {currentMember.username}
+                </h3>
 
+                <p>
+                  Gewicht:{" "}
+                  {currentMember.gewicht_kg}
+                  {" kg · Alter: "}
+                  {currentMember.alter}
+                </p>
+
+                <div className="promille">
+                  {currentPromille.toFixed(2)}
+                  {" ‰"}
+                </div>
+
+                <div className="promilleInfo">
+                  <strong>
+                    🔄 Automatisch aktuell
+                  </strong>
+
+                  <small>
+                    Die Berechnung berücksichtigt
+                    die einzelnen Trinkzeiten und
+                    den geschätzten Alkoholabbau.
+                  </small>
+
+                  <small>
+                    Letzte Aktualisierung:{" "}
+                    {new Date(
+                      now
+                    ).toLocaleTimeString(
+                      "de-DE",
+                      {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }
+                    )}
+                  </small>
+                </div>
+
+                <p className="warning">
+                  ⚠️ Die Promilleanzeige ist
+                  nur eine rechnerische Schätzung
+                  und darf nicht zur Beurteilung
+                  der Fahrtüchtigkeit verwendet
+                  werden.
+                </p>
+              </>
+            ) : (
               <p>
-                Gewicht:{" "}
-                {currentMember.gewicht_kg}
-                {" kg · Alter: "}
-                {currentMember.alter}
+                Bitte zuerst einen
+                Teilnehmer auswählen.
               </p>
-
-              <div className="promille">
-                {currentPromille.toFixed(2)}
-                {" ‰"}
-              </div>
-
-              <div className="promilleInfo">
-                <strong>
-                  🔄 Automatisch aktuell
-                </strong>
-
-                <small>
-                  Die Berechnung berücksichtigt
-                  die einzelnen Trinkzeiten und
-                  den geschätzten Alkoholabbau.
-                </small>
-
-                <small>
-                  Letzte Aktualisierung:{" "}
-                  {new Date(
-                    now
-                  ).toLocaleTimeString(
-                    "de-DE",
-                    {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    }
-                  )}
-                </small>
-              </div>
-
-              <p className="warning">
-                ⚠️ Die Promilleanzeige ist
-                nur eine rechnerische Schätzung
-                und darf nicht zur Beurteilung
-                der Fahrtüchtigkeit verwendet
-                werden.
-              </p>
-            </>
-          ) : (
-            <p>
-              Bitte zuerst einen
-              Teilnehmer auswählen.
-            </p>
-          )}
-
-        </section>
+            )}
+          </section>
+        )}
 
         <section className="card">
-
           <h2>
             📋 Trinkverlauf
           </h2>
@@ -1751,7 +2178,6 @@ export default function Home() {
                       consumption.id
                     }
                   >
-
                     <div>
                       <strong>
                         🍺{" "}
@@ -1782,224 +2208,226 @@ export default function Home() {
                     <span>
                       +10
                     </span>
-
                   </div>
                 );
               }
             )
           )}
-
         </section>
 
-        <section className="card">
+        {activeEvent?.cost_overview_enabled && (
+          <section className="card">
 
-          <h2>
-            💶 Kostenaufteilung
-          </h2>
+            <h2>
+              💶 Kostenaufteilung
+            </h2>
 
-          <div className="total">
-            {totalCost.toFixed(2)} €
-          </div>
-
-          <p className="center">
-            Tatsächlich getrunkene Getränke
-          </p>
-
-          <div className="row">
-            <span>
-              🍺 Getrunken
-            </span>
-
-            <strong>
-              {consumptions.length}
-            </strong>
-          </div>
-
-          <div className="row">
-            <span>
-              👥 Teilnehmer
-            </span>
-
-            <strong>
-              {members.length}
-            </strong>
-          </div>
-
-          <div className="row">
-            <span>
-              💶 Pro Person
-            </span>
-
-            <strong>
-              {amountPerPerson.toFixed(2)}
-              {" €"}
-            </strong>
-          </div>
-
-          <div className="paymentSummary">
-
-            <div className="paymentBox paid">
-              <span>✅</span>
-
-              <strong>
-                {paidCount}
-              </strong>
-
-              <small>
-                Bezahlt
-              </small>
+            <div className="total">
+              {totalCost.toFixed(2)} €
             </div>
 
-            <div className="paymentBox open">
-              <span>⏳</span>
+            <p className="center">
+              Tatsächlich getrunkene Getränke
+            </p>
+
+            <div className="row">
+              <span>
+                🍺 Getrunken
+              </span>
 
               <strong>
-                {openCount}
+                {consumptions.length}
               </strong>
-
-              <small>
-                Offen
-              </small>
             </div>
 
-          </div>
+            <div className="row">
+              <span>
+                👥 Teilnehmer
+              </span>
 
-          <h3>
-            💶 Zahlungen
-          </h3>
+              <strong>
+                {members.length}
+              </strong>
+            </div>
 
-          {members.map(
-            (member) => {
+            <div className="row">
+              <span>
+                💶 Pro Person
+              </span>
 
-              const payment =
-                payments.find(
-                  (item) =>
-                    item.profile_id ===
-                    member.profile_id
-                );
+              <strong>
+                {amountPerPerson.toFixed(2)}
+                {" €"}
+              </strong>
+            </div>
 
-              const isPaid =
-                payment?.status ===
-                "bezahlt";
+            <div className="paymentSummary">
 
-              return (
-                <div
-                  className={
-                    isPaid
-                      ? "paymentPerson paidRow"
-                      : "paymentPerson"
-                  }
-                  key={member.id}
-                >
+              <div className="paymentBox paid">
+                <span>✅</span>
 
-                  <div className="paymentAvatar">
-                    {member.username
-                      .charAt(0)
-                      .toUpperCase()}
-                  </div>
+                <strong>
+                  {paidCount}
+                </strong>
 
-                  <div className="paymentInfo">
-                    <strong>
-                      {member.username}
-                    </strong>
+                <small>
+                  Bezahlt
+                </small>
+              </div>
 
-                    <small>
-                      Anteil:{" "}
-                      {amountPerPerson.toFixed(
-                        2
-                      )}
-                      {" €"}
-                    </small>
-                  </div>
+              <div className="paymentBox open">
+                <span>⏳</span>
 
-                  <button
+                <strong>
+                  {openCount}
+                </strong>
+
+                <small>
+                  Offen
+                </small>
+              </div>
+
+            </div>
+
+            <h3>
+              💶 Zahlungen
+            </h3>
+
+            {members.map(
+              (member) => {
+
+                const payment =
+                  payments.find(
+                    (item) =>
+                      item.profile_id ===
+                      member.profile_id
+                  );
+
+                const isPaid =
+                  payment?.status ===
+                  "bezahlt";
+
+                return (
+                  <div
                     className={
                       isPaid
-                        ? "paidButton"
-                        : "openButton"
+                        ? "paymentPerson paidRow"
+                        : "paymentPerson"
                     }
-                    onClick={() =>
-                      togglePayment(
-                        member
-                      )
-                    }
+                    key={member.id}
                   >
-                    {isPaid
-                      ? "✅ Bezahlt"
-                      : "⏳ Offen"}
-                  </button>
+                    <div className="paymentAvatar">
+                      {member.username
+                        .charAt(0)
+                        .toUpperCase()}
+                    </div>
 
-                </div>
-              );
-            }
-          )}
+                    <div className="paymentInfo">
+                      <strong>
+                        {member.username}
+                      </strong>
 
-        </section>
+                      <small>
+                        Anteil:{" "}
+                        {amountPerPerson.toFixed(
+                          2
+                        )}
+                        {" €"}
+                      </small>
+                    </div>
 
-        <section className="card">
-
-          <h2>
-            🏆 Ranking
-          </h2>
-
-          {ranking.map(
-            (member, index) => {
-
-              const count =
-                getMemberDrinkCount(
-                  member.profile_id
-                );
-
-              const points =
-                getMemberPoints(
-                  member.profile_id
-                );
-
-              return (
-                <div
-                  className="ranking"
-                  key={member.id}
-                >
-
-                  <span className="rank">
-                    {index === 0
-                      ? "🥇"
-                      : index === 1
-                      ? "🥈"
-                      : index === 2
-                      ? "🥉"
-                      : index + 1}
-                  </span>
-
-                  <div>
-                    <strong>
-                      {member.username}
-                    </strong>
-
-                    <small>
-                      🍺 {count}
-                    </small>
+                    <button
+                      className={
+                        isPaid
+                          ? "paidButton"
+                          : "openButton"
+                      }
+                      onClick={() =>
+                        togglePayment(
+                          member
+                        )
+                      }
+                    >
+                      {isPaid
+                        ? "✅ Bezahlt"
+                        : "⏳ Offen"}
+                    </button>
                   </div>
+                );
+              }
+            )}
+          </section>
+        )}
 
-                  <div className="points">
-                    {points}
+        {activeEvent?.ranking_enabled && (
+          <section className="card">
 
-                    <small>
-                      Punkte
-                    </small>
-                  </div>
+            <h2>
+              🏆 Ranking
+            </h2>
 
-                </div>
-              );
-            }
-          )}
+            {ranking.length === 0 ? (
+              <p>
+                Noch keine Teilnehmer.
+              </p>
+            ) : (
+              ranking.map(
+                (member, index) => {
 
-          <div className="totalPoints">
-            🏆 Gesamtpunkte:{" "}
-            {totalPoints}
-          </div>
+                  const count =
+                    getMemberDrinkCount(
+                      member.profile_id
+                    );
 
-        </section>
+                  const points =
+                    getMemberPoints(
+                      member.profile_id
+                    );
+
+                  return (
+                    <div
+                      className="ranking"
+                      key={member.id}
+                    >
+                      <span className="rank">
+                        {index === 0
+                          ? "🥇"
+                          : index === 1
+                          ? "🥈"
+                          : index === 2
+                          ? "🥉"
+                          : index + 1}
+                      </span>
+
+                      <div>
+                        <strong>
+                          {member.username}
+                        </strong>
+
+                        <small>
+                          🍺 {count}
+                        </small>
+                      </div>
+
+                      <div className="points">
+                        {points}
+
+                        <small>
+                          Punkte
+                        </small>
+                      </div>
+                    </div>
+                  );
+                }
+              )
+            )}
+
+            <div className="totalPoints">
+              🏆 Gesamtpunkte:{" "}
+              {totalPoints}
+            </div>
+          </section>
+        )}
 
         {message && (
           <div className="message">
@@ -2017,7 +2445,6 @@ export default function Home() {
             Deine Runde.
           </small>
         </footer>
-
       </div>
 
       <style jsx>{`
@@ -2133,6 +2560,35 @@ export default function Home() {
           margin: 0;
           text-transform: uppercase;
           letter-spacing: 3px;
+        }
+
+        .settingsCard {
+          border: 1px solid rgba(245,158,11,.3);
+        }
+
+        .setting {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 15px;
+          padding: 14px;
+          margin-top: 10px;
+          border-radius: 14px;
+          background: rgba(255,255,255,.05);
+        }
+
+        .toggle {
+          min-width: 85px;
+        }
+
+        .toggle.on {
+          background: #22c55e;
+          color: white;
+        }
+
+        .toggle.off {
+          background: #334155;
+          color: white;
         }
 
         .stats {
@@ -2492,6 +2948,15 @@ export default function Home() {
             font-size: 22px;
           }
 
+          .setting {
+            align-items: stretch;
+            flex-direction: column;
+          }
+
+          .toggle {
+            width: 100%;
+          }
+
           .drink {
             align-items: stretch;
             flex-direction: column;
@@ -2520,7 +2985,6 @@ export default function Home() {
           }
         }
       `}</style>
-
     </main>
   );
 }
