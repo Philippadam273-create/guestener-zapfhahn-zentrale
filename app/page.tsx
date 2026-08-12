@@ -7,7 +7,6 @@ type Event = {
   id: string;
   title: string;
   invite_code: string | null;
-
   cost_overview_enabled: boolean;
   auto_split_costs: boolean;
   ranking_enabled: boolean;
@@ -23,7 +22,6 @@ type Event = {
   ai_recognition_enabled: boolean;
   manual_entry_allowed: boolean;
   privacy_mode: boolean;
-
   created_by_profile_id: string | null;
 };
 
@@ -112,8 +110,8 @@ export default function Home() {
   const [selectedProfile, setSelectedProfile] = useState("");
   const [currentProfileId, setCurrentProfileId] = useState("");
 
-  const [joinCode, setJoinCode] = useState("");
   const [inviteCode, setInviteCode] = useState("");
+  const [joinCode, setJoinCode] = useState("");
 
   const [message, setMessage] = useState("");
   const [now, setNow] = useState(Date.now());
@@ -123,7 +121,8 @@ export default function Home() {
     useState<SettingKey | null>(null);
 
   const currentEvent = useMemo(
-    () => events.find((event) => event.id === eventId) || null,
+    () =>
+      events.find((event) => event.id === eventId) || null,
     [events, eventId]
   );
 
@@ -132,10 +131,13 @@ export default function Home() {
     !!currentProfileId &&
     currentEvent.created_by_profile_id === currentProfileId;
 
-  useEffect(() => {
-    loadProfiles();
-    loadEvents();
+  /*
+   * ---------------------------------------------------------
+   * START
+   * ---------------------------------------------------------
+   */
 
+  useEffect(() => {
     const savedProfile = localStorage.getItem(
       "guesten-current-profile"
     );
@@ -143,17 +145,10 @@ export default function Home() {
     if (savedProfile) {
       setCurrentProfileId(savedProfile);
     }
-  }, []);
 
-  useEffect(() => {
-    if (!eventId) return;
+    loadProfiles();
+    loadEvents();
 
-    localStorage.setItem("guesten-active-event", eventId);
-
-    refreshEvent();
-  }, [eventId]);
-
-  useEffect(() => {
     const timer = setInterval(() => {
       setNow(Date.now());
     }, 60000);
@@ -161,13 +156,41 @@ export default function Home() {
     return () => clearInterval(timer);
   }, []);
 
-  function showMessage(text: string) {
-    setMessage(text);
+  useEffect(() => {
+    if (!eventId) return;
 
-    setTimeout(() => {
-      setMessage("");
-    }, 5000);
-  }
+    localStorage.setItem(
+      "guesten-active-event",
+      eventId
+    );
+
+    refreshEvent();
+  }, [eventId]);
+
+  /*
+   * Wenn Profile UND Event geladen sind,
+   * wird der Ersteller automatisch Teilnehmer.
+   */
+  useEffect(() => {
+    if (
+      currentEvent &&
+      currentProfileId &&
+      currentEvent.created_by_profile_id ===
+        currentProfileId
+    ) {
+      ensureCreatorIsMember();
+    }
+  }, [
+    currentEvent,
+    currentProfileId,
+    profiles.length,
+  ]);
+
+  /*
+   * ---------------------------------------------------------
+   * DATEN LADEN
+   * ---------------------------------------------------------
+   */
 
   async function refreshEvent() {
     await Promise.all([
@@ -208,7 +231,7 @@ export default function Home() {
       });
 
     if (error) {
-      showMessage("❌ Events: " + error.message);
+      setMessage("❌ Events: " + error.message);
       return;
     }
 
@@ -245,7 +268,7 @@ export default function Home() {
       .order("username");
 
     if (error) {
-      showMessage("❌ Profile: " + error.message);
+      setMessage("❌ Profile: " + error.message);
       return;
     }
 
@@ -261,7 +284,7 @@ export default function Home() {
       (profile) => profile.id === saved
     );
 
-    if (!currentProfileId && result.length) {
+    if (result.length) {
       const id =
         saved && validSaved
           ? saved
@@ -297,12 +320,14 @@ export default function Home() {
       .eq("event_id", eventId);
 
     if (error) {
-      showMessage("❌ Teilnehmer: " + error.message);
+      setMessage(
+        "❌ Teilnehmer: " + error.message
+      );
       return;
     }
 
-    const result: Member[] =
-      (data || []).map((row: any) => {
+    const result: Member[] = (data || []).map(
+      (row: any) => {
         const profile = Array.isArray(row.profiles)
           ? row.profiles[0]
           : row.profiles;
@@ -313,15 +338,21 @@ export default function Home() {
           username:
             profile?.username || "Teilnehmer",
           points: Number(profile?.points || 0),
-          drinks: Number(profile?.drinks_count || 0),
+          drinks: Number(
+            profile?.drinks_count || 0
+          ),
           gewicht_kg: Number(
             profile?.gewicht_kg || 82
           ),
-          alter: Number(profile?.alter || 33),
+          alter: Number(
+            profile?.alter || 33
+          ),
           geschlecht:
-            profile?.geschlecht || "männlich",
+            profile?.geschlecht ||
+            "männlich",
         };
-      });
+      }
+    );
 
     setMembers(result);
   }
@@ -348,7 +379,9 @@ export default function Home() {
       });
 
     if (error) {
-      showMessage("❌ Getränke: " + error.message);
+      setMessage(
+        "❌ Getränke: " + error.message
+      );
       return;
     }
 
@@ -369,8 +402,9 @@ export default function Home() {
       });
 
     if (error) {
-      showMessage(
-        "❌ Trinkverlauf: " + error.message
+      setMessage(
+        "❌ Trinkverlauf: " +
+          error.message
       );
       return;
     }
@@ -389,7 +423,10 @@ export default function Home() {
       .eq("event_id", eventId);
 
     if (error) {
-      showMessage("❌ Zahlungen: " + error.message);
+      setMessage(
+        "❌ Zahlungen: " +
+          error.message
+      );
       return;
     }
 
@@ -405,27 +442,92 @@ export default function Home() {
       .eq("id", eventId)
       .single();
 
-    setInviteCode(data?.invite_code || "");
+    setInviteCode(
+      data?.invite_code || ""
+    );
   }
 
-  async function copyInviteCode() {
-    if (!inviteCode) return;
+  /*
+   * ---------------------------------------------------------
+   * ERSTELLER AUTOMATISCH ALS TEILNEHMER
+   * ---------------------------------------------------------
+   */
 
-    try {
-      await navigator.clipboard.writeText(
-        inviteCode
-      );
-
-      showMessage("✅ Einladungscode kopiert.");
-    } catch {
-      showMessage("ℹ️ Code: " + inviteCode);
+  async function ensureCreatorIsMember() {
+    if (
+      !currentEvent ||
+      !currentProfileId ||
+      currentEvent.created_by_profile_id !==
+        currentProfileId
+    ) {
+      return;
     }
+
+    const alreadyMember = members.some(
+      (member) =>
+        member.profile_id === currentProfileId
+    );
+
+    if (alreadyMember) {
+      return;
+    }
+
+    const { data: existing, error: checkError } =
+      await supabase
+        .from("event_members")
+        .select("id")
+        .eq("event_id", currentEvent.id)
+        .eq("profile_id", currentProfileId)
+        .maybeSingle();
+
+    if (checkError) {
+      console.error(
+        "Mitgliedschaft prüfen:",
+        checkError
+      );
+      return;
+    }
+
+    if (existing) {
+      await loadMembers();
+      return;
+    }
+
+    const { error } = await supabase
+      .from("event_members")
+      .insert({
+        event_id: currentEvent.id,
+        profile_id: currentProfileId,
+        joined_at: new Date().toISOString(),
+      });
+
+    if (error) {
+      console.error(
+        "Ersteller konnte nicht automatisch hinzugefügt werden:",
+        error
+      );
+      return;
+    }
+
+    await loadMembers();
+
+    setMessage(
+      "✅ Du wurdest automatisch als Teilnehmer hinzugefügt."
+    );
   }
+
+  /*
+   * ---------------------------------------------------------
+   * EINLADUNG
+   * ---------------------------------------------------------
+   */
 
   async function createInviteCode() {
-    if (!eventId || !isEventCreator) {
-      showMessage(
-        "❌ Nur der Ersteller kann den Code ändern."
+    if (!eventId) return;
+
+    if (!isEventCreator) {
+      setMessage(
+        "❌ Nur der Ersteller kann den Einladungscode ändern."
       );
       return;
     }
@@ -445,36 +547,73 @@ export default function Home() {
       .eq("id", eventId);
 
     if (error) {
-      showMessage("❌ Code: " + error.message);
+      setMessage(
+        "❌ Code: " + error.message
+      );
       return;
     }
 
     setInviteCode(code);
-    await loadEvents();
 
-    showMessage(
+    setEvents((old) =>
+      old.map((event) =>
+        event.id === eventId
+          ? {
+              ...event,
+              invite_code: code,
+            }
+          : event
+      )
+    );
+
+    setMessage(
       "✅ Neuer Einladungscode erstellt."
     );
   }
 
+  async function copyInviteCode() {
+    if (!inviteCode) return;
+
+    try {
+      await navigator.clipboard.writeText(
+        inviteCode
+      );
+
+      setMessage(
+        "✅ Einladungscode kopiert."
+      );
+    } catch {
+      setMessage(
+        "ℹ️ Code: " + inviteCode
+      );
+    }
+  }
+
   async function joinEventWithCode() {
-    const code = joinCode.trim().toUpperCase();
+    setMessage("");
+
+    const code = joinCode
+      .trim()
+      .toUpperCase();
 
     if (!code) {
-      showMessage(
+      setMessage(
         "❌ Bitte Einladungscode eingeben."
       );
       return;
     }
 
-    const { data: event } = await supabase
-      .from("events")
-      .select("id,title,invite_code")
-      .eq("invite_code", code)
-      .maybeSingle();
+    const { data: event } =
+      await supabase
+        .from("events")
+        .select(
+          "id,title,invite_code"
+        )
+        .eq("invite_code", code)
+        .maybeSingle();
 
     if (!event) {
-      showMessage(
+      setMessage(
         "❌ Einladungscode ist ungültig."
       );
       return;
@@ -487,55 +626,80 @@ export default function Home() {
       ) || profiles[0];
 
     if (!profile) {
-      showMessage("❌ Kein Profil vorhanden.");
+      setMessage(
+        "❌ Kein Profil vorhanden."
+      );
       return;
     }
 
-    const { data: existing } = await supabase
-      .from("event_members")
-      .select("id")
-      .eq("event_id", event.id)
-      .eq("profile_id", profile.id)
-      .maybeSingle();
+    const { data: existing } =
+      await supabase
+        .from("event_members")
+        .select("id")
+        .eq("event_id", event.id)
+        .eq("profile_id", profile.id)
+        .maybeSingle();
 
     if (!existing) {
-      const { error } = await supabase
-        .from("event_members")
-        .insert({
-          event_id: event.id,
-          profile_id: profile.id,
-          joined_at: new Date().toISOString(),
-          joined_via_code: code,
-        });
+      const { error } =
+        await supabase
+          .from("event_members")
+          .insert({
+            event_id: event.id,
+            profile_id: profile.id,
+            joined_at:
+              new Date().toISOString(),
+            joined_via_code: code,
+          });
 
       if (error) {
-        showMessage(
-          "❌ Beitreten: " + error.message
+        setMessage(
+          "❌ Beitreten: " +
+            error.message
         );
         return;
       }
     }
 
+    setCurrentProfileId(profile.id);
+
+    localStorage.setItem(
+      "guesten-current-profile",
+      profile.id
+    );
+
     setEventId(event.id);
+
+    localStorage.setItem(
+      "guesten-active-event",
+      event.id
+    );
+
     setJoinCode("");
 
     await loadMembers();
 
-    showMessage(
+    setMessage(
       `✅ Du bist dem Event „${event.title}“ beigetreten.`
     );
   }
 
+  /*
+   * ---------------------------------------------------------
+   * TEILNEHMER
+   * ---------------------------------------------------------
+   */
+
   async function addParticipant() {
     if (!eventId || !selectedProfile) {
-      showMessage(
+      setMessage(
         "❌ Bitte Teilnehmer auswählen."
       );
       return;
     }
 
     if (!isEventCreator) {
-      showMessage(
+      setMessage(
         "❌ Nur der Ersteller kann Teilnehmer hinzufügen."
       );
       return;
@@ -548,23 +712,26 @@ export default function Home() {
           selectedProfile
       )
     ) {
-      showMessage(
+      setMessage(
         "❌ Teilnehmer ist bereits dabei."
       );
       return;
     }
 
-    const { error } = await supabase
-      .from("event_members")
-      .insert({
-        event_id: eventId,
-        profile_id: selectedProfile,
-        joined_at: new Date().toISOString(),
-      });
+    const { error } =
+      await supabase
+        .from("event_members")
+        .insert({
+          event_id: eventId,
+          profile_id: selectedProfile,
+          joined_at:
+            new Date().toISOString(),
+        });
 
     if (error) {
-      showMessage(
-        "❌ Teilnehmer: " + error.message
+      setMessage(
+        "❌ Teilnehmer: " +
+          error.message
       );
       return;
     }
@@ -573,7 +740,7 @@ export default function Home() {
 
     await loadMembers();
 
-    showMessage(
+    setMessage(
       "✅ Teilnehmer hinzugefügt."
     );
   }
@@ -582,34 +749,59 @@ export default function Home() {
     memberId: string
   ) {
     if (!isEventCreator) {
-      showMessage(
+      setMessage(
         "❌ Nur der Ersteller kann Teilnehmer entfernen."
       );
       return;
     }
 
-    const { error } = await supabase
-      .from("event_members")
-      .delete()
-      .eq("id", memberId);
+    const member =
+      members.find(
+        (item) => item.id === memberId
+      );
+
+    if (
+      member &&
+      member.profile_id === currentProfileId
+    ) {
+      setMessage(
+        "❌ Der Ersteller kann sich nicht selbst aus dem Event entfernen."
+      );
+      return;
+    }
+
+    const { error } =
+      await supabase
+        .from("event_members")
+        .delete()
+        .eq("id", memberId);
 
     if (error) {
-      showMessage(
-        "❌ Entfernen: " + error.message
+      setMessage(
+        "❌ Entfernen: " +
+          error.message
       );
       return;
     }
 
     await loadMembers();
 
-    showMessage(
+    setMessage(
       "✅ Teilnehmer entfernt."
     );
   }
 
+  /*
+   * ---------------------------------------------------------
+   * GETRÄNKE
+   * ---------------------------------------------------------
+   */
+
   async function saveDrink() {
+    setMessage("");
+
     if (!eventId) {
-      showMessage(
+      setMessage(
         "❌ Kein Event ausgewählt."
       );
       return;
@@ -619,70 +811,38 @@ export default function Home() {
       currentEvent &&
       !currentEvent.manual_entry_allowed
     ) {
-      showMessage(
-        "❌ Manuelle Getränkeeingabe ist deaktiviert."
+      setMessage(
+        "❌ Manuelle Getränkeeingabe ist für dieses Event deaktiviert."
       );
       return;
     }
 
     if (!drinkName.trim()) {
-      showMessage(
+      setMessage(
         "❌ Bitte Getränk eingeben."
       );
       return;
     }
 
-    const literValue = Number(liters);
-    const alcoholValue = Number(alcohol);
-    const priceValue = Number(price);
-
-    if (
-      !Number.isFinite(literValue) ||
-      literValue <= 0
-    ) {
-      showMessage(
-        "❌ Bitte eine gültige Literzahl eingeben."
-      );
-      return;
-    }
-
-    if (
-      !Number.isFinite(alcoholValue) ||
-      alcoholValue < 0
-    ) {
-      showMessage(
-        "❌ Bitte einen gültigen Alkoholwert eingeben."
-      );
-      return;
-    }
-
-    if (
-      !Number.isFinite(priceValue) ||
-      priceValue < 0
-    ) {
-      showMessage(
-        "❌ Bitte einen gültigen Preis eingeben."
-      );
-      return;
-    }
-
-    const { error } = await supabase
-      .from("drinks")
-      .insert({
-        event_id: eventId,
-        drink_name: drinkName.trim(),
-        getraenk: drinkName.trim(),
-        liters: literValue,
-        menge: literValue,
-        alcohol_percent: alcoholValue,
-        alkohol: alcoholValue,
-        preis: priceValue,
-        quantity: 1,
-      });
+    const { error } =
+      await supabase
+        .from("drinks")
+        .insert({
+          event_id: eventId,
+          drink_name: drinkName.trim(),
+          getraenk: drinkName.trim(),
+          liters: Number(liters),
+          menge: Number(liters),
+          alcohol_percent: Number(alcohol),
+          alkohol: Number(alcohol),
+          preis: Number(price),
+          quantity: 1,
+        });
 
     if (error) {
-      showMessage(
-        "❌ Getränk: " + error.message
+      setMessage(
+        "❌ Getränk: " +
+          error.message
       );
       return;
     }
@@ -694,10 +854,16 @@ export default function Home() {
 
     await loadDrinks();
 
-    showMessage(
+    setMessage(
       "✅ Getränk gespeichert."
     );
   }
+
+  /*
+   * ---------------------------------------------------------
+   * EVENT EINSTELLUNGEN
+   * ---------------------------------------------------------
+   */
 
   async function toggleEventSetting(
     key: SettingKey
@@ -705,28 +871,34 @@ export default function Home() {
     if (!currentEvent) return;
 
     if (!isEventCreator) {
-      showMessage(
+      setMessage(
         "❌ Nur der Ersteller kann Event-Einstellungen ändern."
       );
       return;
     }
 
-    const value = !currentEvent[key];
+    const value =
+      !currentEvent[key];
 
     setSavingSetting(key);
 
-    const { error } = await supabase
-      .from("events")
-      .update({
-        [key]: value,
-      })
-      .eq("id", currentEvent.id);
+    const { error } =
+      await supabase
+        .from("events")
+        .update({
+          [key]: value,
+        })
+        .eq(
+          "id",
+          currentEvent.id
+        );
 
     setSavingSetting(null);
 
     if (error) {
-      showMessage(
-        "❌ Einstellung: " + error.message
+      setMessage(
+        "❌ Einstellung: " +
+          error.message
       );
       return;
     }
@@ -742,10 +914,16 @@ export default function Home() {
       )
     );
 
-    showMessage(
+    setMessage(
       "✅ Event-Einstellung geändert."
     );
   }
+
+  /*
+   * ---------------------------------------------------------
+   * HILFSFUNKTIONEN
+   * ---------------------------------------------------------
+   */
 
   function getDrinkName(drink: Drink) {
     return (
@@ -792,18 +970,27 @@ export default function Home() {
     profileId: string
   ) {
     return (
-      getMemberDrinkCount(profileId) *
-      10
+      getMemberDrinkCount(
+        profileId
+      ) * 10
     );
   }
+
+  /*
+   * ---------------------------------------------------------
+   * PROMILLE
+   * ---------------------------------------------------------
+   */
 
   function calculatePromille(
     profileId: string
   ) {
-    const member = members.find(
-      (item) =>
-        item.profile_id === profileId
-    );
+    const member =
+      members.find(
+        (item) =>
+          item.profile_id ===
+          profileId
+      );
 
     if (!member) return 0;
 
@@ -826,53 +1013,68 @@ export default function Home() {
 
     let result = 0;
 
-    for (const consumption of personal) {
-      const drink = drinks.find(
-        (item) =>
-          item.id ===
-          consumption.drink_id
-      );
+    for (
+      const consumption of personal
+    ) {
+      const drink =
+        drinks.find(
+          (item) =>
+            item.id ===
+            consumption.drink_id
+        );
 
       if (!drink) continue;
 
       const alcoholGrams =
         getDrinkLiters(drink) *
         1000 *
-        (getDrinkAlcohol(drink) / 100) *
+        (getDrinkAlcohol(drink) /
+          100) *
         0.789;
 
       const initial =
         alcoholGrams /
         (weight * faktor);
 
-      const elapsedHours = Math.max(
-        0,
-        (now -
-          new Date(
-            consumption.created_at
-          ).getTime()) /
-          3600000
-      );
+      const elapsedHours =
+        Math.max(
+          0,
+          (now -
+            new Date(
+              consumption.created_at
+            ).getTime()) /
+            3600000
+        );
 
-      const remaining = Math.max(
-        0,
-        initial -
-          elapsedHours * 0.15
-      );
+      const remaining =
+        Math.max(
+          0,
+          initial -
+            elapsedHours * 0.15
+        );
 
       result += remaining;
     }
 
     return Number(
-      Math.max(0, result).toFixed(2)
+      Math.max(
+        0,
+        result
+      ).toFixed(2)
     );
   }
+
+  /*
+   * ---------------------------------------------------------
+   * GETRÄNK TRINKEN
+   * ---------------------------------------------------------
+   */
 
   async function drinkNow(
     drinkId: string
   ) {
     if (!currentProfileId) {
-      showMessage(
+      setMessage(
         "❌ Bitte zuerst einen Teilnehmer auswählen."
       );
       return;
@@ -885,22 +1087,24 @@ export default function Home() {
           currentProfileId
       )
     ) {
-      showMessage(
+      setMessage(
         "❌ Teilnehmer ist nicht im Event."
       );
       return;
     }
 
-    const { error } = await supabase
-      .from("drink_consumptions")
-      .insert({
-        event_id: eventId,
-        drink_id: drinkId,
-        profile_id: currentProfileId,
-      });
+    const { error } =
+      await supabase
+        .from("drink_consumptions")
+        .insert({
+          event_id: eventId,
+          drink_id: drinkId,
+          profile_id:
+            currentProfileId,
+        });
 
     if (error) {
-      showMessage(
+      setMessage(
         "❌ Trinkvorgang: " +
           error.message
       );
@@ -918,12 +1122,17 @@ export default function Home() {
         drinks_count: newCount,
         points: newCount * 10,
       })
-      .eq("id", currentProfileId);
+      .eq(
+        "id",
+        currentProfileId
+      );
 
-    await loadConsumptions();
-    await loadMembers();
+    await Promise.all([
+      loadConsumptions(),
+      loadMembers(),
+    ]);
 
-    showMessage(
+    setMessage(
       "🍺 Getränk hinzugefügt. +10 Punkte"
     );
   }
@@ -935,49 +1144,68 @@ export default function Home() {
       consumption.profile_id !==
       currentProfileId
     ) {
-      showMessage(
+      setMessage(
         "❌ Du kannst nur deine eigenen Getränke entfernen."
       );
       return;
     }
 
-    const { error } = await supabase
-      .from("drink_consumptions")
-      .delete()
-      .eq("id", consumption.id);
+    const { error } =
+      await supabase
+        .from("drink_consumptions")
+        .delete()
+        .eq(
+          "id",
+          consumption.id
+        );
 
     if (error) {
-      showMessage(
+      setMessage(
         "❌ Entfernen: " +
           error.message
       );
       return;
     }
 
-    await loadConsumptions();
-
     const remaining =
       getMemberDrinkCount(
         consumption.profile_id
-      );
+      ) - 1;
 
     await supabase
       .from("profiles")
       .update({
-        drinks_count: remaining,
-        points: remaining * 10,
+        drinks_count:
+          Math.max(
+            0,
+            remaining
+          ),
+        points:
+          Math.max(
+            0,
+            remaining
+          ) * 10,
       })
       .eq(
         "id",
         consumption.profile_id
       );
 
-    await loadMembers();
+    await Promise.all([
+      loadConsumptions(),
+      loadMembers(),
+    ]);
 
-    showMessage(
+    setMessage(
       "↩️ Getränk entfernt."
     );
   }
+
+  /*
+   * ---------------------------------------------------------
+   * ZAHLUNGEN
+   * ---------------------------------------------------------
+   */
 
   async function togglePayment(
     member: Member
@@ -988,28 +1216,31 @@ export default function Home() {
       return;
     }
 
-    const total = consumptions.reduce(
-      (sum, consumption) => {
-        const drink = drinks.find(
-          (item) =>
-            item.id ===
-            consumption.drink_id
-        );
+    const totalCost =
+      consumptions.reduce(
+        (sum, consumption) => {
+          const drink =
+            drinks.find(
+              (item) =>
+                item.id ===
+                consumption.drink_id
+            );
 
-        return (
-          sum +
-          Number(
-            drink?.preis || 0
-          )
-        );
-      },
-      0
-    );
+          return (
+            sum +
+            Number(
+              drink?.preis || 0
+            )
+          );
+        },
+        0
+      );
 
-    const perPerson =
+    const amountPerPerson =
       currentEvent.auto_split_costs &&
       members.length
-        ? total / members.length
+        ? totalCost /
+          members.length
         : 0;
 
     const existing =
@@ -1030,7 +1261,8 @@ export default function Home() {
           .from("payments")
           .update({
             status,
-            betrag: perPerson,
+            betrag:
+              amountPerPerson,
           })
           .eq(
             "id",
@@ -1038,7 +1270,7 @@ export default function Home() {
           );
 
       if (error) {
-        showMessage(
+        setMessage(
           "❌ Zahlung: " +
             error.message
         );
@@ -1054,12 +1286,13 @@ export default function Home() {
               member.profile_id,
             bezahlt_von:
               member.profile_id,
-            betrag: perPerson,
+            betrag:
+              amountPerPerson,
             status,
           });
 
       if (error) {
-        showMessage(
+        setMessage(
           "❌ Zahlung: " +
             error.message
         );
@@ -1069,12 +1302,18 @@ export default function Home() {
 
     await loadPayments();
 
-    showMessage(
+    setMessage(
       status === "bezahlt"
         ? `✅ ${member.username} hat bezahlt.`
         : `↩️ ${member.username} wieder auf offen gesetzt.`
     );
   }
+
+  /*
+   * ---------------------------------------------------------
+   * BERECHNUNGEN
+   * ---------------------------------------------------------
+   */
 
   const drinkUsage = useMemo(() => {
     const result: Record<
@@ -1082,7 +1321,9 @@ export default function Home() {
       number
     > = {};
 
-    for (const item of consumptions) {
+    for (
+      const item of consumptions
+    ) {
       result[item.drink_id] =
         (result[item.drink_id] || 0) +
         1;
@@ -1091,88 +1332,100 @@ export default function Home() {
     return result;
   }, [consumptions]);
 
-  const sortedDrinks = useMemo(
-    () =>
-      [...drinks].sort(
-        (a, b) =>
-          (drinkUsage[b.id] || 0) -
-          (drinkUsage[a.id] || 0)
-      ),
-    [drinks, drinkUsage]
-  );
+  const sortedDrinks =
+    useMemo(
+      () =>
+        [...drinks].sort(
+          (a, b) =>
+            (drinkUsage[b.id] || 0) -
+            (drinkUsage[a.id] || 0)
+        ),
+      [drinks, drinkUsage]
+    );
 
-  const totalCost = consumptions.reduce(
-    (sum, consumption) => {
-      const drink = drinks.find(
-        (item) =>
-          item.id ===
-          consumption.drink_id
-      );
+  const totalCost =
+    consumptions.reduce(
+      (sum, consumption) => {
+        const drink =
+          drinks.find(
+            (item) =>
+              item.id ===
+              consumption.drink_id
+          );
 
-      return (
-        sum +
-        Number(drink?.preis || 0)
-      );
-    },
-    0
-  );
+        return (
+          sum +
+          Number(
+            drink?.preis || 0
+          )
+        );
+      },
+      0
+    );
 
-  const totalLiters = consumptions.reduce(
-    (sum, consumption) => {
-      const drink = drinks.find(
-        (item) =>
-          item.id ===
-          consumption.drink_id
-      );
+  const totalLiters =
+    consumptions.reduce(
+      (sum, consumption) => {
+        const drink =
+          drinks.find(
+            (item) =>
+              item.id ===
+              consumption.drink_id
+          );
 
-      return (
-        sum +
-        (drink
-          ? getDrinkLiters(drink)
-          : 0)
-      );
-    },
-    0
-  );
+        return (
+          sum +
+          (drink
+            ? getDrinkLiters(drink)
+            : 0)
+        );
+      },
+      0
+    );
 
   const amountPerPerson =
     currentEvent?.auto_split_costs &&
     members.length
-      ? totalCost / members.length
+      ? totalCost /
+        members.length
       : 0;
 
-  const totalPoints = members.reduce(
-    (sum, member) =>
-      sum +
-      getMemberPoints(
-        member.profile_id
-      ),
-    0
-  );
+  const totalPoints =
+    members.reduce(
+      (sum, member) =>
+        sum +
+        getMemberPoints(
+          member.profile_id
+        ),
+      0
+    );
 
-  const ranking = [...members].sort(
-    (a, b) =>
-      getMemberPoints(
-        b.profile_id
-      ) -
-      getMemberPoints(
-        a.profile_id
-      )
-  );
+  const ranking =
+    [...members].sort(
+      (a, b) =>
+        getMemberPoints(
+          b.profile_id
+        ) -
+        getMemberPoints(
+          a.profile_id
+        )
+    );
 
-  const paidCount = members.filter(
-    (member) =>
-      payments.some(
-        (payment) =>
-          payment.profile_id ===
-            member.profile_id &&
-          payment.status ===
-            "bezahlt"
-      )
-  ).length;
+  const paidCount =
+    members.filter(
+      (member) =>
+        payments.some(
+          (payment) =>
+            payment.profile_id ===
+              member.profile_id &&
+            payment.status ===
+              "bezahlt"
+        )
+    ).length;
 
   const openCount =
-    members.length - paidCount;
+    members.length -
+    paidCount;
 
   const currentMember =
     members.find(
@@ -1195,6 +1448,96 @@ export default function Home() {
         )
       : 0;
 
+  /*
+   * ---------------------------------------------------------
+   * EINSTELLUNGEN
+   * ---------------------------------------------------------
+   */
+
+  function settingLabel(
+    key: SettingKey
+  ) {
+    const labels: Record<
+      SettingKey,
+      string
+    > = {
+      cost_overview_enabled:
+        "💶 Kostenberechnung",
+      auto_split_costs:
+        "➗ Kosten automatisch teilen",
+      ranking_enabled:
+        "🏆 Ranking",
+      show_points:
+        "⭐ Punkte",
+      show_ranking:
+        "🏆 Rangliste",
+      show_promille:
+        "🍷 Promille",
+      show_statistics:
+        "📊 Statistiken",
+      show_drink_amounts:
+        "🍺 Trinkmengen",
+      show_costs:
+        "💰 Getränkepreise",
+      team_mode:
+        "👥 Team-Modus",
+      show_photos:
+        "📸 Fotos",
+      photo_required:
+        "📷 Foto erforderlich",
+      ai_recognition_enabled:
+        "🤖 KI-Erkennung",
+      manual_entry_allowed:
+        "✍️ Manuelle Eingabe",
+      privacy_mode:
+        "🔒 Privatsphäre-Modus",
+    };
+
+    return labels[key];
+  }
+
+  function settingDescription(
+    key: SettingKey
+  ) {
+    const descriptions: Record<
+      SettingKey,
+      string
+    > = {
+      cost_overview_enabled:
+        "Kostenaufteilung und Zahlungen anzeigen.",
+      auto_split_costs:
+        "Gesamtkosten automatisch gleichmäßig verteilen.",
+      ranking_enabled:
+        "Das komplette Ranking aktivieren.",
+      show_points:
+        "Punkte bei Teilnehmern anzeigen.",
+      show_ranking:
+        "Die Rangliste anzeigen.",
+      show_promille:
+        "Promilleanzeige anzeigen.",
+      show_statistics:
+        "Statistikbereich anzeigen.",
+      show_drink_amounts:
+        "Getrunkene Mengen anzeigen.",
+      show_costs:
+        "Preise der Getränke anzeigen.",
+      team_mode:
+        "Teilnehmer in Teams organisieren.",
+      show_photos:
+        "Fotos bei Getränken erlauben.",
+      photo_required:
+        "Bei jedem Getränk ein Foto verlangen.",
+      ai_recognition_enabled:
+        "KI-Erkennung für Getränke aktivieren.",
+      manual_entry_allowed:
+        "Getränke manuell eingeben erlauben.",
+      privacy_mode:
+        "Persönliche Daten stärker ausblenden.",
+    };
+
+    return descriptions[key];
+  }
+
   const settings: SettingKey[] = [
     "cost_overview_enabled",
     "auto_split_costs",
@@ -1213,77 +1556,11 @@ export default function Home() {
     "privacy_mode",
   ];
 
-  const settingLabels: Record<
-    SettingKey,
-    string
-  > = {
-    cost_overview_enabled:
-      "💶 Kostenberechnung",
-    auto_split_costs:
-      "➗ Kosten automatisch teilen",
-    ranking_enabled:
-      "🏆 Ranking",
-    show_points:
-      "⭐ Punkte",
-    show_ranking:
-      "🏆 Rangliste",
-    show_promille:
-      "🍷 Promille",
-    show_statistics:
-      "📊 Statistiken",
-    show_drink_amounts:
-      "🍺 Trinkmengen",
-    show_costs:
-      "💰 Getränkepreise",
-    team_mode:
-      "👥 Team-Modus",
-    show_photos:
-      "📸 Fotos",
-    photo_required:
-      "📷 Foto erforderlich",
-    ai_recognition_enabled:
-      "🤖 KI-Erkennung",
-    manual_entry_allowed:
-      "✍️ Manuelle Eingabe",
-    privacy_mode:
-      "🔒 Privatsphäre-Modus",
-  };
-
-  const settingDescriptions: Record<
-    SettingKey,
-    string
-  > = {
-    cost_overview_enabled:
-      "Kostenaufteilung und Zahlungen anzeigen.",
-    auto_split_costs:
-      "Gesamtkosten automatisch gleichmäßig verteilen.",
-    ranking_enabled:
-      "Das komplette Ranking aktivieren.",
-    show_points:
-      "Punkte bei Teilnehmern anzeigen.",
-    show_ranking:
-      "Die Rangliste anzeigen.",
-    show_promille:
-      "Promilleanzeige anzeigen.",
-    show_statistics:
-      "Statistikbereich anzeigen.",
-    show_drink_amounts:
-      "Getrunkene Mengen anzeigen.",
-    show_costs:
-      "Preise der Getränke anzeigen.",
-    team_mode:
-      "Teilnehmer in Teams organisieren.",
-    show_photos:
-      "Fotos bei Getränken erlauben.",
-    photo_required:
-      "Bei jedem Getränk ein Foto verlangen.",
-    ai_recognition_enabled:
-      "KI-Erkennung für Getränke aktivieren.",
-    manual_entry_allowed:
-      "Getränke manuell eingeben erlauben.",
-    privacy_mode:
-      "Persönliche Daten stärker ausblenden.",
-  };
+  /*
+   * ---------------------------------------------------------
+   * UI
+   * ---------------------------------------------------------
+   */
 
   return (
     <main className="page">
@@ -1306,7 +1583,9 @@ export default function Home() {
         {/* EVENT */}
 
         <section className="card">
-          <h2>📅 Aktuelles Event</h2>
+          <h2>
+            📅 Aktuelles Event
+          </h2>
 
           <select
             value={eventId}
@@ -1330,7 +1609,9 @@ export default function Home() {
 
           {eventId && (
             <div className="inviteBox">
-              <h3>🔗 Freunde einladen</h3>
+              <h3>
+                🔗 Freunde einladen
+              </h3>
 
               <p>
                 Teile diesen Code:
@@ -1342,7 +1623,9 @@ export default function Home() {
                 </strong>
 
                 <button
-                  onClick={copyInviteCode}
+                  onClick={
+                    copyInviteCode
+                  }
                 >
                   📋 Kopieren
                 </button>
@@ -1372,6 +1655,7 @@ export default function Home() {
                 }
               >
                 ⚙️ Event-Verwaltung
+
                 <span>
                   {settingsOpen
                     ? "▲"
@@ -1383,7 +1667,7 @@ export default function Home() {
                 <div className="settings">
                   <p className="settingsInfo">
                     {isEventCreator
-                      ? "Du bist der Ersteller dieses Events und kannst die Einstellungen ändern."
+                      ? "👑 Du bist der Ersteller dieses Events und kannst die Einstellungen ändern."
                       : "Nur der Ersteller kann diese Einstellungen ändern."}
                   </p>
 
@@ -1398,19 +1682,15 @@ export default function Home() {
                       >
                         <div className="settingText">
                           <strong>
-                            {
-                              settingLabels[
-                                key
-                              ]
-                            }
+                            {settingLabel(
+                              key
+                            )}
                           </strong>
 
                           <small>
-                            {
-                              settingDescriptions[
-                                key
-                              ]
-                            }
+                            {settingDescription(
+                              key
+                            )}
                           </small>
                         </div>
 
@@ -1444,10 +1724,12 @@ export default function Home() {
           )}
         </section>
 
-        {/* BEITRETEN */}
+        {/* EVENT BEITRETEN */}
 
         <section className="card">
-          <h2>👥 Event beitreten</h2>
+          <h2>
+            👥 Event beitreten
+          </h2>
 
           <p>
             Einladungscode eingeben:
@@ -1475,7 +1757,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* STATISTIK */}
+        {/* STATISTIKEN */}
 
         {(!currentEvent ||
           currentEvent.show_statistics) && (
@@ -1486,7 +1768,9 @@ export default function Home() {
               <strong>
                 {consumptions.length}
               </strong>
-              <small>Getrunken</small>
+              <small>
+                Getrunken
+              </small>
             </div>
 
             <div className="stat">
@@ -1494,7 +1778,9 @@ export default function Home() {
               <strong>
                 {totalLiters.toFixed(1)}
               </strong>
-              <small>Liter</small>
+              <small>
+                Liter
+              </small>
             </div>
 
             {(!currentEvent ||
@@ -1515,16 +1801,19 @@ export default function Home() {
               <strong>
                 {members.length}
               </strong>
-              <small>Teilnehmer</small>
+              <small>
+                Teilnehmer
+              </small>
             </div>
-
           </div>
         )}
 
         {/* TEILNEHMER */}
 
         <section className="card">
-          <h2>👥 Teilnehmer</h2>
+          <h2>
+            👥 Teilnehmer
+          </h2>
 
           <div className="profileSelect">
             <label>
@@ -1532,7 +1821,9 @@ export default function Home() {
             </label>
 
             <select
-              value={currentProfileId}
+              value={
+                currentProfileId
+              }
               onChange={(e) => {
                 setCurrentProfileId(
                   e.target.value
@@ -1550,8 +1841,12 @@ export default function Home() {
 
               {members.map((member) => (
                 <option
-                  key={member.profile_id}
-                  value={member.profile_id}
+                  key={
+                    member.profile_id
+                  }
+                  value={
+                    member.profile_id
+                  }
                 >
                   {member.username}
                 </option>
@@ -1570,7 +1865,9 @@ export default function Home() {
             ).length > 0 && (
               <div className="addParticipant">
                 <select
-                  value={selectedProfile}
+                  value={
+                    selectedProfile
+                  }
                   onChange={(e) =>
                     setSelectedProfile(
                       e.target.value
@@ -1592,8 +1889,12 @@ export default function Home() {
                     )
                     .map((profile) => (
                       <option
-                        key={profile.id}
-                        value={profile.id}
+                        key={
+                          profile.id
+                        }
+                        value={
+                          profile.id
+                        }
                       >
                         {profile.username ||
                           "Unbenannt"}
@@ -1660,23 +1961,25 @@ export default function Home() {
                 )}
               </div>
 
-              {isEventCreator && (
-                <button
-                  className="remove"
-                  onClick={() =>
-                    removeParticipant(
-                      member.id
-                    )
-                  }
-                >
-                  ×
-                </button>
-              )}
+              {isEventCreator &&
+                member.profile_id !==
+                  currentProfileId && (
+                  <button
+                    className="remove"
+                    onClick={() =>
+                      removeParticipant(
+                        member.id
+                      )
+                    }
+                  >
+                    ×
+                  </button>
+                )}
             </div>
           ))}
         </section>
 
-        {/* GETRÄNK */}
+        {/* GETRÄNK HINZUFÜGEN */}
 
         {(!currentEvent ||
           currentEvent.manual_entry_allowed) && (
@@ -1734,7 +2037,9 @@ export default function Home() {
 
             <button
               className="save"
-              onClick={saveDrink}
+              onClick={
+                saveDrink
+              }
             >
               🍻 Getränk speichern
             </button>
@@ -1744,7 +2049,9 @@ export default function Home() {
         {/* GETRÄNKE */}
 
         <section className="card">
-          <h2>🍺 Getränke</h2>
+          <h2>
+            🍺 Getränke
+          </h2>
 
           <p>
             Getränk anklicken, um es einem
@@ -1753,12 +2060,14 @@ export default function Home() {
 
           {sortedDrinks.length === 0 ? (
             <div className="empty">
-              Noch keine Getränke angelegt.
+              Noch keine Getränke.
             </div>
           ) : (
             sortedDrinks.map((drink) => {
               const usage =
-                drinkUsage[drink.id] || 0;
+                drinkUsage[
+                  drink.id
+                ] || 0;
 
               return (
                 <div
@@ -1782,12 +2091,14 @@ export default function Home() {
                         <small>
                           {getDrinkLiters(
                             drink
-                          ).toFixed(1)}{" "}
-                          L ·{" "}
+                          ).toFixed(1)}
+                          {" L · "}
                           {getDrinkAlcohol(
                             drink
-                          ).toFixed(1)}{" "}
-                          % · {usage}× getrunken
+                          ).toFixed(1)}
+                          {" % · "}
+                          {usage}
+                          × getrunken
                         </small>
                       )}
 
@@ -1795,7 +2106,8 @@ export default function Home() {
                         currentEvent.show_costs) && (
                         <small>
                           {Number(
-                            drink.preis || 0
+                            drink.preis ||
+                              0
                           ).toFixed(2)}
                           € pro Getränk
                         </small>
@@ -1829,7 +2141,9 @@ export default function Home() {
         {/* MEINE GETRÄNKE */}
 
         <section className="card">
-          <h2>🍻 Meine Getränke</h2>
+          <h2>
+            🍻 Meine Getränke
+          </h2>
 
           <p>
             Hier kannst du eigene
@@ -1875,10 +2189,8 @@ export default function Home() {
                         ).toLocaleTimeString(
                           "de-DE",
                           {
-                            hour:
-                              "2-digit",
-                            minute:
-                              "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
                           }
                         )}
                       </small>
@@ -1918,10 +2230,8 @@ export default function Home() {
 
                 <p>
                   Gewicht:{" "}
-                  {
-                    currentMember.gewicht_kg
-                  }{" "}
-                  kg · Alter:{" "}
+                  {currentMember.gewicht_kg}
+                  {" kg · Alter: "}
                   {currentMember.alter}
                 </p>
 
@@ -1940,7 +2250,7 @@ export default function Home() {
                   <small>
                     Die Berechnung berücksichtigt
                     die einzelnen Trinkzeiten
-                    und einen geschätzten
+                    und den geschätzten
                     Alkoholabbau.
                   </small>
 
@@ -1951,10 +2261,8 @@ export default function Home() {
                     ).toLocaleTimeString(
                       "de-DE",
                       {
-                        hour:
-                          "2-digit",
-                        minute:
-                          "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
                       }
                     )}
                   </small>
@@ -2028,17 +2336,15 @@ export default function Home() {
                             ? getDrinkName(
                                 drink
                               )
-                            : "Getränk"}{" "}
-                          ·{" "}
+                            : "Getränk"}
+                          {" · "}
                           {new Date(
                             consumption.created_at
                           ).toLocaleTimeString(
                             "de-DE",
                             {
-                              hour:
-                                "2-digit",
-                              minute:
-                                "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
                             }
                           )}
                         </small>
@@ -2116,7 +2422,9 @@ export default function Home() {
                 <strong>
                   {paidCount}
                 </strong>
-                <small>Bezahlt</small>
+                <small>
+                  Bezahlt
+                </small>
               </div>
 
               <div className="paymentBox open">
@@ -2124,72 +2432,78 @@ export default function Home() {
                 <strong>
                   {openCount}
                 </strong>
-                <small>Offen</small>
+                <small>
+                  Offen
+                </small>
               </div>
             </div>
 
-            <h3>💶 Zahlungen</h3>
+            <h3>
+              💶 Zahlungen
+            </h3>
 
-            {members.map((member) => {
-              const payment =
-                payments.find(
-                  (item) =>
-                    item.profile_id ===
-                    member.profile_id
-                );
+            {members.map(
+              (member) => {
+                const payment =
+                  payments.find(
+                    (item) =>
+                      item.profile_id ===
+                      member.profile_id
+                  );
 
-              const isPaid =
-                payment?.status ===
-                "bezahlt";
+                const isPaid =
+                  payment?.status ===
+                  "bezahlt";
 
-              return (
-                <div
-                  className={
-                    isPaid
-                      ? "paymentPerson paidRow"
-                      : "paymentPerson"
-                  }
-                  key={member.id}
-                >
-                  <div className="paymentAvatar">
-                    {member.username
-                      .charAt(0)
-                      .toUpperCase()}
-                  </div>
-
-                  <div className="paymentInfo">
-                    <strong>
-                      {member.username}
-                    </strong>
-
-                    <small>
-                      Anteil:{" "}
-                      {amountPerPerson.toFixed(
-                        2
-                      )}{" "}
-                      €
-                    </small>
-                  </div>
-
-                  <button
+                return (
+                  <div
                     className={
                       isPaid
-                        ? "paidButton"
-                        : "openButton"
+                        ? "paymentPerson paidRow"
+                        : "paymentPerson"
                     }
-                    onClick={() =>
-                      togglePayment(
-                        member
-                      )
-                    }
+                    key={member.id}
                   >
-                    {isPaid
-                      ? "✅ Bezahlt"
-                      : "⏳ Offen"}
-                  </button>
-                </div>
-              );
-            })}
+                    <div className="paymentAvatar">
+                      {member.username
+                        .charAt(0)
+                        .toUpperCase()}
+                    </div>
+
+                    <div className="paymentInfo">
+                      <strong>
+                        {member.username}
+                      </strong>
+
+                      <small>
+                        Anteil:{" "}
+                        {amountPerPerson.toFixed(
+                          2
+                        )}{" "}
+                        €
+                      </small>
+                    </div>
+
+                    <button
+                      className={
+                        isPaid
+                          ? "paidButton"
+                          : "openButton"
+                      }
+                      onClick={() =>
+                        togglePayment(
+                          member
+                        )
+                      }
+                    >
+                      {isPaid
+                        ? "✅ Bezahlt"
+                        : "⏳ Offen"}
+                    </button>
+                  </div>
+                );
+              }
+            )}
           </section>
         )}
 
@@ -2200,16 +2514,20 @@ export default function Home() {
           (!currentEvent ||
             currentEvent.show_ranking) && (
             <section className="card">
-              <h2>🏆 Ranking</h2>
+              <h2>
+                🏆 Ranking
+              </h2>
 
-              {ranking.length ===
-              0 ? (
+              {ranking.length === 0 ? (
                 <p>
                   Noch keine Teilnehmer.
                 </p>
               ) : (
                 ranking.map(
-                  (member, index) => {
+                  (
+                    member,
+                    index
+                  ) => {
                     const count =
                       getMemberDrinkCount(
                         member.profile_id
@@ -2295,7 +2613,6 @@ export default function Home() {
             Deine Runde.
           </small>
         </footer>
-
       </div>
 
       <style jsx>{`
@@ -2374,35 +2691,6 @@ export default function Home() {
             rgba(255,255,255,.08);
         }
 
-        input,
-        select {
-          width: 100%;
-          padding: 13px;
-          margin-bottom: 10px;
-          border-radius: 12px;
-          border:
-            1px solid
-            #344252;
-          background: #121a23;
-          color: white;
-          font-size: 15px;
-        }
-
-        button {
-          padding: 13px 17px;
-          border: 0;
-          border-radius: 12px;
-          background: #f59e0b;
-          color: #111;
-          font-weight: bold;
-          cursor: pointer;
-        }
-
-        button:disabled {
-          opacity: .45;
-          cursor: not-allowed;
-        }
-
         .inviteBox {
           margin-top: 15px;
           padding: 16px;
@@ -2425,6 +2713,10 @@ export default function Home() {
           grid-template-columns:
             1fr auto;
           gap: 8px;
+        }
+
+        .codeRow {
+          align-items: center;
         }
 
         .codeRow strong {
@@ -2450,7 +2742,8 @@ export default function Home() {
         .managementButton {
           width: 100%;
           display: flex;
-          justify-content: space-between;
+          justify-content:
+            space-between;
           align-items: center;
           background: #334155;
           color: white;
@@ -2476,7 +2769,8 @@ export default function Home() {
         .setting {
           display: flex;
           align-items: center;
-          justify-content: space-between;
+          justify-content:
+            space-between;
           gap: 12px;
           padding: 13px;
           margin-top: 8px;
@@ -2534,6 +2828,34 @@ export default function Home() {
           display: block;
           font-size: 20px;
           margin-top: 4px;
+        }
+
+        input,
+        select {
+          width: 100%;
+          padding: 13px;
+          margin-bottom: 10px;
+          border-radius: 12px;
+          border:
+            1px solid #344252;
+          background: #121a23;
+          color: white;
+          font-size: 15px;
+        }
+
+        button {
+          padding: 13px 17px;
+          border: 0;
+          border-radius: 12px;
+          background: #f59e0b;
+          color: #111;
+          font-weight: bold;
+          cursor: pointer;
+        }
+
+        button:disabled {
+          opacity: .45;
+          cursor: not-allowed;
         }
 
         .profileSelect {
@@ -2597,7 +2919,8 @@ export default function Home() {
         .drink {
           display: flex;
           align-items: center;
-          justify-content: space-between;
+          justify-content:
+            space-between;
           gap: 12px;
           padding: 12px;
           margin-top: 8px;
@@ -2624,7 +2947,8 @@ export default function Home() {
 
         .consumption {
           display: flex;
-          justify-content: space-between;
+          justify-content:
+            space-between;
           align-items: center;
           gap: 10px;
           padding: 12px;
@@ -2681,7 +3005,8 @@ export default function Home() {
 
         .history {
           display: flex;
-          justify-content: space-between;
+          justify-content:
+            space-between;
           align-items: center;
           padding: 12px;
           margin-top: 8px;
@@ -2708,7 +3033,8 @@ export default function Home() {
 
         .row {
           display: flex;
-          justify-content: space-between;
+          justify-content:
+            space-between;
           padding: 13px;
           margin-top: 8px;
           border-radius: 12px;
@@ -2851,16 +3177,19 @@ export default function Home() {
           }
 
           .three {
-            grid-template-columns: 1fr;
+            grid-template-columns:
+              1fr;
           }
 
           .addParticipant,
           .joinBox {
-            grid-template-columns: 1fr;
+            grid-template-columns:
+              1fr;
           }
 
           .codeRow {
-            grid-template-columns: 1fr;
+            grid-template-columns:
+              1fr;
           }
 
           .codeRow strong {
@@ -2868,7 +3197,12 @@ export default function Home() {
           }
 
           .setting {
-            align-items: flex-start;
+            align-items:
+              flex-start;
+          }
+
+          .settingText {
+            padding-right: 5px;
           }
 
           .toggle {
@@ -2876,8 +3210,10 @@ export default function Home() {
           }
 
           .drink {
-            align-items: stretch;
-            flex-direction: column;
+            align-items:
+              stretch;
+            flex-direction:
+              column;
           }
 
           .drinkButton {
@@ -2885,8 +3221,10 @@ export default function Home() {
           }
 
           .consumption {
-            align-items: stretch;
-            flex-direction: column;
+            align-items:
+              stretch;
+            flex-direction:
+              column;
           }
 
           .undo {
@@ -2899,7 +3237,8 @@ export default function Home() {
           }
 
           .paymentPerson button {
-            grid-column: 1 / -1;
+            grid-column:
+              1 / -1;
             width: 100%;
           }
         }
