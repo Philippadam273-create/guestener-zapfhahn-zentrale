@@ -7,7 +7,6 @@ type Event = {
   id: string;
   title: string;
   invite_code: string | null;
-
   cost_overview_enabled: boolean;
   auto_split_costs: boolean;
   ranking_enabled: boolean;
@@ -121,6 +120,12 @@ export default function Home() {
   const [savingSetting, setSavingSetting] =
     useState<SettingKey | null>(null);
 
+  /* FOTO */
+
+  const [drinkPhoto, setDrinkPhoto] = useState<File | null>(null);
+  const [drinkPhotoPreview, setDrinkPhotoPreview] =
+    useState<string>("");
+
   const currentEvent = useMemo(
     () =>
       events.find((event) => event.id === eventId) || null,
@@ -132,9 +137,6 @@ export default function Home() {
     !!currentProfileId &&
     currentEvent.created_by_profile_id === currentProfileId;
 
-  /*
-   * INITIALISIERUNG
-   */
   useEffect(() => {
     loadProfiles();
     loadEvents();
@@ -148,9 +150,6 @@ export default function Home() {
     }
   }, []);
 
-  /*
-   * EVENT WECHSEL
-   */
   useEffect(() => {
     if (!eventId) return;
 
@@ -162,9 +161,6 @@ export default function Home() {
     refreshEvent();
   }, [eventId]);
 
-  /*
-   * PROMILLE AKTUALISIEREN
-   */
   useEffect(() => {
     const timer = setInterval(() => {
       setNow(Date.now());
@@ -172,6 +168,49 @@ export default function Home() {
 
     return () => clearInterval(timer);
   }, []);
+
+  function handleDrinkPhoto(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setMessage("❌ Bitte ein Bild auswählen.");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setMessage(
+        "❌ Das Foto darf maximal 10 MB groß sein."
+      );
+      return;
+    }
+
+    setDrinkPhoto(file);
+
+    const previewUrl = URL.createObjectURL(file);
+
+    setDrinkPhotoPreview(previewUrl);
+
+    setMessage(
+      "📸 Getränkefoto ausgewählt."
+    );
+  }
+
+  function removeDrinkPhoto() {
+    if (drinkPhotoPreview) {
+      URL.revokeObjectURL(drinkPhotoPreview);
+    }
+
+    setDrinkPhoto(null);
+    setDrinkPhotoPreview("");
+
+    setMessage(
+      "↩️ Getränkefoto entfernt."
+    );
+  }
 
   async function refreshEvent() {
     await Promise.all([
@@ -183,9 +222,6 @@ export default function Home() {
     ]);
   }
 
-  /*
-   * EVENTS
-   */
   async function loadEvents() {
     const { data, error } = await supabase
       .from("events")
@@ -240,9 +276,6 @@ export default function Home() {
     );
   }
 
-  /*
-   * PROFILE
-   */
   async function loadProfiles() {
     const { data, error } = await supabase
       .from("profiles")
@@ -283,9 +316,6 @@ export default function Home() {
     }
   }
 
-  /*
-   * EVENT MITGLIEDER
-   */
   async function loadMembers() {
     if (!eventId) return;
 
@@ -308,7 +338,8 @@ export default function Home() {
 
     if (error) {
       setMessage(
-        "❌ Teilnehmer: " + error.message
+        "❌ Teilnehmer: " +
+          error.message
       );
       return;
     }
@@ -326,30 +357,18 @@ export default function Home() {
           username:
             profile?.username ||
             "Teilnehmer",
-
-          /*
-           * Diese Werte dienen nur als Profildaten.
-           * Punkte/Getränke werden weiter unten
-           * EVENT-BEZOGEN berechnet.
-           */
           points: Number(
             profile?.points || 0
           ),
-
           drinks: Number(
             profile?.drinks_count || 0
           ),
-
-          gewicht_kg:
-            Number(
-              profile?.gewicht_kg || 82
-            ),
-
-          alter:
-            Number(
-              profile?.alter || 33
-            ),
-
+          gewicht_kg: Number(
+            profile?.gewicht_kg || 82
+          ),
+          alter: Number(
+            profile?.alter || 33
+          ),
           geschlecht:
             profile?.geschlecht ||
             "männlich",
@@ -359,9 +378,6 @@ export default function Home() {
     setMembers(result);
   }
 
-  /*
-   * GETRÄNKE
-   */
   async function loadDrinks() {
     if (!eventId) return;
 
@@ -385,7 +401,8 @@ export default function Home() {
 
     if (error) {
       setMessage(
-        "❌ Getränke: " + error.message
+        "❌ Getränke: " +
+          error.message
       );
       return;
     }
@@ -393,9 +410,6 @@ export default function Home() {
     setDrinks(data || []);
   }
 
-  /*
-   * TRINKVORGÄNGE
-   */
   async function loadConsumptions() {
     if (!eventId) return;
 
@@ -420,9 +434,6 @@ export default function Home() {
     setConsumptions(data || []);
   }
 
-  /*
-   * ZAHLUNGEN
-   */
   async function loadPayments() {
     if (!eventId) return;
 
@@ -444,9 +455,6 @@ export default function Home() {
     setPayments(data || []);
   }
 
-  /*
-   * EINLADUNGSCODE
-   */
   async function loadInviteCode() {
     if (!eventId) return;
 
@@ -520,9 +528,6 @@ export default function Home() {
     }
   }
 
-  /*
-   * EVENT BEITRETEN
-   */
   async function joinEventWithCode() {
     setMessage("");
 
@@ -616,9 +621,6 @@ export default function Home() {
     );
   }
 
-  /*
-   * TEILNEHMER HINZUFÜGEN
-   */
   async function addParticipant() {
     if (
       !eventId ||
@@ -678,9 +680,6 @@ export default function Home() {
     );
   }
 
-  /*
-   * TEILNEHMER ENTFERNEN
-   */
   async function removeParticipant(
     memberId: string
   ) {
@@ -715,10 +714,9 @@ export default function Home() {
     );
   }
 
-  /*
-   * GETRÄNK SPEICHERN
-   */
   async function saveDrink() {
+    setMessage("");
+
     if (!eventId) {
       setMessage(
         "❌ Kein Event ausgewählt."
@@ -743,41 +741,12 @@ export default function Home() {
       return;
     }
 
-    const literValue =
-      Number(liters);
-
-    const alcoholValue =
-      Number(alcohol);
-
-    const priceValue =
-      Number(price);
-
     if (
-      !Number.isFinite(literValue) ||
-      literValue <= 0
+      currentEvent?.photo_required &&
+      !drinkPhoto
     ) {
       setMessage(
-        "❌ Bitte eine gültige Literzahl eingeben."
-      );
-      return;
-    }
-
-    if (
-      !Number.isFinite(alcoholValue) ||
-      alcoholValue < 0
-    ) {
-      setMessage(
-        "❌ Bitte einen gültigen Alkoholgehalt eingeben."
-      );
-      return;
-    }
-
-    if (
-      !Number.isFinite(priceValue) ||
-      priceValue < 0
-    ) {
-      setMessage(
-        "❌ Bitte einen gültigen Preis eingeben."
+        "❌ Für dieses Event ist ein Getränkefoto erforderlich."
       );
       return;
     }
@@ -792,15 +761,15 @@ export default function Home() {
           getraenk:
             drinkName.trim(),
           liters:
-            literValue,
+            Number(liters),
           menge:
-            literValue,
+            Number(liters),
           alcohol_percent:
-            alcoholValue,
+            Number(alcohol),
           alkohol:
-            alcoholValue,
+            Number(alcohol),
           preis:
-            priceValue,
+            Number(price),
           quantity: 1,
         });
 
@@ -811,6 +780,8 @@ export default function Home() {
       );
       return;
     }
+
+    removeDrinkPhoto();
 
     setDrinkName("");
     setLiters("0.5");
@@ -824,9 +795,6 @@ export default function Home() {
     );
   }
 
-  /*
-   * EVENT-EINSTELLUNG
-   */
   async function toggleEventSetting(
     key: SettingKey
   ) {
@@ -882,9 +850,6 @@ export default function Home() {
     );
   }
 
-  /*
-   * HILFSFUNKTIONEN
-   */
   function getDrinkName(
     drink: Drink
   ) {
@@ -925,18 +890,11 @@ export default function Home() {
     );
   }
 
-  /*
-   * WICHTIG:
-   * Anzahl wird ausschließlich aus den
-   * Trinkvorgängen dieses Events berechnet.
-   */
   function getMemberDrinkCount(
     profileId: string
   ) {
-    return consumptions.filter(
-      (item) =>
-        item.profile_id ===
-        profileId
+    return getMemberConsumptions(
+      profileId
     ).length;
   }
 
@@ -950,9 +908,6 @@ export default function Home() {
     );
   }
 
-  /*
-   * PROMILLE
-   */
   function calculatePromille(
     profileId: string
   ) {
@@ -978,7 +933,8 @@ export default function Home() {
         : 0.68;
 
     const weight =
-      member.gewicht_kg > 0
+      member.gewicht_kg >
+      0
         ? member.gewicht_kg
         : 82;
 
@@ -1009,7 +965,8 @@ export default function Home() {
 
       const initial =
         alcoholGrams /
-        (weight * faktor);
+        (weight *
+          faktor);
 
       const elapsedHours =
         Math.max(
@@ -1040,19 +997,9 @@ export default function Home() {
     );
   }
 
-  /*
-   * GETRÄNK TRINKEN
-   */
   async function drinkNow(
     drinkId: string
   ) {
-    if (!eventId) {
-      setMessage(
-        "❌ Kein Event ausgewählt."
-      );
-      return;
-    }
-
     if (!currentProfileId) {
       setMessage(
         "❌ Bitte zuerst einen Teilnehmer auswählen."
@@ -1093,21 +1040,32 @@ export default function Home() {
       return;
     }
 
-    await Promise.all([
-      loadConsumptions(),
-      loadMembers(),
-    ]);
+    const newCount =
+      getMemberDrinkCount(
+        currentProfileId
+      ) + 1;
 
-    setNow(Date.now());
+    await supabase
+      .from("profiles")
+      .update({
+        drinks_count:
+          newCount,
+        points:
+          newCount * 10,
+      })
+      .eq(
+        "id",
+        currentProfileId
+      );
+
+    await loadConsumptions();
+    await loadMembers();
 
     setMessage(
       "🍺 Getränk hinzugefügt. +10 Punkte"
     );
   }
 
-  /*
-   * GETRÄNK ENTFERNEN
-   */
   async function removeConsumption(
     consumption: Consumption
   ) {
@@ -1142,31 +1100,41 @@ export default function Home() {
 
     await loadConsumptions();
 
-    setNow(Date.now());
+    const remaining =
+      getMemberDrinkCount(
+        consumption.profile_id
+      );
+
+    await supabase
+      .from("profiles")
+      .update({
+        drinks_count:
+          remaining,
+        points:
+          remaining * 10,
+      })
+      .eq(
+        "id",
+        consumption.profile_id
+      );
+
+    await loadMembers();
 
     setMessage(
       "↩️ Getränk entfernt."
     );
   }
 
-  /*
-   * ZAHLUNG UMSCHALTEN
-   */
   async function togglePayment(
     member: Member
   ) {
-    if (
-      !currentEvent?.cost_overview_enabled
-    ) {
+    if (!currentEvent?.cost_overview_enabled) {
       return;
     }
 
     const totalCost =
       consumptions.reduce(
-        (
-          sum,
-          consumption
-        ) => {
+        (sum, consumption) => {
           const drink =
             drinks.find(
               (item) =>
@@ -1177,7 +1145,8 @@ export default function Home() {
           return (
             sum +
             Number(
-              drink?.preis || 0
+              drink?.preis ||
+                0
             )
           );
         },
@@ -1260,9 +1229,6 @@ export default function Home() {
     );
   }
 
-  /*
-   * GETRÄNKE-NUTZUNG
-   */
   const drinkUsage =
     useMemo(() => {
       const result: Record<
@@ -1297,15 +1263,9 @@ export default function Home() {
       [drinks, drinkUsage]
     );
 
-  /*
-   * GESAMTKOSTEN
-   */
   const totalCost =
     consumptions.reduce(
-      (
-        sum,
-        consumption
-      ) => {
+      (sum, consumption) => {
         const drink =
           drinks.find(
             (item) =>
@@ -1323,15 +1283,9 @@ export default function Home() {
       0
     );
 
-  /*
-   * GESAMTLITER
-   */
   const totalLiters =
     consumptions.reduce(
-      (
-        sum,
-        consumption
-      ) => {
+      (sum, consumption) => {
         const drink =
           drinks.find(
             (item) =>
@@ -1351,9 +1305,6 @@ export default function Home() {
       0
     );
 
-  /*
-   * KOSTEN PRO PERSON
-   */
   const amountPerPerson =
     currentEvent?.auto_split_costs &&
     members.length
@@ -1361,15 +1312,9 @@ export default function Home() {
         members.length
       : 0;
 
-  /*
-   * GESAMTPUNKTE
-   */
   const totalPoints =
     members.reduce(
-      (
-        sum,
-        member
-      ) =>
+      (sum, member) =>
         sum +
         getMemberPoints(
           member.profile_id
@@ -1377,9 +1322,6 @@ export default function Home() {
       0
     );
 
-  /*
-   * RANKING
-   */
   const ranking =
     [...members].sort(
       (a, b) =>
@@ -1391,9 +1333,6 @@ export default function Home() {
         )
     );
 
-  /*
-   * ZAHLUNGSSTATUS
-   */
   const paidCount =
     members.filter(
       (member) =>
@@ -1410,9 +1349,6 @@ export default function Home() {
     members.length -
     paidCount;
 
-  /*
-   * AKTUELLER TEILNEHMER
-   */
   const currentMember =
     members.find(
       (member) =>
@@ -1420,9 +1356,6 @@ export default function Home() {
         currentProfileId
     );
 
-  /*
-   * EIGENE GETRÄNKE
-   */
   const currentConsumptions =
     consumptions.filter(
       (item) =>
@@ -1430,9 +1363,6 @@ export default function Home() {
         currentProfileId
     );
 
-  /*
-   * PROMILLE
-   */
   const currentPromille =
     currentMember
       ? calculatePromille(
@@ -1440,9 +1370,6 @@ export default function Home() {
         )
       : 0;
 
-  /*
-   * EINSTELLUNGS-TEXTE
-   */
   function settingLabel(
     key: SettingKey
   ) {
@@ -1452,46 +1379,32 @@ export default function Home() {
     > = {
       cost_overview_enabled:
         "💶 Kostenberechnung",
-
       auto_split_costs:
         "➗ Kosten automatisch teilen",
-
       ranking_enabled:
         "🏆 Ranking",
-
       show_points:
         "⭐ Punkte",
-
       show_ranking:
         "🏆 Rangliste",
-
       show_promille:
         "🍷 Promille",
-
       show_statistics:
         "📊 Statistiken",
-
       show_drink_amounts:
         "🍺 Trinkmengen",
-
       show_costs:
         "💰 Getränkepreise",
-
       team_mode:
         "👥 Team-Modus",
-
       show_photos:
         "📸 Fotos",
-
       photo_required:
         "📷 Foto erforderlich",
-
       ai_recognition_enabled:
         "🤖 KI-Erkennung",
-
       manual_entry_allowed:
         "✍️ Manuelle Eingabe",
-
       privacy_mode:
         "🔒 Privatsphäre-Modus",
     };
@@ -1508,46 +1421,32 @@ export default function Home() {
     > = {
       cost_overview_enabled:
         "Kostenaufteilung und Zahlungen anzeigen.",
-
       auto_split_costs:
         "Gesamtkosten automatisch gleichmäßig verteilen.",
-
       ranking_enabled:
         "Das komplette Ranking aktivieren.",
-
       show_points:
         "Punkte bei Teilnehmern anzeigen.",
-
       show_ranking:
         "Die Rangliste anzeigen.",
-
       show_promille:
         "Promilleanzeige anzeigen.",
-
       show_statistics:
         "Statistikbereich anzeigen.",
-
       show_drink_amounts:
         "Getrunkene Mengen anzeigen.",
-
       show_costs:
         "Preise der Getränke anzeigen.",
-
       team_mode:
         "Teilnehmer in Teams organisieren.",
-
       show_photos:
         "Fotos bei Getränken erlauben.",
-
       photo_required:
         "Bei jedem Getränk ein Foto verlangen.",
-
       ai_recognition_enabled:
         "KI-Erkennung für Getränke aktivieren.",
-
       manual_entry_allowed:
         "Getränke manuell eingeben erlauben.",
-
       privacy_mode:
         "Persönliche Daten stärker ausblenden.",
     };
@@ -1577,8 +1476,6 @@ export default function Home() {
     <main className="page">
       <div className="container">
 
-        {/* HEADER */}
-
         <header className="header">
           <div className="logo">
             🍻
@@ -1594,8 +1491,6 @@ export default function Home() {
             </p>
           </div>
         </header>
-
-        {/* EVENT */}
 
         <section className="card">
           <h2>
@@ -1665,8 +1560,6 @@ export default function Home() {
 
             </div>
           )}
-
-          {/* VERWALTUNG */}
 
           {currentEvent && (
             <div className="management">
@@ -1762,8 +1655,6 @@ export default function Home() {
 
         </section>
 
-        {/* EVENT BEITRETEN */}
-
         <section className="card">
           <h2>
             👥 Event beitreten
@@ -1796,8 +1687,6 @@ export default function Home() {
 
           </div>
         </section>
-
-        {/* STATISTIKEN */}
 
         {(!currentEvent ||
           currentEvent.show_statistics) && (
@@ -1860,8 +1749,6 @@ export default function Home() {
 
           </div>
         )}
-
-        {/* TEILNEHMER */}
 
         <section className="card">
           <h2>
@@ -2051,8 +1938,6 @@ export default function Home() {
 
         </section>
 
-        {/* GETRÄNK HINZUFÜGEN */}
-
         {(!currentEvent ||
           currentEvent.manual_entry_allowed) && (
           <section className="card">
@@ -2060,6 +1945,90 @@ export default function Home() {
             <h2>
               🍺 Getränk hinzufügen
             </h2>
+
+            {/* FOTO */}
+
+            {(!currentEvent ||
+              currentEvent.show_photos ||
+              currentEvent.ai_recognition_enabled) && (
+              <div className="photoBox">
+
+                <div className="photoHeader">
+                  <div>
+                    <strong>
+                      📸 Getränk fotografieren
+                    </strong>
+
+                    <small>
+                      Foto aufnehmen oder aus der Galerie auswählen.
+                    </small>
+                  </div>
+
+                  {currentEvent?.ai_recognition_enabled && (
+                    <span className="aiBadge">
+                      🤖 KI
+                    </span>
+                  )}
+                </div>
+
+                <label className="photoButton">
+
+                  📸 Foto aufnehmen
+
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={
+                      handleDrinkPhoto
+                    }
+                    hidden
+                  />
+
+                </label>
+
+                {drinkPhotoPreview && (
+                  <div className="photoPreview">
+
+                    <img
+                      src={
+                        drinkPhotoPreview
+                      }
+                      alt="Getränkevorschau"
+                    />
+
+                    <div className="photoActions">
+
+                      <strong>
+                        📸 Foto ausgewählt
+                      </strong>
+
+                      <button
+                        type="button"
+                        className="removePhoto"
+                        onClick={
+                          removeDrinkPhoto
+                        }
+                      >
+                        × Entfernen
+                      </button>
+
+                    </div>
+
+                    {currentEvent?.ai_recognition_enabled && (
+                      <div className="aiInfo">
+                        🤖 Die automatische
+                        Getränkeerkennung wird
+                        im nächsten Schritt
+                        mit diesem Foto verbunden.
+                      </div>
+                    )}
+
+                  </div>
+                )}
+
+              </div>
+            )}
 
             <input
               placeholder="Getränk"
@@ -2122,8 +2091,6 @@ export default function Home() {
           </section>
         )}
 
-        {/* GETRÄNKE */}
-
         <section className="card">
 
           <h2>
@@ -2135,97 +2102,88 @@ export default function Home() {
             Teilnehmer zuzuordnen.
           </p>
 
-          {sortedDrinks.length === 0 ? (
-            <div className="empty">
-              Noch keine Getränke vorhanden.
-            </div>
-          ) : (
-            sortedDrinks.map(
-              (drink) => {
+          {sortedDrinks.map(
+            (drink) => {
 
-                const usage =
-                  drinkUsage[
-                    drink.id
-                  ] || 0;
+              const usage =
+                drinkUsage[
+                  drink.id
+                ] || 0;
 
-                return (
-                  <div
-                    className="drink"
-                    key={drink.id}
-                  >
+              return (
+                <div
+                  className="drink"
+                  key={drink.id}
+                >
 
-                    <div className="drinkMain">
+                  <div className="drinkMain">
 
-                      <div className="drinkIcon">
-                        🍺
-                      </div>
+                    <div className="drinkIcon">
+                      🍺
+                    </div>
 
-                      <div>
+                    <div>
 
-                        <strong>
-                          {getDrinkName(
+                      <strong>
+                        {getDrinkName(
+                          drink
+                        )}
+                      </strong>
+
+                      {(!currentEvent ||
+                        currentEvent.show_drink_amounts) && (
+                        <small>
+                          {getDrinkLiters(
                             drink
-                          )}
-                        </strong>
+                          ).toFixed(1)}
+                          {" L · "}
+                          {getDrinkAlcohol(
+                            drink
+                          ).toFixed(1)}
+                          {" % · "}
+                          {usage}
+                          × getrunken
+                        </small>
+                      )}
 
-                        {(!currentEvent ||
-                          currentEvent.show_drink_amounts) && (
-                          <small>
-                            {getDrinkLiters(
-                              drink
-                            ).toFixed(1)}
-                            {" L · "}
-                            {getDrinkAlcohol(
-                              drink
-                            ).toFixed(1)}
-                            {" % · "}
-                            {usage}
-                            × getrunken
-                          </small>
-                        )}
-
-                        {(!currentEvent ||
-                          currentEvent.show_costs) && (
-                          <small>
-                            {Number(
-                              drink.preis ||
-                                0
-                            ).toFixed(2)}
-                            € pro Getränk
-                          </small>
-                        )}
-
-                      </div>
+                      {(!currentEvent ||
+                        currentEvent.show_costs) && (
+                        <small>
+                          {Number(
+                            drink.preis ||
+                              0
+                          ).toFixed(2)}
+                          € pro Getränk
+                        </small>
+                      )}
 
                     </div>
 
-                    <button
-                      className="drinkButton"
-                      disabled={
-                        !currentProfileId ||
-                        !currentMember
-                      }
-                      onClick={() =>
-                        drinkNow(
-                          drink.id
-                        )
-                      }
-                    >
-                      🍺{" "}
-                      {currentMember?.username ||
-                        "Teilnehmer"}{" "}
-                      +1
-                    </button>
-
                   </div>
-                );
-              }
-            )
+
+                  <button
+                    className="drinkButton"
+                    disabled={
+                      !currentProfileId
+                    }
+                    onClick={() =>
+                      drinkNow(
+                        drink.id
+                      )
+                    }
+                  >
+                    🍺{" "}
+                    {currentMember?.username ||
+                      "Teilnehmer"}{" "}
+                    +1
+                  </button>
+
+                </div>
+              );
+            }
           )}
 
         </section>
-
-        {/* MEINE GETRÄNKE */}
 
         <section className="card">
 
@@ -2309,8 +2267,6 @@ export default function Home() {
 
         </section>
 
-        {/* PROMILLE */}
-
         {(!currentEvent ||
           currentEvent.show_promille) && (
           <section className="card promilleCard">
@@ -2392,8 +2348,6 @@ export default function Home() {
 
           </section>
         )}
-
-        {/* TRINKVERLAUF */}
 
         {(!currentEvent ||
           currentEvent.show_statistics) && (
@@ -2479,8 +2433,6 @@ export default function Home() {
 
           </section>
         )}
-
-        {/* KOSTEN */}
 
         {(!currentEvent ||
           currentEvent.cost_overview_enabled) && (
@@ -2645,8 +2597,6 @@ export default function Home() {
           </section>
         )}
 
-        {/* RANKING */}
-
         {(!currentEvent ||
           currentEvent.ranking_enabled) &&
           (!currentEvent ||
@@ -2741,15 +2691,11 @@ export default function Home() {
           </section>
         )}
 
-        {/* MESSAGE */}
-
         {message && (
           <div className="message">
             {message}
           </div>
         )}
-
-        {/* FOOTER */}
 
         <footer>
 
@@ -3045,6 +2991,97 @@ export default function Home() {
           width: 100%;
         }
 
+        /* FOTO */
+
+        .photoBox {
+          padding: 15px;
+          margin-bottom: 14px;
+          border-radius: 16px;
+          background: rgba(255,255,255,.04);
+          border: 1px dashed #475569;
+        }
+
+        .photoHeader {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          margin-bottom: 12px;
+        }
+
+        .photoHeader strong {
+          display: block;
+          font-size: 16px;
+        }
+
+        .aiBadge {
+          padding: 7px 10px;
+          border-radius: 10px;
+          background: rgba(139,92,246,.18);
+          border: 1px solid rgba(139,92,246,.4);
+          color: #c4b5fd;
+          font-size: 12px;
+          font-weight: bold;
+        }
+
+        .photoButton {
+          display: block;
+          width: 100%;
+          padding: 15px;
+          border-radius: 13px;
+          background: #334155;
+          color: white;
+          text-align: center;
+          font-weight: bold;
+          cursor: pointer;
+        }
+
+        .photoButton:hover {
+          background: #475569;
+        }
+
+        .photoPreview {
+          margin-top: 12px;
+          overflow: hidden;
+          border-radius: 15px;
+          background: #0f172a;
+          border: 1px solid #334155;
+        }
+
+        .photoPreview img {
+          display: block;
+          width: 100%;
+          max-height: 350px;
+          object-fit: contain;
+          background: #020617;
+        }
+
+        .photoActions {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          padding: 10px;
+        }
+
+        .removePhoto {
+          padding: 8px 10px;
+          background: #475569;
+          color: white;
+          font-size: 12px;
+        }
+
+        .aiInfo {
+          margin: 0 10px 10px;
+          padding: 10px;
+          border-radius: 10px;
+          background: rgba(139,92,246,.1);
+          border: 1px solid rgba(139,92,246,.2);
+          color: #c4b5fd;
+          font-size: 12px;
+          line-height: 1.4;
+        }
+
         .drink {
           display: flex;
           align-items: center;
@@ -3332,6 +3369,19 @@ export default function Home() {
 
           .paymentPerson button {
             grid-column: 1 / -1;
+            width: 100%;
+          }
+
+          .photoHeader {
+            align-items: flex-start;
+          }
+
+          .photoActions {
+            align-items: stretch;
+            flex-direction: column;
+          }
+
+          .removePhoto {
             width: 100%;
           }
         }
