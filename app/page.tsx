@@ -40,8 +40,13 @@ type Payment = {
   status: "offen" | "bezahlt";
 };
 
+type Event = {
+  id: string;
+  title: string;
+};
+
 export default function Home() {
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [eventId, setEventId] = useState("");
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -59,8 +64,6 @@ export default function Home() {
 
   const [showNewEvent, setShowNewEvent] = useState(false);
   const [newEventTitle, setNewEventTitle] = useState("");
-  const [newEventStart, setNewEventStart] = useState("");
-  const [newEventEnd, setNewEventEnd] = useState("");
 
   useEffect(() => {
     loadEvents();
@@ -80,7 +83,7 @@ export default function Home() {
   async function loadEvents() {
     const { data, error } = await supabase
       .from("events")
-      .select("id,title,start_date,end_date,is_active")
+      .select("id,title")
       .order("start_date", { ascending: false });
 
     if (error) {
@@ -90,40 +93,46 @@ export default function Home() {
 
     setEvents(data || []);
 
-    if (!data || data.length === 0) return;
+    if (!data || data.length === 0) {
+      setEventId("");
+      return;
+    }
 
     const saved = localStorage.getItem("guesten-active-event");
 
     const exists = data.some((event) => event.id === saved);
 
-    setEventId(
-      saved && exists
-        ? saved
-        : data[0].id
-    );
+    setEventId(saved && exists ? saved : data[0].id);
   }
 
   async function createEvent() {
     setMessage("");
 
     if (!newEventTitle.trim()) {
-      setMessage("❌ Bitte einen Eventnamen eingeben.");
+      setMessage("❌ Bitte Eventnamen eingeben.");
       return;
     }
+
+    const now = new Date();
+
+    const end = new Date(now);
+    end.setHours(23, 59, 59, 999);
+
+    const inviteCode = Math.random()
+      .toString(36)
+      .substring(2, 8)
+      .toUpperCase();
 
     const { data, error } = await supabase
       .from("events")
       .insert({
         title: newEventTitle.trim(),
-        start_date: newEventStart
-          ? new Date(newEventStart).toISOString()
-          : new Date().toISOString(),
-        end_date: newEventEnd
-          ? new Date(newEventEnd).toISOString()
-          : null,
+        invite_code: inviteCode,
+        start_date: now.toISOString(),
+        end_date: end.toISOString(),
         is_active: true,
       })
-      .select("id,title,start_date,end_date,is_active")
+      .select("id,title")
       .single();
 
     if (error) {
@@ -131,21 +140,17 @@ export default function Home() {
       return;
     }
 
-    if (!data) {
-      setMessage("❌ Event wurde nicht erstellt.");
-      return;
-    }
-
-    setEvents((old) => [data, ...old]);
-    setEventId(data.id);
-
     setNewEventTitle("");
-    setNewEventStart("");
-    setNewEventEnd("");
     setShowNewEvent(false);
 
+    await loadEvents();
+
+    if (data?.id) {
+      setEventId(data.id);
+    }
+
     setMessage(
-      `✅ Event „${data.title}“ wurde erstellt.`
+      `✅ Event erstellt! Einladungscode: ${inviteCode}`
     );
   }
 
@@ -185,20 +190,19 @@ export default function Home() {
       return;
     }
 
-    const result: Member[] =
-      (data || []).map((row: any) => {
-        const profile = Array.isArray(row.profiles)
-          ? row.profiles[0]
-          : row.profiles;
+    const result: Member[] = (data || []).map((row: any) => {
+      const profile = Array.isArray(row.profiles)
+        ? row.profiles[0]
+        : row.profiles;
 
-        return {
-          id: row.id,
-          profile_id: row.profile_id,
-          username: profile?.username || "Teilnehmer",
-          points: Number(profile?.points || 0),
-          drinks: Number(profile?.drinks_count || 0),
-        };
-      });
+      return {
+        id: row.id,
+        profile_id: row.profile_id,
+        username: profile?.username || "Teilnehmer",
+        points: Number(profile?.points || 0),
+        drinks: Number(profile?.drinks_count || 0),
+      };
+    });
 
     setMembers(result);
   }
@@ -264,8 +268,7 @@ export default function Home() {
 
     if (
       members.some(
-        (member) =>
-          member.profile_id === selectedProfile
+        (member) => member.profile_id === selectedProfile
       )
     ) {
       setMessage("❌ Teilnehmer ist bereits dabei.");
@@ -374,16 +377,11 @@ export default function Home() {
 
     const { error: drinkError } = await supabase
       .from("drinks")
-      .update({
-        profile_id: profileId,
-      })
+      .update({ profile_id: profileId })
       .eq("id", drinkId);
 
     if (drinkError) {
-      setMessage(
-        "❌ Zuordnung: " +
-        drinkError.message
-      );
+      setMessage("❌ Zuordnung: " + drinkError.message);
       return;
     }
 
@@ -397,8 +395,7 @@ export default function Home() {
       await supabase
         .from("profiles")
         .update({
-          points:
-            Number(profile.points || 0) + 10,
+          points: Number(profile.points || 0) + 10,
           drinks_count:
             Number(profile.drinks_count || 0) + 1,
         })
@@ -409,14 +406,13 @@ export default function Home() {
     await loadMembers();
     await loadDrinks();
 
-    const member = members.find(
-      (item) =>
-        item.profile_id === profileId
+    const profileData = profiles.find(
+      (item) => item.id === profileId
     );
 
     setMessage(
       `🍺 Getränk zugeordnet! ${
-        member?.username || "Teilnehmer"
+        profileData?.username || "Teilnehmer"
       } +10 Punkte`
     );
   }
@@ -479,11 +475,7 @@ export default function Home() {
   const totalLiters = drinks.reduce(
     (sum, drink) =>
       sum +
-      Number(
-        drink.liters ??
-        drink.menge ??
-        0
-      ),
+      Number(drink.liters ?? drink.menge ?? 0),
     0
   );
 
@@ -506,23 +498,19 @@ export default function Home() {
 
   const ranking = [...members].sort(
     (a, b) =>
-      Number(b.points) -
-      Number(a.points)
+      Number(b.points) - Number(a.points)
   );
 
-  const paidCount = members.filter(
-    (member) =>
-      payments.some(
-        (payment) =>
-          payment.event_id === eventId &&
-          payment.profile_id ===
-            member.profile_id &&
-          payment.status === "bezahlt"
-      )
+  const paidCount = members.filter((member) =>
+    payments.some(
+      (payment) =>
+        payment.event_id === eventId &&
+        payment.profile_id === member.profile_id &&
+        payment.status === "bezahlt"
+    )
   ).length;
 
-  const openCount =
-    members.length - paidCount;
+  const openCount = members.length - paidCount;
 
   return (
     <main className="page">
@@ -533,52 +521,44 @@ export default function Home() {
 
           <div>
             <h1>Güstener Zapfhahn Zentrale</h1>
-            <p>
-              Events · Getränke · Kosten · Rankings
-            </p>
+            <p>Events · Getränke · Kosten · Rankings</p>
           </div>
         </header>
 
         <section className="card">
-          <div className="eventHeader">
-            <div>
-              <h2>📅 Aktuelles Event</h2>
+          <h2>📅 Aktuelles Event</h2>
 
-              <select
-                value={eventId}
-                onChange={(e) =>
-                  setEventId(e.target.value)
-                }
+          <select
+            value={eventId}
+            onChange={(e) =>
+              setEventId(e.target.value)
+            }
+          >
+            <option value="">
+              Wähle dein Event
+            </option>
+
+            {events.map((event) => (
+              <option
+                key={event.id}
+                value={event.id}
               >
-                <option value="">
-                  Wähle dein Event
-                </option>
+                {event.title}
+              </option>
+            ))}
+          </select>
 
-                {events.map((event) => (
-                  <option
-                    key={event.id}
-                    value={event.id}
-                  >
-                    {event.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <button
-              className="newEventButton"
-              onClick={() =>
-                setShowNewEvent(!showNewEvent)
-              }
-            >
-              ➕ Neues Event
-            </button>
-          </div>
+          <button
+            className="newEventButton"
+            onClick={() =>
+              setShowNewEvent(!showNewEvent)
+            }
+          >
+            ➕ Neues Event
+          </button>
 
           {showNewEvent && (
-            <div className="newEventBox">
-              <h3>➕ Neues Event erstellen</h3>
-
+            <div className="newEvent">
               <input
                 placeholder="Name des Events"
                 value={newEventTitle}
@@ -587,43 +567,12 @@ export default function Home() {
                 }
               />
 
-              <label>Start</label>
-
-              <input
-                type="datetime-local"
-                value={newEventStart}
-                onChange={(e) =>
-                  setNewEventStart(e.target.value)
-                }
-              />
-
-              <label>Ende</label>
-
-              <input
-                type="datetime-local"
-                value={newEventEnd}
-                onChange={(e) =>
-                  setNewEventEnd(e.target.value)
-                }
-              />
-
-              <div className="newEventButtons">
-                <button
-                  className="save"
-                  onClick={createEvent}
-                >
-                  ✅ Event erstellen
-                </button>
-
-                <button
-                  className="cancel"
-                  onClick={() =>
-                    setShowNewEvent(false)
-                  }
-                >
-                  Abbrechen
-                </button>
-              </div>
+              <button
+                className="save"
+                onClick={createEvent}
+              >
+                🍻 Event erstellen
+              </button>
             </div>
           )}
         </section>
@@ -637,17 +586,13 @@ export default function Home() {
 
           <div className="stat">
             <span>💧</span>
-            <strong>
-              {totalLiters.toFixed(1)}
-            </strong>
+            <strong>{totalLiters.toFixed(1)}</strong>
             <small>Liter</small>
           </div>
 
           <div className="stat">
             <span>💶</span>
-            <strong>
-              {totalCost.toFixed(2)} €
-            </strong>
+            <strong>{totalCost.toFixed(2)} €</strong>
             <small>Kosten</small>
           </div>
 
@@ -673,9 +618,7 @@ export default function Home() {
               <select
                 value={selectedProfile}
                 onChange={(e) =>
-                  setSelectedProfile(
-                    e.target.value
-                  )
+                  setSelectedProfile(e.target.value)
                 }
               >
                 <option value="">
@@ -687,8 +630,7 @@ export default function Home() {
                     (profile) =>
                       !members.some(
                         (member) =>
-                          member.profile_id ===
-                          profile.id
+                          member.profile_id === profile.id
                       )
                   )
                   .map((profile) => (
@@ -696,30 +638,23 @@ export default function Home() {
                       key={profile.id}
                       value={profile.id}
                     >
-                      {profile.username ||
-                        "Unbenannt"}
+                      {profile.username || "Unbenannt"}
                     </option>
                   ))}
               </select>
 
-              <button
-                onClick={addParticipant}
-              >
+              <button onClick={addParticipant}>
                 ➕ Hinzufügen
               </button>
             </div>
           ) : (
             <div className="successBox">
-              ✅ Alle vorhandenen Profile
-              sind bereits dabei.
+              ✅ Alle vorhandenen Profile sind bereits dabei.
             </div>
           )}
 
           {members.map((member) => (
-            <div
-              className="member"
-              key={member.id}
-            >
+            <div className="member" key={member.id}>
               <div className="avatar">
                 {member.username
                   .charAt(0)
@@ -727,23 +662,16 @@ export default function Home() {
               </div>
 
               <div>
-                <strong>
-                  {member.username}
-                </strong>
-
+                <strong>{member.username}</strong>
                 <small>
-                  🍺 {member.drinks}
-                  {" · "}
-                  🏆 {member.points} Punkte
+                  🍺 {member.drinks} · 🏆 {member.points} Punkte
                 </small>
               </div>
 
               <button
                 className="remove"
                 onClick={() =>
-                  removeParticipant(
-                    member.id
-                  )
+                  removeParticipant(member.id)
                 }
               >
                 ×
@@ -807,9 +735,7 @@ export default function Home() {
           <h2>🔗 Getränk zuordnen</h2>
 
           {members.length === 0 ? (
-            <p>
-              👥 Zuerst Teilnehmer hinzufügen.
-            </p>
+            <p>👥 Zuerst Teilnehmer hinzufügen.</p>
           ) : (
             members.map((member) => (
               <div
@@ -841,9 +767,7 @@ export default function Home() {
                     <option
                       key={drink.id}
                       value={drink.id}
-                      disabled={
-                        !!drink.profile_id
-                      }
+                      disabled={!!drink.profile_id}
                     >
                       {drink.drink_name ||
                         drink.getraenk ||
@@ -851,13 +775,11 @@ export default function Home() {
                       {" · "}
                       {Number(
                         drink.liters ??
-                        drink.menge ??
-                        0
+                          drink.menge ??
+                          0
                       ).toFixed(1)}
                       L
-                      {drink.profile_id
-                        ? " ✓"
-                        : ""}
+                      {drink.profile_id ? " ✓" : ""}
                     </option>
                   ))}
                 </select>
@@ -877,13 +799,8 @@ export default function Home() {
             );
 
             return (
-              <div
-                className="drink"
-                key={drink.id}
-              >
-                <div className="drinkIcon">
-                  🍺
-                </div>
+              <div className="drink" key={drink.id}>
+                <div className="drinkIcon">🍺</div>
 
                 <div>
                   <strong>
@@ -895,14 +812,14 @@ export default function Home() {
                   <small>
                     {Number(
                       drink.liters ??
-                      drink.menge ??
-                      0
+                        drink.menge ??
+                        0
                     ).toFixed(1)}
                     {" Liter · "}
                     {Number(
                       drink.alcohol_percent ??
-                      drink.alkohol ??
-                      0
+                        drink.alkohol ??
+                        0
                     ).toFixed(1)}
                     %
                   </small>
@@ -938,9 +855,7 @@ export default function Home() {
 
           <div className="row">
             <span>👥 Teilnehmer</span>
-            <strong>
-              {members.length}
-            </strong>
+            <strong>{members.length}</strong>
           </div>
 
           <div className="row">
@@ -967,13 +882,12 @@ export default function Home() {
           <h3>💶 Zahlungen</h3>
 
           {members.map((member) => {
-            const payment =
-              payments.find(
-                (item) =>
-                  item.event_id === eventId &&
-                  item.profile_id ===
-                    member.profile_id
-              );
+            const payment = payments.find(
+              (item) =>
+                item.event_id === eventId &&
+                item.profile_id ===
+                  member.profile_id
+            );
 
             const isPaid =
               payment?.status === "bezahlt";
@@ -994,10 +908,7 @@ export default function Home() {
                 </div>
 
                 <div className="paymentInfo">
-                  <strong>
-                    {member.username}
-                  </strong>
-
+                  <strong>{member.username}</strong>
                   <small>
                     Anteil:{" "}
                     {amountPerPerson.toFixed(2)} €
@@ -1026,41 +937,34 @@ export default function Home() {
         <section className="card">
           <h2>🏆 Ranking</h2>
 
-          {ranking.map(
-            (member, index) => (
-              <div
-                className="ranking"
-                key={member.id}
-              >
-                <span className="rank">
-                  {index === 0
-                    ? "🥇"
-                    : index === 1
-                    ? "🥈"
-                    : index === 2
-                    ? "🥉"
-                    : index + 1}
-                </span>
+          {ranking.map((member, index) => (
+            <div
+              className="ranking"
+              key={member.id}
+            >
+              <span className="rank">
+                {index === 0
+                  ? "🥇"
+                  : index === 1
+                  ? "🥈"
+                  : index === 2
+                  ? "🥉"
+                  : index + 1}
+              </span>
 
-                <div>
-                  <strong>
-                    {member.username}
-                  </strong>
-
-                  <small>
-                    🍺 {member.drinks}
-                  </small>
-                </div>
-
-                <div className="points">
-                  {member.points}
-                  <small>Punkte</small>
-                </div>
+              <div>
+                <strong>{member.username}</strong>
+                <small>🍺 {member.drinks}</small>
               </div>
-            )
-          )}
 
-          <div className="rankingTotal">
+              <div className="points">
+                {member.points}
+                <small>Punkte</small>
+              </div>
+            </div>
+          ))}
+
+          <div className="grandTotal">
             🏆 Gesamtpunkte: {totalPoints}
           </div>
         </section>
@@ -1072,13 +976,9 @@ export default function Home() {
         )}
 
         <footer>
-          <strong>
-            🍻 Güstener Zapfhahn Zentrale
-          </strong>
-
+          <strong>🍻 Güstener Zapfhahn Zentrale</strong>
           <small>
-            Dein Event. Deine Getränke.
-            Deine Runde.
+            Dein Event. Deine Getränke. Deine Runde.
           </small>
         </footer>
       </div>
@@ -1093,12 +993,11 @@ export default function Home() {
           padding: 16px;
           color: white;
           font-family: Arial, Helvetica, sans-serif;
-          background:
-            radial-gradient(
-              circle at top,
-              #29445d 0%,
-              #0a0f16 62%
-            );
+          background: radial-gradient(
+            circle at top,
+            #29445d 0%,
+            #0a0f16 62%
+          );
         }
 
         .container {
@@ -1152,50 +1051,6 @@ export default function Home() {
           border: 1px solid rgba(255,255,255,.08);
         }
 
-        .eventHeader {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          gap: 15px;
-        }
-
-        .eventHeader > div {
-          flex: 1;
-        }
-
-        .newEventButton {
-          white-space: nowrap;
-          background: #22c55e;
-          color: white;
-        }
-
-        .newEventBox {
-          margin-top: 15px;
-          padding: 16px;
-          border-radius: 16px;
-          background: rgba(0,0,0,.18);
-          border: 1px solid rgba(255,255,255,.08);
-        }
-
-        .newEventBox label {
-          display: block;
-          margin: 8px 0 5px;
-          color: #94a3b8;
-          font-size: 13px;
-        }
-
-        .newEventButtons {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 8px;
-          margin-top: 8px;
-        }
-
-        .cancel {
-          background: #475569;
-          color: white;
-        }
-
         .stats {
           display: grid;
           grid-template-columns: repeat(4,1fr);
@@ -1243,6 +1098,18 @@ export default function Home() {
           cursor: pointer;
         }
 
+        .newEventButton {
+          width: 100%;
+          margin-top: 3px;
+        }
+
+        .newEvent {
+          margin-top: 12px;
+          padding: 12px;
+          border-radius: 14px;
+          background: rgba(255,255,255,.05);
+        }
+
         .addParticipant {
           display: grid;
           grid-template-columns: 1fr auto;
@@ -1286,8 +1153,6 @@ export default function Home() {
 
         .save {
           width: 100%;
-          background: #f59e0b;
-          color: #111;
         }
 
         .assign {
@@ -1439,12 +1304,12 @@ export default function Home() {
           font-weight: normal;
         }
 
-        .rankingTotal {
+        .grandTotal {
           margin-top: 15px;
-          padding: 14px;
+          padding: 15px;
           text-align: center;
           border-radius: 14px;
-          background: rgba(245,158,11,.10);
+          background: rgba(245,158,11,.12);
           color: #fbbf24;
           font-weight: bold;
         }
@@ -1465,15 +1330,6 @@ export default function Home() {
         }
 
         @media(max-width:650px) {
-          .eventHeader {
-            display: block;
-          }
-
-          .newEventButton {
-            width: 100%;
-            margin-top: 5px;
-          }
-
           .stats {
             grid-template-columns: repeat(2,1fr);
           }
@@ -1497,10 +1353,6 @@ export default function Home() {
           .paymentPerson button {
             grid-column: 1 / -1;
             width: 100%;
-          }
-
-          .newEventButtons {
-            grid-template-columns: 1fr;
           }
         }
       `}</style>
