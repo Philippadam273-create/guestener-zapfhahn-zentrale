@@ -3,14 +3,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 
-type EventRow = {
+/* ============================================================
+   TYPEN
+   ============================================================ */
+
+type Event = {
   id: string;
   title: string;
   description?: string | null;
   location?: string | null;
+  image?: string | null;
+  invite_code?: string | null;
   start_date?: string | null;
   end_date?: string | null;
-  invite_code?: string | null;
   is_active?: boolean | null;
 
   ranking_enabled?: boolean | null;
@@ -19,16 +24,26 @@ type EventRow = {
   show_promille?: boolean | null;
   show_statistics?: boolean | null;
   show_drink_amounts?: boolean | null;
+  photo_required?: boolean | null;
+  ai_recognition_enabled?: boolean | null;
+  manual_entry_allowed?: boolean | null;
   cost_overview_enabled?: boolean | null;
   auto_split_costs?: boolean | null;
+  team_mode?: boolean | null;
+  show_photos?: boolean | null;
   show_costs?: boolean | null;
+  privacy_mode?: boolean | null;
+
+  created_by_profile_id?: string | null;
 };
 
 type Profile = {
   id: string;
-  username: string | null;
-  points: number;
-  drinks_count: number;
+  user_id?: string | null;
+  username?: string | null;
+  role?: string | null;
+  points?: number | null;
+  drinks_count?: number | null;
   weight_kg?: number | null;
   height_cm?: number | null;
   age?: number | null;
@@ -38,120 +53,124 @@ type Profile = {
   geschlecht?: string | null;
 };
 
-type Person = {
-  id: string;
-  name: string;
-  profile_id?: string;
-  drinks: number;
-  liters: number;
-  cost: number;
-  points: number;
-  promille: number;
-};
-
 type Drink = {
   id: string;
-  event_id: string;
+  event_id?: string | null;
   profile_id?: string | null;
+
   category?: string | null;
   drink_name?: string | null;
   brand?: string | null;
   liters?: number | null;
   alcohol_percent?: number | null;
   quantity?: number | null;
-  preis?: number | null;
+
+  image?: string | null;
+  comment?: string | null;
+
+  image_path?: string | null;
+  ai_detected?: boolean | null;
+  detected_brand?: string | null;
+  detected_alcohol_percent?: number | null;
+
+  paid_by?: string | null;
+  shared_cost?: boolean | null;
+
+  marke?: string | null;
+  bezahlt_von?: string | null;
+  promille_wert?: number | null;
+  getraenk?: string | null;
   menge?: number | null;
   alkohol?: number | null;
-  getraenk?: string | null;
-  marke?: string | null;
-  promille_wert?: number | null;
-  created_at?: string;
+  preis?: number | null;
+  foto?: string | null;
+
+  created_at?: string | null;
+};
+
+type Payment = {
+  id: string;
+  event_id?: string | null;
+  betrag?: number | null;
+  created_at?: string | null;
+  bezahlt_von?: string | null;
+  profile_id?: string | null;
+  status?: string | null;
 };
 
 type Challenge = {
   id: string;
-  title: string | null;
-  description: string | null;
-  points: number | null;
-  category: string | null;
-  status: string | null;
-  assigned_profile_id: string | null;
-  winner_profile_id: string | null;
-  required_votes: number | null;
-  duration_minutes: number | null;
-  starts_at: string | null;
-  ends_at: string | null;
-  completed_at: string | null;
-  is_active: boolean | null;
+  title?: string | null;
+  description?: string | null;
+  points?: number | null;
+  created_at?: string | null;
+  event_id?: string | null;
+  category?: string | null;
+  status?: string | null;
+  created_by_profile_id?: string | null;
+  assigned_profile_id?: string | null;
+  winner_profile_id?: string | null;
+  required_votes?: number | null;
+  duration_minutes?: number | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  completed_at?: string | null;
+  is_active?: boolean | null;
 };
 
 type ChallengeTemplate = {
   id: string;
   title: string;
-  description: string | null;
-  category: string | null;
-  default_points: number | null;
-  requires_vote: boolean | null;
-  minimum_votes: number | null;
-  is_active: boolean | null;
-};
-
-type ChallengeVote = {
-  id: string;
-  challenge_id: string;
-  voter_profile_id: string;
-  target_profile_id: string | null;
-  vote: string;
-  comment: string | null;
-};
-
-type Payment = {
-  id: string;
-  event_id: string;
-  betrag: number;
-  bezahlt_von: string | null;
-  profile_id: string | null;
-  status: string | null;
-  created_at?: string;
+  description?: string | null;
+  category?: string | null;
+  default_points?: number | null;
+  requires_vote?: boolean | null;
+  minimum_votes?: number | null;
+  is_active?: boolean | null;
 };
 
 type RankingTitle = {
   id: string;
   min_points: number;
   title: string;
-  emoji: string | null;
-  description: string | null;
+  emoji?: string | null;
+  description?: string | null;
 };
 
-type AnimationType =
-  | "toast"
-  | "prost"
-  | "money"
-  | "points"
-  | "challenge";
 
-type AnimationState = {
-  type: AnimationType;
-  text?: string;
-  points?: number;
-};
+/* ============================================================
+   HAUPTKOMPONENTE
+   ============================================================ */
 
 export default function Home() {
-  const [events, setEvents] = useState<EventRow[]>([]);
+  /* ==========================================================
+     EVENTS
+     ========================================================== */
+
+  const [events, setEvents] = useState<Event[]>([]);
   const [eventId, setEventId] = useState("");
 
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [people, setPeople] = useState<Person[]>([]);
-  const [drinks, setDrinks] = useState<Drink[]>([]);
-  const [challenges, setChallenges] = useState<Challenge[]>([]);
-  const [challengeTemplates, setChallengeTemplates] = useState<
-    ChallengeTemplate[]
-  >([]);
-  const [votes, setVotes] = useState<ChallengeVote[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [rankingTitles, setRankingTitles] = useState<RankingTitle[]>([]);
+  const [showEventForm, setShowEventForm] = useState(false);
+  const [newEventTitle, setNewEventTitle] = useState("");
+  const [newEventDescription, setNewEventDescription] = useState("");
+  const [newEventLocation, setNewEventLocation] = useState("");
+  const [newEventStart, setNewEventStart] = useState("");
+  const [newEventEnd, setNewEventEnd] = useState("");
 
-  const [selectedEvent, setSelectedEvent] = useState<EventRow | null>(null);
+  /* ==========================================================
+     PROFILE
+     ========================================================== */
+
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [currentProfile, setCurrentProfile] = useState<Profile | null>(
+    null
+  );
+
+  /* ==========================================================
+     DRINKS
+     ========================================================== */
+
+  const [drinks, setDrinks] = useState<Drink[]>([]);
 
   const [drinkName, setDrinkName] = useState("");
   const [drinkBrand, setDrinkBrand] = useState("");
@@ -160,232 +179,524 @@ export default function Home() {
   const [alcohol, setAlcohol] = useState("5");
   const [price, setPrice] = useState("0");
 
+  /* ==========================================================
+     PARTICIPANTS
+     ========================================================== */
+
+  const [participants, setParticipants] = useState<Profile[]>([]);
   const [personName, setPersonName] = useState("");
 
-  const [newEventTitle, setNewEventTitle] = useState("");
-  const [newEventLocation, setNewEventLocation] = useState("");
-  const [newEventDescription, setNewEventDescription] = useState("");
+  /* ==========================================================
+     PAYMENTS
+     ========================================================== */
+
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentProfileId, setPaymentProfileId] = useState("");
+
+  /* ==========================================================
+     CHALLENGES
+     ========================================================== */
+
+  const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [challengeTemplates, setChallengeTemplates] = useState<
+    ChallengeTemplate[]
+  >([]);
 
   const [challengeTitle, setChallengeTitle] = useState("");
   const [challengeDescription, setChallengeDescription] = useState("");
-  const [challengePoints, setChallengePoints] = useState("20");
+  const [challengePoints, setChallengePoints] = useState("10");
   const [challengeCategory, setChallengeCategory] = useState("Quatsch");
-  const [challengeVotesRequired, setChallengeVotesRequired] =
-    useState("1");
+  const [challengeTarget, setChallengeTarget] = useState("");
+  const [requiredVotes, setRequiredVotes] = useState("1");
 
-  const [paymentAmount, setPaymentAmount] = useState("");
+  /* ==========================================================
+     RANKING
+     ========================================================== */
+
+  const [rankingTitles, setRankingTitles] = useState<RankingTitle[]>([]);
+
+  /* ==========================================================
+     UI
+     ========================================================== */
 
   const [message, setMessage] = useState("");
-
-  const [animation, setAnimation] =
-    useState<AnimationState | null>(null);
-
   const [loading, setLoading] = useState(false);
 
-  /* ============================================================
+  const [animation, setAnimation] = useState<
+    "none" | "prost" | "money"
+  >("none");
+
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "drinks" | "challenges" | "ranking"
+  >("overview");
+
+  /* ==========================================================
+     EVENT
+     ========================================================== */
+
+  const selectedEvent = useMemo(() => {
+    return events.find((event) => event.id === eventId) || null;
+  }, [events, eventId]);
+
+  /* ==========================================================
      HILFSFUNKTIONEN
-     ============================================================ */
-
-  function showAnimation(
-    type: AnimationType,
-    text?: string,
-    points?: number
-  ) {
-    setAnimation({
-      type,
-      text,
-      points,
-    });
-
-    window.setTimeout(() => {
-      setAnimation(null);
-    }, 2600);
-  }
+     ========================================================== */
 
   function showMessage(text: string) {
     setMessage(text);
 
     window.setTimeout(() => {
       setMessage("");
-    }, 3500);
+    }, 4500);
   }
 
-  function number(value: unknown): number {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : 0;
+  function playAnimation(type: "prost" | "money") {
+    setAnimation(type);
+
+    window.setTimeout(() => {
+      setAnimation("none");
+    }, 2300);
   }
 
-  function getDrinkName(drink: Drink) {
-    return (
-      drink.getraenk ||
-      drink.drink_name ||
-      "Getränk"
+  function getProfileWeight(profile: Profile) {
+    return Number(
+      profile.weight_kg ??
+        profile.gewicht_kg ??
+        82
     );
   }
 
-  function getDrinkLiters(drink: Drink) {
-    return number(
+  function getProfileHeight(profile: Profile) {
+    return Number(
+      profile.height_cm ??
+        profile.height_cm ??
+        182
+    );
+  }
+
+  function getProfileAge(profile: Profile) {
+    return Number(
+      profile.age ??
+        profile.alter ??
+        33
+    );
+  }
+
+  function getProfileGender(profile: Profile) {
+    return String(
+      profile.gender ??
+        profile.geschlecht ??
+        "m"
+    ).toLowerCase();
+  }
+
+  /*
+   * Einfache Näherung für die Promilleanzeige.
+   * Sie ersetzt keine medizinische Berechnung.
+   */
+
+  function calculateDrinkPromille(
+    drink: Drink,
+    profile: Profile
+  ) {
+    const volume = Number(
       drink.liters ??
         drink.menge ??
         0
     );
-  }
 
-  function getDrinkAlcohol(drink: Drink) {
-    return number(
+    const percent = Number(
       drink.alcohol_percent ??
         drink.alkohol ??
         0
     );
-  }
 
-  function getDrinkPrice(drink: Drink) {
-    return number(drink.preis);
-  }
+    const weight = getProfileWeight(profile);
 
-  function calculatePromille(
-    person: Person,
-    drink: Drink
-  ) {
-    const profile = profiles.find(
-      (p) =>
-        p.id === person.profile_id
-    );
-
-    const weight = number(
-      profile?.weight_kg ??
-        profile?.gewicht_kg ??
-        80
-    );
-
-    const gender =
-      profile?.gender ||
-      profile?.geschlecht ||
-      "m";
-
-    const liters = getDrinkLiters(drink);
-    const alcoholPercent =
-      getDrinkAlcohol(drink);
-
-    /*
-      Vereinfachte Näherung.
-      Sie ist NICHT als medizinisch genaue
-      Blutalkoholberechnung gedacht.
-    */
+    if (
+      volume <= 0 ||
+      percent <= 0 ||
+      weight <= 0
+    ) {
+      return 0;
+    }
 
     const alcoholGrams =
-      liters *
+      volume *
       1000 *
-      (alcoholPercent / 100) *
+      (percent / 100) *
       0.789;
 
+    const gender = getProfileGender(profile);
+
     const factor =
-      gender.toLowerCase().startsWith("w")
+      gender.startsWith("w") ||
+      gender === "f"
         ? 0.55
         : 0.68;
 
-    const result =
+    const raw =
       alcoholGrams /
-      Math.max(weight * factor, 1);
+      (weight * factor);
 
     return Math.max(
       0,
-      Number(result.toFixed(2))
+      raw * 0.85
     );
   }
 
-  function getRankingTitle(
-    points: number
-  ) {
+  function getRankingTitle(points: number) {
     if (rankingTitles.length === 0) {
-      if (points >= 200)
+      if (points >= 200) {
         return {
           emoji: "👑",
           title: "Zapfhahn-Legende",
         };
+      }
 
-      if (points >= 100)
-        return {
-          emoji: "🔥",
-          title: "Party-Maschine",
-        };
-
-      if (points >= 50)
+      if (points >= 100) {
         return {
           emoji: "🍻",
-          title: "Prost-Profi",
+          title: "Bier-Baron",
         };
+      }
 
-      if (points >= 20)
+      if (points >= 50) {
+        return {
+          emoji: "🔥",
+          title: "Party-Profi",
+        };
+      }
+
+      if (points >= 20) {
         return {
           emoji: "😎",
           title: "Stimmungsmacher",
         };
+      }
 
       return {
-        emoji: "🐣",
-        title: "Frischling",
+        emoji: "🍺",
+        title: "Zapfhahn-Lehrling",
       };
     }
 
     const sorted = [...rankingTitles]
       .sort(
         (a, b) =>
-          b.min_points -
-          a.min_points
-      );
-
-    const found =
-      sorted.find(
-        (title) =>
-          points >= title.min_points
+          Number(b.min_points) -
+          Number(a.min_points)
       );
 
     return (
-      found || {
-        emoji: "🐣",
-        title: "Frischling",
+      sorted.find(
+        (item) =>
+          points >=
+          Number(item.min_points)
+      ) || {
+        emoji: "🍺",
+        title: "Zapfhahn-Lehrling",
       }
     );
   }
 
-  /* ============================================================
-     EVENTS
-     ============================================================ */
+  /* ==========================================================
+     EVENTS LADEN
+     ========================================================== */
 
   async function loadEvents() {
-    const { data, error } =
-      await supabase
-        .from("events")
-        .select("*")
-        .order(
-          "created_at",
-          {
-            ascending: false,
-          }
-        );
+    const { data, error } = await supabase
+      .from("events")
+      .select("*")
+      .order("created_at", {
+        ascending: false,
+      });
 
     if (error) {
       showMessage(
-        "❌ Events konnten nicht geladen werden: " +
+        "❌ Events: " + error.message
+      );
+      return;
+    }
+
+    const loadedEvents =
+      (data || []) as Event[];
+
+    setEvents(loadedEvents);
+
+    if (
+      !eventId &&
+      loadedEvents.length > 0
+    ) {
+      setEventId(
+        loadedEvents[0].id
+      );
+    }
+  }
+
+  /* ==========================================================
+     PROFILE LADEN
+     ========================================================== */
+
+  async function loadProfiles() {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .order("username", {
+        ascending: true,
+      });
+
+    if (error) {
+      showMessage(
+        "❌ Profile: " + error.message
+      );
+      return;
+    }
+
+    const loaded =
+      (data || []) as Profile[];
+
+    setProfiles(loaded);
+
+    if (loaded.length > 0) {
+      setCurrentProfile(
+        loaded[0]
+      );
+    }
+  }
+
+  /* ==========================================================
+     EVENT-DATEN LADEN
+     ========================================================== */
+
+  async function loadEventData() {
+    if (!eventId) {
+      setDrinks([]);
+      setParticipants([]);
+      setPayments([]);
+      setChallenges([]);
+      return;
+    }
+
+    setLoading(true);
+
+    await Promise.all([
+      loadDrinks(),
+      loadParticipants(),
+      loadPayments(),
+      loadChallenges(),
+    ]);
+
+    setLoading(false);
+  }
+
+  /* ==========================================================
+     DRINKS LADEN
+     ========================================================== */
+
+  async function loadDrinks() {
+    if (!eventId) return;
+
+    const { data, error } = await supabase
+      .from("drinks")
+      .select("*")
+      .eq("event_id", eventId)
+      .order("created_at", {
+        ascending: false,
+      });
+
+    if (error) {
+      showMessage(
+        "❌ Getränke: " +
           error.message
       );
       return;
     }
 
-    setEvents(data || []);
-
-    if (
-      !eventId &&
-      data &&
-      data.length > 0
-    ) {
-      setEventId(data[0].id);
-    }
+    setDrinks(
+      (data || []) as Drink[]
+    );
   }
 
+  /* ==========================================================
+     TEILNEHMER LADEN
+     ========================================================== */
+
+  async function loadParticipants() {
+    if (!eventId) return;
+
+    const { data, error } =
+      await supabase
+        .from("event_members")
+        .select(
+          `
+          profile_id,
+          profiles (*)
+        `
+        )
+        .eq(
+          "event_id",
+          eventId
+        );
+
+    if (error) {
+      /*
+       * Falls event_members wegen
+       * RLS nicht lesbar ist,
+       * verwenden wir alternativ
+       * vorhandene Profile.
+       */
+
+      setParticipants(
+        profiles
+      );
+
+      return;
+    }
+
+    const loaded =
+      (data || [])
+        .map(
+          (item: any) =>
+            item.profiles
+        )
+        .filter(Boolean) as Profile[];
+
+    setParticipants(
+      loaded
+    );
+  }
+
+  /* ==========================================================
+     ZAHLUNGEN LADEN
+     ========================================================== */
+
+  async function loadPayments() {
+    if (!eventId) return;
+
+    const { data, error } = await supabase
+      .from("payments")
+      .select("*")
+      .eq("event_id", eventId)
+      .order("created_at", {
+        ascending: false,
+      });
+
+    if (error) {
+      showMessage(
+        "❌ Zahlungen: " +
+          error.message
+      );
+      return;
+    }
+
+    setPayments(
+      (data || []) as Payment[]
+    );
+  }
+
+  /* ==========================================================
+     CHALLENGES LADEN
+     ========================================================== */
+
+  async function loadChallenges() {
+    if (!eventId) return;
+
+    const { data, error } = await supabase
+      .from("challenges")
+      .select("*")
+      .eq("event_id", eventId)
+      .order("created_at", {
+        ascending: false,
+      });
+
+    if (error) {
+      showMessage(
+        "❌ Challenges: " +
+          error.message
+      );
+      return;
+    }
+
+    setChallenges(
+      (data || []) as Challenge[]
+    );
+  }
+
+  /* ==========================================================
+     CHALLENGE-VORLAGEN
+     ========================================================== */
+
+  async function loadChallengeTemplates() {
+    const { data, error } =
+      await supabase
+        .from("challenge_templates")
+        .select("*")
+        .eq("is_active", true)
+        .order("title");
+
+    if (error) {
+      return;
+    }
+
+    setChallengeTemplates(
+      (data || []) as ChallengeTemplate[]
+    );
+  }
+
+  /* ==========================================================
+     RANKING-TITEL
+     ========================================================== */
+
+  async function loadRankingTitles() {
+    const { data } =
+      await supabase
+        .from("ranking_titles")
+        .select("*")
+        .order("min_points", {
+          ascending: true,
+        });
+
+    setRankingTitles(
+      (data || []) as RankingTitle[]
+    );
+  }
+
+  /* ==========================================================
+     INITIAL LADEN
+     ========================================================== */
+
+  useEffect(() => {
+    loadEvents();
+    loadProfiles();
+    loadChallengeTemplates();
+    loadRankingTitles();
+  }, []);
+
+  useEffect(() => {
+    loadEventData();
+  }, [eventId]);
+
+  useEffect(() => {
+    if (
+      profiles.length > 0 &&
+      !currentProfile
+    ) {
+      setCurrentProfile(
+        profiles[0]
+      );
+    }
+  }, [profiles]);
+
+  /* ==========================================================
+     EVENT ERSTELLEN
+     ========================================================== */
+
   async function createEvent() {
-    if (!newEventTitle.trim()) {
+    if (
+      !newEventTitle.trim()
+    ) {
       showMessage(
         "❌ Bitte einen Eventnamen eingeben."
       );
@@ -394,36 +705,55 @@ export default function Home() {
 
     setLoading(true);
 
-    const inviteCode =
-      Math.random()
-        .toString(36)
-        .substring(2, 8)
-        .toUpperCase();
+    let creatorId =
+      currentProfile?.id ||
+      profiles[0]?.id ||
+      null;
+
+    const insertData: any = {
+      title:
+        newEventTitle.trim(),
+
+      description:
+        newEventDescription.trim() ||
+        null,
+
+      location:
+        newEventLocation.trim() ||
+        null,
+
+      start_date:
+        newEventStart || null,
+
+      end_date:
+        newEventEnd || null,
+
+      is_active: true,
+
+      ranking_enabled: true,
+      show_points: true,
+      show_ranking: true,
+      show_promille: true,
+      show_statistics: true,
+      show_drink_amounts: true,
+      photo_required: false,
+      ai_recognition_enabled: false,
+      manual_entry_allowed: true,
+      cost_overview_enabled: true,
+      auto_split_costs: true,
+      team_mode: false,
+      show_photos: true,
+      show_costs: true,
+      privacy_mode: false,
+
+      created_by_profile_id:
+        creatorId,
+    };
 
     const { data, error } =
       await supabase
         .from("events")
-        .insert({
-          title:
-            newEventTitle.trim(),
-          description:
-            newEventDescription.trim(),
-          location:
-            newEventLocation.trim(),
-          invite_code:
-            inviteCode,
-          is_active: true,
-
-          ranking_enabled: true,
-          show_points: true,
-          show_ranking: true,
-          show_promille: true,
-          show_statistics: true,
-          show_drink_amounts: true,
-          cost_overview_enabled: true,
-          auto_split_costs: true,
-          show_costs: true,
-        })
+        .insert(insertData)
         .select()
         .single();
 
@@ -437,40 +767,46 @@ export default function Home() {
       return;
     }
 
+    const newEvent =
+      data as Event;
+
+    setEvents((old) => [
+      newEvent,
+      ...old,
+    ]);
+
+    setEventId(
+      newEvent.id
+    );
+
     setNewEventTitle("");
-    setNewEventLocation("");
     setNewEventDescription("");
+    setNewEventLocation("");
+    setNewEventStart("");
+    setNewEventEnd("");
 
-    await loadEvents();
+    setShowEventForm(false);
 
-    if (data) {
-      setEventId(data.id);
-    }
-
-    showAnimation(
-      "toast",
-      "🎉 Event erstellt!"
+    showMessage(
+      "🎉 Event erfolgreich erstellt!"
     );
   }
 
+  /* ==========================================================
+     EVENT LÖSCHEN
+     ========================================================== */
+
   async function deleteEvent() {
-    if (!eventId) {
+    if (!selectedEvent) {
       showMessage(
         "❌ Kein Event ausgewählt."
       );
       return;
     }
 
-    const event =
-      events.find(
-        (e) => e.id === eventId
-      );
-
-    if (!event) return;
-
     const confirmed =
       window.confirm(
-        `Event "${event.title}" wirklich löschen?\n\nAlle zugehörigen Getränke, Challenges und Zahlungen werden ebenfalls entfernt.`
+        `Event "${selectedEvent.title}" wirklich löschen?`
       );
 
     if (!confirmed) return;
@@ -478,75 +814,44 @@ export default function Home() {
     setLoading(true);
 
     /*
-      Zuerst abhängige Daten löschen.
-      Dadurch sind wir nicht auf CASCADE angewiesen.
-    */
+     * abhängige Daten zuerst entfernen
+     */
 
     await supabase
       .from("challenge_votes")
       .delete()
-      .eq(
+      .in(
         "challenge_id",
-        eventId
+        challenges.map(
+          (challenge) =>
+            challenge.id
+        )
       );
-
-    const {
-      data: eventChallenges,
-    } = await supabase
-      .from("challenges")
-      .select("id")
-      .eq(
-        "event_id",
-        eventId
-      );
-
-    if (eventChallenges) {
-      const ids =
-        eventChallenges.map(
-          (c) => c.id
-        );
-
-      if (ids.length > 0) {
-        await supabase
-          .from(
-            "challenge_participants"
-          )
-          .delete()
-          .in(
-            "challenge_id",
-            ids
-          );
-
-        await supabase
-          .from(
-            "challenge_results"
-          )
-          .delete()
-          .in(
-            "challenge_id",
-            ids
-          );
-
-        await supabase
-          .from("challenge_votes")
-          .delete()
-          .in(
-            "challenge_id",
-            ids
-          );
-      }
-    }
 
     await supabase
-      .from("challenges")
+      .from("challenge_results")
       .delete()
-      .eq(
-        "event_id",
-        eventId
+      .in(
+        "challenge_id",
+        challenges.map(
+          (challenge) =>
+            challenge.id
+        )
       );
 
     await supabase
-      .from("drinks")
+      .from("challenge_participants")
+      .delete()
+      .in(
+        "challenge_id",
+        challenges.map(
+          (challenge) =>
+            challenge.id
+        )
+      );
+
+    await supabase
+      .from("challenges")
       .delete()
       .eq(
         "event_id",
@@ -555,6 +860,14 @@ export default function Home() {
 
     await supabase
       .from("payments")
+      .delete()
+      .eq(
+        "event_id",
+        eventId
+      );
+
+    await supabase
+      .from("drinks")
       .delete()
       .eq(
         "event_id",
@@ -588,200 +901,204 @@ export default function Home() {
       return;
     }
 
-    setEventId("");
-    setSelectedEvent(null);
+    const remaining =
+      events.filter(
+        (event) =>
+          event.id !== eventId
+      );
 
-    setPeople([]);
-    setDrinks([]);
-    setChallenges([]);
-    setPayments([]);
+    setEvents(
+      remaining
+    );
 
-    await loadEvents();
+    setEventId(
+      remaining[0]?.id || ""
+    );
 
-    showAnimation(
-      "toast",
-      "🗑️ Event gelöscht"
+    showMessage(
+      "🗑️ Event gelöscht."
     );
   }
 
-  /* ============================================================
-     PROFILE
-     ============================================================ */
+  /* ==========================================================
+     TEILNEHMER HINZUFÜGEN
+     ========================================================== */
 
-  async function loadProfiles() {
-    const { data } =
-      await supabase
-        .from("profiles")
-        .select("*");
-
-    setProfiles(data || []);
-  }
-
-  /* ============================================================
-     EVENT DATA
-     ============================================================ */
-
-  async function loadEventData() {
-    if (!eventId) return;
-
-    const event =
-      events.find(
-        (e) => e.id === eventId
-      ) || null;
-
-    setSelectedEvent(event);
-
-    const {
-      data: drinkData,
-    } = await supabase
-      .from("drinks")
-      .select("*")
-      .eq(
-        "event_id",
-        eventId
-      )
-      .order(
-        "created_at",
-        {
-          ascending: false,
-        }
-      );
-
-    setDrinks(drinkData || []);
-
-    const {
-      data: members,
-    } = await supabase
-      .from("event_members")
-      .select("*")
-      .eq(
-        "event_id",
-        eventId
-      );
-
+  async function addParticipant() {
     if (
-      members &&
-      profiles.length > 0
+      !eventId
     ) {
-      const mapped: Person[] =
-        members.map(
-          (member) => {
-            const profile =
-              profiles.find(
-                (p) =>
-                  p.id ===
-                  member.profile_id
-              );
-
-            const profileDrinks =
-              (drinkData || []).filter(
-                (drink) =>
-                  drink.profile_id ===
-                  member.profile_id
-              );
-
-            const liters =
-              profileDrinks.reduce(
-                (sum, drink) =>
-                  sum +
-                  getDrinkLiters(
-                    drink
-                  ),
-                0
-              );
-
-            const cost =
-              profileDrinks.reduce(
-                (sum, drink) =>
-                  sum +
-                  getDrinkPrice(
-                    drink
-                  ),
-                0
-              );
-
-            const drinkPoints =
-              profileDrinks.length *
-              10;
-
-            return {
-              id: member.id,
-              profile_id:
-                member.profile_id,
-              name:
-                profile?.username ||
-                "Teilnehmer",
-              drinks:
-                profileDrinks.length,
-              liters,
-              cost,
-              points:
-                number(
-                  profile?.points
-                ) +
-                drinkPoints,
-              promille: 0,
-            };
-          }
-        );
-
-      setPeople(mapped);
+      showMessage(
+        "❌ Bitte zuerst ein Event auswählen."
+      );
+      return;
     }
 
-    const {
-      data: challengeData,
-    } = await supabase
-      .from("challenges")
-      .select("*")
-      .eq(
-        "event_id",
-        eventId
-      )
-      .order(
-        "created_at",
-        {
-          ascending: false,
-        }
+    if (
+      !personName.trim()
+    ) {
+      showMessage(
+        "❌ Bitte einen Namen eingeben."
+      );
+      return;
+    }
+
+    /*
+     * Existierendes Profil suchen
+     */
+
+    let profile =
+      profiles.find(
+        (item) =>
+          String(
+            item.username
+          ).toLowerCase() ===
+          personName
+            .trim()
+            .toLowerCase()
+      ) || null;
+
+    /*
+     * Wenn kein Profil existiert,
+     * versuchen wir es anzulegen.
+     */
+
+    if (!profile) {
+      const { data, error } =
+        await supabase
+          .from("profiles")
+          .insert({
+            username:
+              personName.trim(),
+            role: "member",
+            points: 0,
+            drinks_count: 0,
+          })
+          .select()
+          .single();
+
+      if (error) {
+        showMessage(
+          "❌ Teilnehmer konnte nicht erstellt werden: " +
+            error.message
+        );
+        return;
+      }
+
+      profile =
+        data as Profile;
+
+      setProfiles((old) => [
+        ...old,
+        profile!,
+      ]);
+    }
+
+    /*
+     * Prüfen, ob schon Mitglied
+     */
+
+    const already =
+      participants.some(
+        (item) =>
+          item.id ===
+          profile!.id
       );
 
-    setChallenges(
-      challengeData || []
-    );
-
-    const {
-      data: paymentData,
-    } = await supabase
-      .from("payments")
-      .select("*")
-      .eq(
-        "event_id",
-        eventId
-      )
-      .order(
-        "created_at",
-        {
-          ascending: false,
-        }
+    if (already) {
+      showMessage(
+        "❌ Teilnehmer ist bereits im Event."
       );
+      return;
+    }
 
-    setPayments(
-      paymentData || []
+    const { error } =
+      await supabase
+        .from("event_members")
+        .insert({
+          event_id:
+            eventId,
+          profile_id:
+            profile.id,
+          joined_via_code:
+            null,
+          gender_factor:
+            getProfileGender(
+              profile
+            ).startsWith("w")
+              ? 0.55
+              : 0.68,
+        });
+
+    if (error) {
+      showMessage(
+        "❌ Teilnehmer konnte nicht hinzugefügt werden: " +
+          error.message
+      );
+      return;
+    }
+
+    setParticipants(
+      (old) => [
+        ...old,
+        profile!,
+      ]
     );
 
-    const {
-      data: voteData,
-    } = await supabase
-      .from("challenge_votes")
-      .select("*");
+    setPersonName("");
 
-    setVotes(
-      voteData || []
+    showMessage(
+      `👋 ${profile.username || personName} ist dabei!`
     );
   }
 
-  /* ============================================================
-     DRINKS
-     ============================================================ */
+  /* ==========================================================
+     TEILNEHMER ENTFERNEN
+     ========================================================== */
+
+  async function removeParticipant(
+    profileId: string
+  ) {
+    if (!eventId) return;
+
+    const { error } =
+      await supabase
+        .from("event_members")
+        .delete()
+        .eq(
+          "event_id",
+          eventId
+        )
+        .eq(
+          "profile_id",
+          profileId
+        );
+
+    if (error) {
+      showMessage(
+        "❌ Teilnehmer konnte nicht entfernt werden: " +
+          error.message
+      );
+      return;
+    }
+
+    setParticipants(
+      (old) =>
+        old.filter(
+          (item) =>
+            item.id !==
+            profileId
+        )
+    );
+
+    showMessage(
+      "👋 Teilnehmer entfernt."
+    );
+  }
+
+  /* ==========================================================
+     GETRÄNK SPEICHERN
+     ========================================================== */
 
   async function saveDrink() {
     if (!eventId) {
@@ -791,44 +1108,73 @@ export default function Home() {
       return;
     }
 
-    if (!drinkName.trim()) {
+    if (
+      !drinkName.trim()
+    ) {
       showMessage(
         "❌ Bitte ein Getränk eingeben."
       );
       return;
     }
 
-    setLoading(true);
+    const drinkLiters =
+      Number(liters);
 
-    const { error } =
+    const drinkAlcohol =
+      Number(alcohol);
+
+    const drinkPrice =
+      Number(price);
+
+    const { data, error } =
       await supabase
         .from("drinks")
         .insert({
-          event_id: eventId,
-          getraenk:
-            drinkName.trim(),
-          drink_name:
-            drinkName.trim(),
-          marke:
-            drinkBrand.trim(),
-          brand:
-            drinkBrand.trim(),
+          event_id:
+            eventId,
+
+          profile_id:
+            null,
+
           category:
             drinkCategory,
-          menge:
-            number(liters),
-          liters:
-            number(liters),
-          alkohol:
-            number(alcohol),
-          alcohol_percent:
-            number(alcohol),
-          preis:
-            number(price),
-          quantity: 1,
-        });
 
-    setLoading(false);
+          drink_name:
+            drinkName.trim(),
+
+          brand:
+            drinkBrand.trim() ||
+            null,
+
+          liters:
+            drinkLiters,
+
+          alcohol_percent:
+            drinkAlcohol,
+
+          quantity: 1,
+
+          marke:
+            drinkBrand.trim() ||
+            null,
+
+          getraenk:
+            drinkName.trim(),
+
+          menge:
+            drinkLiters,
+
+          alkohol:
+            drinkAlcohol,
+
+          preis:
+            drinkPrice,
+
+          shared_cost:
+            true,
+        })
+        .select()
+        .single();
 
     if (error) {
       showMessage(
@@ -838,50 +1184,69 @@ export default function Home() {
       return;
     }
 
+    setDrinks((old) => [
+      data as Drink,
+      ...old,
+    ]);
+
     setDrinkName("");
     setDrinkBrand("");
     setLiters("0.5");
     setAlcohol("5");
     setPrice("0");
 
-    await loadEventData();
-
-    showAnimation(
-      "prost",
-      "PROST!"
+    showMessage(
+      "🍺 Getränk gespeichert!"
     );
   }
 
-  async function assignDrink(
-    person: Person,
-    drinkId: string
+  /* ==========================================================
+     GETRÄNK TRINKEN / ZUORDNEN
+     ========================================================== */
+
+  async function drinkForPerson(
+    profile: Profile,
+    drink: Drink
   ) {
-    const drink =
-      drinks.find(
-        (d) => d.id === drinkId
+    if (!eventId) return;
+
+    const promille =
+      calculateDrinkPromille(
+        drink,
+        profile
       );
 
-    if (!drink) return;
-
-    if (!person.profile_id) {
-      showMessage(
-        "❌ Teilnehmer besitzt kein Profil."
+    const drinkLiters =
+      Number(
+        drink.liters ??
+          drink.menge ??
+          0
       );
-      return;
-    }
 
-    const {
-      error,
-    } = await supabase
-      .from("drinks")
-      .update({
-        profile_id:
-          person.profile_id,
-      })
-      .eq(
-        "id",
-        drink.id
+    const drinkAlcohol =
+      Number(
+        drink.alcohol_percent ??
+          drink.alkohol ??
+          0
       );
+
+    /*
+     * Getränk mit Teilnehmer verknüpfen
+     */
+
+    const { error } =
+      await supabase
+        .from("drinks")
+        .update({
+          profile_id:
+            profile.id,
+          promille_wert:
+            promille,
+        })
+        .eq(
+          "id",
+          drink.id
+        );
 
     if (error) {
       showMessage(
@@ -892,482 +1257,157 @@ export default function Home() {
     }
 
     /*
-      Punkte für Getränk
-    */
+     * Punkte aktualisieren
+     */
 
-    const profile =
-      profiles.find(
-        (p) =>
-          p.id ===
-          person.profile_id
+    const oldPoints =
+      Number(
+        profile.points || 0
       );
 
-    if (profile) {
-      await supabase
-        .from("profiles")
-        .update({
-          points:
-            number(
-              profile.points
-            ) + 10,
-          drinks_count:
-            number(
-              profile.drinks_count
-            ) + 1,
-        })
-        .eq(
-          "id",
-          profile.id
-        );
-    }
+    const newPoints =
+      oldPoints + 10;
 
-    await loadProfiles();
-    await loadEventData();
-
-    showAnimation(
-      "prost",
-      "PROST!",
-      10
-    );
-  }
-
-  async function deleteDrink(
-    drinkId: string
-  ) {
-    const confirmed =
-      window.confirm(
-        "Getränk wirklich löschen?"
-      );
-
-    if (!confirmed) return;
-
-    const { error } =
-      await supabase
-        .from("drinks")
-        .delete()
-        .eq(
-          "id",
-          drinkId
-        );
-
-    if (error) {
-      showMessage(
-        "❌ " +
-          error.message
-      );
-      return;
-    }
-
-    await loadEventData();
-
-    showMessage(
-      "🗑️ Getränk gelöscht."
-    );
-  }
-
-  /* ============================================================
-     PARTICIPANTS
-     ============================================================ */
-
-  async function addPerson() {
-    if (!personName.trim()) {
-      showMessage(
-        "❌ Bitte einen Namen eingeben."
-      );
-      return;
-    }
-
-    const existing =
-      profiles.find(
-        (profile) =>
-          profile.username
-            ?.toLowerCase() ===
-          personName
-            .trim()
-            .toLowerCase()
-      );
-
-    let profileId =
-      existing?.id;
-
-    if (!profileId) {
-      const {
-        data,
-        error,
-      } = await supabase
-        .from("profiles")
-        .insert({
-          username:
-            personName.trim(),
-          points: 0,
-          drinks_count: 0,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        showMessage(
-          "❌ Teilnehmer konnte nicht angelegt werden: " +
-            error.message
-        );
-        return;
-      }
-
-      profileId = data.id;
-
-      await loadProfiles();
-    }
-
-    if (!profileId) return;
-
-    const {
-      error,
-    } = await supabase
-      .from("event_members")
-      .insert({
-        event_id: eventId,
-        profile_id:
-          profileId,
-        joined_via_code:
-          "manual",
-      });
-
-    if (error) {
-      showMessage(
-        "❌ Teilnehmer konnte nicht hinzugefügt werden: " +
-          error.message
-      );
-      return;
-    }
-
-    setPersonName("");
-
-    await loadEventData();
-
-    showAnimation(
-      "points",
-      "👥 Teilnehmer dabei!"
-    );
-  }
-
-  async function removePerson(
-    person: Person
-  ) {
-    const confirmed =
-      window.confirm(
-        `${person.name} wirklich aus diesem Event entfernen?`
-      );
-
-    if (!confirmed) return;
-
-    const {
-      error,
-    } = await supabase
-      .from("event_members")
-      .delete()
-      .eq(
-        "id",
-        person.id
-      );
-
-    if (error) {
-      showMessage(
-        "❌ Teilnehmer konnte nicht entfernt werden: " +
-          error.message
-      );
-      return;
-    }
-
-    await loadEventData();
-
-    showMessage(
-      "👋 Teilnehmer entfernt."
-    );
-  }
-
-  /* ============================================================
-     CHALLENGES
-     ============================================================ */
-
-  async function loadChallengeTemplates() {
-    const {
-      data,
-    } = await supabase
-      .from(
-        "challenge_templates"
-      )
-      .select("*")
-      .eq(
-        "is_active",
-        true
-      )
-      .order(
-        "title"
-      );
-
-    setChallengeTemplates(
-      data || []
-    );
-  }
-
-  async function createChallenge(
-    template?: ChallengeTemplate
-  ) {
-    const title =
-      template?.title ||
-      challengeTitle;
-
-    const description =
-      template?.description ||
-      challengeDescription;
-
-    const points =
-      template?.default_points ??
-      number(challengePoints);
-
-    const category =
-      template?.category ||
-      challengeCategory;
-
-    if (!title.trim()) {
-      showMessage(
-        "❌ Bitte eine Challenge eingeben."
-      );
-      return;
-    }
-
-    const {
-      error,
-    } = await supabase
-      .from("challenges")
-      .insert({
-        event_id:
-          eventId,
-        title:
-          title.trim(),
-        description:
-          description?.trim() ||
-          null,
-        points,
-        category,
-        status:
-          "open",
-        required_votes:
-          number(
-            challengeVotesRequired
-          ),
-        is_active:
-          true,
-      });
-
-    if (error) {
-      showMessage(
-        "❌ Challenge konnte nicht erstellt werden: " +
-          error.message
-      );
-      return;
-    }
-
-    setChallengeTitle("");
-    setChallengeDescription("");
-
-    await loadEventData();
-
-    showAnimation(
-      "challenge",
-      "🎯 CHALLENGE!"
-    );
-  }
-
-  async function completeChallenge(
-    challenge: Challenge,
-    winner: Person
-  ) {
-    if (!winner.profile_id) {
-      showMessage(
-        "❌ Teilnehmer besitzt kein Profil."
-      );
-      return;
-    }
-
-    const points =
-      number(
-        challenge.points
-      );
-
-    const {
-      error,
-    } = await supabase
-      .from("challenges")
+    await supabase
+      .from("profiles")
       .update({
-        status:
-          "completed",
-        winner_profile_id:
-          winner.profile_id,
-        completed_at:
-          new Date().toISOString(),
-        is_active:
-          false,
+        points:
+          newPoints,
+        drinks_count:
+          Number(
+            profile.drinks_count ||
+              0
+          ) + 1,
       })
       .eq(
         "id",
-        challenge.id
+        profile.id
       );
 
-    if (error) {
+    /*
+     * Lokalen Zustand aktualisieren
+     */
+
+    setProfiles((old) =>
+      old.map((item) =>
+        item.id ===
+        profile.id
+          ? {
+              ...item,
+              points:
+                newPoints,
+              drinks_count:
+                Number(
+                  item.drinks_count ||
+                    0
+                ) + 1,
+            }
+          : item
+      )
+    );
+
+    setParticipants(
+      (old) =>
+        old.map((item) =>
+          item.id ===
+          profile.id
+            ? {
+                ...item,
+                points:
+                  newPoints,
+                drinks_count:
+                  Number(
+                    item.drinks_count ||
+                      0
+                  ) + 1,
+              }
+            : item
+        )
+    );
+
+    setDrinks((old) =>
+      old.map((item) =>
+        item.id ===
+        drink.id
+          ? {
+              ...item,
+              profile_id:
+                profile.id,
+              promille_wert:
+                promille,
+            }
+          : item
+      )
+    );
+
+    playAnimation(
+      "prost"
+    );
+
+    showMessage(
+      `🍻 ${profile.username || "Teilnehmer"} bekommt ${drinkLiters.toFixed(
+        1
+      )} L · ${drinkAlcohol.toFixed(
+        1
+      )}% · +10 Punkte`
+    );
+  }
+
+  /* ==========================================================
+     ZAHLUNG SPEICHERN
+     ========================================================== */
+
+  async function savePayment() {
+    if (!eventId) {
       showMessage(
-        "❌ Challenge konnte nicht abgeschlossen werden: " +
-          error.message
+        "❌ Bitte zuerst ein Event auswählen."
       );
       return;
     }
 
-    await supabase
-      .from(
-        "challenge_results"
-      )
-      .insert({
-        challenge_id:
-          challenge.id,
-        profile_id:
-          winner.profile_id,
-        place: 1,
-        points,
-        result_type:
-          "winner",
-      });
-
-    const profile =
-      profiles.find(
-        (p) =>
-          p.id ===
-          winner.profile_id
+    const amount =
+      Number(
+        paymentAmount
       );
 
-    if (profile) {
-      await supabase
-        .from("profiles")
-        .update({
-          points:
-            number(
-              profile.points
-            ) + points,
-        })
-        .eq(
-          "id",
-          profile.id
-        );
-    }
-
-    await loadProfiles();
-    await loadEventData();
-
-    showAnimation(
-      "points",
-      `🏆 ${winner.name} +${points} Punkte`,
-      points
-    );
-  }
-
-  async function voteForChallenge(
-    challenge: Challenge,
-    target: Person,
-    voter: Person
-  ) {
     if (
-      !voter.profile_id ||
-      !target.profile_id
+      !amount ||
+      amount <= 0
     ) {
       showMessage(
-        "❌ Profil fehlt."
+        "❌ Bitte einen gültigen Betrag eingeben."
       );
       return;
     }
 
-    const existing =
-      votes.find(
-        (vote) =>
-          vote.challenge_id ===
-            challenge.id &&
-          vote.voter_profile_id ===
-            voter.profile_id
-      );
+    const payer =
+      paymentProfileId ||
+      currentProfile?.id ||
+      participants[0]?.id ||
+      profiles[0]?.id ||
+      null;
 
-    if (existing) {
-      showMessage(
-        "🗳️ Du hast für diese Challenge bereits abgestimmt."
-      );
-      return;
-    }
+    const { data, error } =
+      await supabase
+        .from("payments")
+        .insert({
+          event_id:
+            eventId,
 
-    const {
-      error,
-    } = await supabase
-      .from(
-        "challenge_votes"
-      )
-      .insert({
-        challenge_id:
-          challenge.id,
-        voter_profile_id:
-          voter.profile_id,
-        target_profile_id:
-          target.profile_id,
-        vote:
-          "yes",
-      });
+          betrag:
+            amount,
 
-    if (error) {
-      showMessage(
-        "❌ Abstimmung fehlgeschlagen: " +
-          error.message
-      );
-      return;
-    }
+          bezahlt_von:
+            payer,
 
-    await loadEventData();
+          profile_id:
+            payer,
 
-    showAnimation(
-      "points",
-      "🗳️ Stimme abgegeben!"
-    );
-  }
-
-  /* ============================================================
-     PAYMENTS
-     ============================================================ */
-
-  async function savePayment(
-    person?: Person
-  ) {
-    const amount =
-      number(paymentAmount);
-
-    if (amount <= 0) {
-      showMessage(
-        "❌ Bitte einen Betrag eingeben."
-      );
-      return;
-    }
-
-    const {
-      error,
-    } = await supabase
-      .from("payments")
-      .insert({
-        event_id:
-          eventId,
-        betrag:
-          amount,
-        profile_id:
-          person?.profile_id ||
-          null,
-        bezahlt_von:
-          person?.profile_id ||
-          null,
-        status:
-          "paid",
-      });
+          status:
+            "paid",
+        })
+        .select()
+        .single();
 
     if (error) {
       showMessage(
@@ -1377,242 +1417,543 @@ export default function Home() {
       return;
     }
 
+    setPayments((old) => [
+      data as Payment,
+      ...old,
+    ]);
+
     setPaymentAmount("");
 
-    await loadEventData();
+    playAnimation(
+      "money"
+    );
 
-    showAnimation(
-      "money",
-      `💶 ${amount.toFixed(2)} € bezahlt`
+    showMessage(
+      `💶 ${amount.toFixed(
+        2
+      )} € bezahlt!`
     );
   }
 
-  /* ============================================================
-     DATEN LADEN
-     ============================================================ */
+  /* ==========================================================
+     CHALLENGE ERSTELLEN
+     ========================================================== */
 
-  useEffect(() => {
-    loadEvents();
-    loadProfiles();
-    loadChallengeTemplates();
-  }, []);
+  async function createChallenge() {
+    if (!eventId) {
+      showMessage(
+        "❌ Bitte zuerst ein Event auswählen."
+      );
+      return;
+    }
 
-  useEffect(() => {
-    if (!eventId) return;
+    if (
+      !challengeTitle.trim()
+    ) {
+      showMessage(
+        "❌ Bitte einen Challenge-Titel eingeben."
+      );
+      return;
+    }
 
-    loadEventData();
-  }, [
-    eventId,
-    profiles.length,
-    events.length,
-  ]);
+    const points =
+      Math.max(
+        1,
+        Number(
+          challengePoints
+        ) || 10
+      );
 
-  useEffect(() => {
-    const event =
-      events.find(
-        (e) => e.id === eventId
-      ) || null;
+    const votes =
+      Math.max(
+        1,
+        Number(
+          requiredVotes
+        ) || 1
+      );
 
-    setSelectedEvent(event);
-  }, [
-    eventId,
-    events,
-  ]);
+    const creator =
+      currentProfile?.id ||
+      profiles[0]?.id ||
+      null;
 
-  /* ============================================================
-     STATISTIK
-     ============================================================ */
+    const { data, error } =
+      await supabase
+        .from("challenges")
+        .insert({
+          event_id:
+            eventId,
+
+          title:
+            challengeTitle.trim(),
+
+          description:
+            challengeDescription.trim() ||
+            null,
+
+          points,
+
+          category:
+            challengeCategory,
+
+          status:
+            "open",
+
+          created_by_profile_id:
+            creator,
+
+          assigned_profile_id:
+            challengeTarget ||
+            null,
+
+          required_votes:
+            votes,
+
+          is_active:
+            true,
+        })
+        .select()
+        .single();
+
+    if (error) {
+      showMessage(
+        "❌ Challenge konnte nicht erstellt werden: " +
+          error.message
+      );
+      return;
+    }
+
+    setChallenges(
+      (old) => [
+        data as Challenge,
+        ...old,
+      ]
+    );
+
+    setChallengeTitle("");
+    setChallengeDescription("");
+    setChallengePoints("10");
+    setChallengeTarget("");
+    setRequiredVotes("1");
+
+    showMessage(
+      "🎯 Challenge erstellt!"
+    );
+  }
+
+  /* ==========================================================
+     VORLAGE ÜBERNEHMEN
+     ========================================================== */
+
+  function useChallengeTemplate(
+    template: ChallengeTemplate
+  ) {
+    setChallengeTitle(
+      template.title
+    );
+
+    setChallengeDescription(
+      template.description ||
+        ""
+    );
+
+    setChallengePoints(
+      String(
+        template.default_points ||
+          10
+      )
+    );
+
+    setChallengeCategory(
+      template.category ||
+        "Quatsch"
+    );
+
+    setRequiredVotes(
+      String(
+        template.minimum_votes ||
+          1
+      )
+    );
+  }
+
+  /* ==========================================================
+     CHALLENGE ABSCHLIESSEN
+     ========================================================== */
+
+  async function completeChallenge(
+    challenge: Challenge,
+    winnerId?: string
+  ) {
+    const winner =
+      winnerId ||
+      challenge.assigned_profile_id ||
+      null;
+
+    const points =
+      Number(
+        challenge.points || 0
+      );
+
+    /*
+     * Challenge aktualisieren
+     */
+
+    const { error } =
+      await supabase
+        .from("challenges")
+        .update({
+          status:
+            "completed",
+
+          winner_profile_id:
+            winner,
+
+          completed_at:
+            new Date().toISOString(),
+
+          is_active:
+            false,
+        })
+        .eq(
+          "id",
+          challenge.id
+        );
+
+    if (error) {
+      showMessage(
+        "❌ Challenge konnte nicht abgeschlossen werden: " +
+          error.message
+      );
+      return;
+    }
+
+    /*
+     * Gewinner bekommt Punkte
+     */
+
+    if (winner) {
+      const winnerProfile =
+        profiles.find(
+          (profile) =>
+            profile.id ===
+            winner
+        );
+
+      if (winnerProfile) {
+        const newPoints =
+          Number(
+            winnerProfile.points ||
+              0
+          ) + points;
+
+        await supabase
+          .from("profiles")
+          .update({
+            points:
+              newPoints,
+          })
+          .eq(
+            "id",
+            winner
+          );
+
+        setProfiles(
+          (old) =>
+            old.map(
+              (profile) =>
+                profile.id ===
+                winner
+                  ? {
+                      ...profile,
+                      points:
+                        newPoints,
+                    }
+                  : profile
+            )
+        );
+
+        setParticipants(
+          (old) =>
+            old.map(
+              (profile) =>
+                profile.id ===
+                winner
+                  ? {
+                      ...profile,
+                      points:
+                        newPoints,
+                    }
+                  : profile
+            )
+        );
+
+        await supabase
+          .from(
+            "challenge_results"
+          )
+          .insert({
+            challenge_id:
+              challenge.id,
+            profile_id:
+              winner,
+            place: 1,
+            points,
+            result_type:
+              "winner",
+          });
+      }
+    }
+
+    setChallenges(
+      (old) =>
+        old.map(
+          (item) =>
+            item.id ===
+            challenge.id
+              ? {
+                  ...item,
+                  status:
+                    "completed",
+                  winner_profile_id:
+                    winner,
+                  completed_at:
+                    new Date().toISOString(),
+                  is_active:
+                    false,
+                }
+              : item
+        )
+    );
+
+    showMessage(
+      `🏆 Challenge abgeschlossen! +${points} Punkte`
+    );
+  }
+
+  /* ==========================================================
+     CHALLENGE LÖSCHEN
+     ========================================================== */
+
+  async function deleteChallenge(
+    challengeId: string
+  ) {
+    const confirmed =
+      window.confirm(
+        "Challenge wirklich löschen?"
+      );
+
+    if (!confirmed) return;
+
+    await supabase
+      .from("challenge_votes")
+      .delete()
+      .eq(
+        "challenge_id",
+        challengeId
+      );
+
+    await supabase
+      .from(
+        "challenge_participants"
+      )
+      .delete()
+      .eq(
+        "challenge_id",
+        challengeId
+      );
+
+    await supabase
+      .from(
+        "challenge_results"
+      )
+      .delete()
+      .eq(
+        "challenge_id",
+        challengeId
+      );
+
+    const { error } =
+      await supabase
+        .from("challenges")
+        .delete()
+        .eq(
+          "id",
+          challengeId
+        );
+
+    if (error) {
+      showMessage(
+        "❌ Challenge konnte nicht gelöscht werden: " +
+          error.message
+      );
+      return;
+    }
+
+    setChallenges(
+      (old) =>
+        old.filter(
+          (item) =>
+            item.id !==
+            challengeId
+        )
+    );
+
+    showMessage(
+      "🗑️ Challenge gelöscht."
+    );
+  }
+
+  /* ==========================================================
+     BERECHNUNGEN
+     ========================================================== */
 
   const totalLiters =
     drinks.reduce(
       (sum, drink) =>
         sum +
-        getDrinkLiters(
-          drink
-        ),
+        Number(
+          drink.liters ??
+            drink.menge ??
+            0
+        ) *
+          Number(
+            drink.quantity || 1
+          ),
       0
     );
 
-  const totalCost =
+  const totalDrinkCost =
     drinks.reduce(
       (sum, drink) =>
         sum +
-        getDrinkPrice(
-          drink
-        ),
+        Number(
+          drink.preis || 0
+        ) *
+          Number(
+            drink.quantity || 1
+          ),
       0
     );
 
-  const totalPaid =
+  const totalPayments =
     payments.reduce(
       (sum, payment) =>
         sum +
-        number(
-          payment.betrag
+        Number(
+          payment.betrag || 0
         ),
       0
+    );
+
+  const remainingCost =
+    Math.max(
+      0,
+      totalDrinkCost -
+        totalPayments
     );
 
   const costPerPerson =
-    people.length > 0
-      ? totalCost /
-        people.length
+    participants.length > 0
+      ? totalDrinkCost /
+        participants.length
       : 0;
 
   const totalPoints =
-    people.reduce(
-      (sum, person) =>
+    profiles.reduce(
+      (sum, profile) =>
         sum +
-        number(
-          person.points
+        Number(
+          profile.points || 0
         ),
       0
     );
 
-  const ranking = [
-    ...people,
-  ].sort(
-    (a, b) =>
-      b.points -
-      a.points
-  );
+  const ranking =
+    [...profiles]
+      .sort(
+        (a, b) =>
+          Number(
+            b.points || 0
+          ) -
+          Number(
+            a.points || 0
+          )
+      )
+      .slice(0, 20);
 
-  const topPerson =
-    ranking[0];
-
-  const averageDrinkAlcohol =
-    drinks.length > 0
-      ? drinks.reduce(
-          (sum, drink) =>
-            sum +
-            getDrinkAlcohol(
-              drink
-            ),
-          0
-        ) /
-        drinks.length
-      : 0;
-
-  const openChallenges =
-    challenges.filter(
-      (challenge) =>
-        challenge.status !==
-        "completed"
-    );
-
-  const completedChallenges =
-    challenges.filter(
-      (challenge) =>
-        challenge.status ===
-        "completed"
-    );
-
-  const paymentBalance =
-    totalPaid - totalCost;
-
-  const currentRankingTitle =
-    topPerson
-      ? getRankingTitle(
-          topPerson.points
-        )
-      : {
-          emoji: "🏆",
-          title: "Noch kein Champion",
-        };
-
-  /* ============================================================
+  /* ==========================================================
      RENDER
-     ============================================================ */
+     ========================================================== */
 
   return (
-    <main className="page">
-      <div className="app">
+    <main className="app">
+      {/* ======================================================
+          ANIMATION
+          ====================================================== */}
 
-        {/* =====================================================
-            ANIMATIONEN
-        ===================================================== */}
-
-        {animation?.type ===
-          "prost" && (
-          <div className="animationOverlay prostOverlay">
-            <div className="beerLeft">
-              🍺
-            </div>
-
-            <div className="beerRight">
+      {animation ===
+        "prost" && (
+        <div className="animationOverlay">
+          <div className="beerClash">
+            <div className="beer beerLeft">
               🍺
             </div>
 
             <div className="prostText">
-              PROST!
+              PROST! 🍻
             </div>
 
-            {animation.points &&
-              animation.points > 0 && (
-                <div className="animationPoints">
-                  +{animation.points} Punkte
-                </div>
-              )}
+            <div className="beer beerRight">
+              🍺
+            </div>
           </div>
-        )}
 
-        {animation?.type ===
-          "money" && (
-          <div className="moneyOverlay">
-            {Array.from({
-              length: 28,
-            }).map((_, i) => (
+          <div className="spark spark1">
+            ✨
+          </div>
+          <div className="spark spark2">
+            ✨
+          </div>
+          <div className="spark spark3">
+            ✨
+          </div>
+        </div>
+      )}
+
+      {animation ===
+        "money" && (
+        <div className="moneyOverlay">
+          {Array.from({
+            length: 30,
+          }).map(
+            (_, index) => (
               <span
-                key={i}
+                key={index}
                 className="money"
                 style={{
-                  left: `${Math.random() * 100}%`,
-                  animationDelay: `${
-                    Math.random() * 0.8
-                  }s`,
+                  left:
+                    `${(index * 37) % 100}%`,
+                  animationDelay:
+                    `${(index % 10) * 0.08}s`,
                 }}
               >
                 💶
               </span>
-            ))}
+            )
+          )}
 
-            <div className="moneyText">
-              💰 BEZAHLT!
-            </div>
+          <div className="moneyText">
+            💸 BEZAHLT! 💸
           </div>
-        )}
+        </div>
+      )}
 
-        {animation?.type ===
-          "points" && (
-          <div className="pointsOverlay">
-            <div className="pointsEmoji">
-              🏆
-            </div>
+      <div className="container">
 
-            <div className="pointsText">
-              {animation.text}
-            </div>
-          </div>
-        )}
-
-        {animation?.type ===
-          "challenge" && (
-          <div className="challengeAnimation">
-            <div>
-              🎯
-            </div>
-            <strong>
-              CHALLENGE!
-            </strong>
-            <span>
-              Wer traut sich?
-            </span>
-          </div>
-        )}
-
-        {/* =====================================================
+        {/* ==================================================
             HEADER
-        ===================================================== */}
+            ================================================== */}
 
         <header className="hero">
           <div className="heroLogo">
@@ -1621,7 +1962,7 @@ export default function Home() {
 
           <div className="heroText">
             <div className="eyebrow">
-              DIE PARTY-ZENTRALE
+              GÜSTEN · PARTY · CHAOS
             </div>
 
             <h1>
@@ -1631,20 +1972,23 @@ export default function Home() {
             </h1>
 
             <p>
-              Getränke · Challenges ·
-              Punkte · Chaos
+              Dein Event.
+              Deine Getränke.
+              Deine Challenges.
+              Dein Chaos.
             </p>
           </div>
         </header>
 
-        {/* =====================================================
+        {/* ==================================================
             EVENT
-        ===================================================== */}
+            ================================================== */}
 
-        <section className="card eventCard">
-          <div className="sectionTitle">
+        <section className="glassCard eventCard">
+
+          <div className="sectionTop">
             <div>
-              <span className="icon">
+              <span className="sectionEmoji">
                 📅
               </span>
 
@@ -1653,23 +1997,23 @@ export default function Home() {
                   Aktuelles Event
                 </h2>
 
-                <small>
-                  Wo die Legenden
-                  entstehen
-                </small>
+                <p>
+                  Wo gerade das
+                  Chaos stattfindet
+                </p>
               </div>
             </div>
 
-            {selectedEvent && (
-              <button
-                className="dangerButton"
-                onClick={
-                  deleteEvent
-                }
-              >
-                🗑️
-              </button>
-            )}
+            <button
+              className="smallButton"
+              onClick={() =>
+                setShowEventForm(
+                  !showEventForm
+                )
+              }
+            >
+              ➕ Event
+            </button>
           </div>
 
           <select
@@ -1689,9 +2033,7 @@ export default function Home() {
               (event) => (
                 <option
                   key={event.id}
-                  value={
-                    event.id
-                  }
+                  value={event.id}
                 >
                   {event.title}
                 </option>
@@ -1701,90 +2043,121 @@ export default function Home() {
 
           {selectedEvent && (
             <div className="eventInfo">
-              <strong>
-                {selectedEvent.title}
-              </strong>
+              <div>
+                <b>
+                  {selectedEvent.title}
+                </b>
 
-              {selectedEvent.location && (
-                <span>
-                  📍{" "}
-                  {
-                    selectedEvent.location
-                  }
-                </span>
-              )}
-
-              {selectedEvent.invite_code && (
-                <span>
-                  🔑 Code:{" "}
-                  <b>
+                {selectedEvent.location && (
+                  <span>
+                    📍{" "}
                     {
-                      selectedEvent.invite_code
+                      selectedEvent.location
                     }
-                  </b>
-                </span>
-              )}
+                  </span>
+                )}
+              </div>
+
+              <button
+                className="dangerButton"
+                onClick={
+                  deleteEvent
+                }
+              >
+                🗑️ Löschen
+              </button>
             </div>
           )}
 
-          <div className="createEventBox">
-            <h3>
-              ➕ Neues Event
-            </h3>
+          {showEventForm && (
+            <div className="formBox">
+              <h3>
+                🎉 Neues Event
+              </h3>
 
-            <input
-              placeholder="Eventname"
-              value={
-                newEventTitle
-              }
-              onChange={(e) =>
-                setNewEventTitle(
-                  e.target.value
-                )
-              }
-            />
+              <input
+                placeholder="Eventname"
+                value={
+                  newEventTitle
+                }
+                onChange={(e) =>
+                  setNewEventTitle(
+                    e.target.value
+                  )
+                }
+              />
 
-            <input
-              placeholder="Ort"
-              value={
-                newEventLocation
-              }
-              onChange={(e) =>
-                setNewEventLocation(
-                  e.target.value
-                )
-              }
-            />
+              <input
+                placeholder="Beschreibung"
+                value={
+                  newEventDescription
+                }
+                onChange={(e) =>
+                  setNewEventDescription(
+                    e.target.value
+                  )
+                }
+              />
 
-            <textarea
-              placeholder="Beschreibung"
-              value={
-                newEventDescription
-              }
-              onChange={(e) =>
-                setNewEventDescription(
-                  e.target.value
-                )
-              }
-            />
+              <input
+                placeholder="Ort"
+                value={
+                  newEventLocation
+                }
+                onChange={(e) =>
+                  setNewEventLocation(
+                    e.target.value
+                  )
+                }
+              />
 
-            <button
-              className="primaryButton"
-              onClick={
-                createEvent
-              }
-              disabled={loading}
-            >
-              🎉 Event erstellen
-            </button>
-          </div>
+              <div className="two">
+                <input
+                  type="date"
+                  value={
+                    newEventStart
+                  }
+                  onChange={(e) =>
+                    setNewEventStart(
+                      e.target.value
+                    )
+                  }
+                />
+
+                <input
+                  type="date"
+                  value={
+                    newEventEnd
+                  }
+                  onChange={(e) =>
+                    setNewEventEnd(
+                      e.target.value
+                    )
+                  }
+                />
+              </div>
+
+              <button
+                className="primaryButton"
+                onClick={
+                  createEvent
+                }
+                disabled={
+                  loading
+                }
+              >
+                🚀 Event erstellen
+              </button>
+            </div>
+          )}
         </section>
 
-        {/* =====================================================
-            STATS
-        ===================================================== */}
+        {/* ==================================================
+            STATISTIK
+            ================================================== */}
 
-        <section className="statsGrid">
+        <div className="statsGrid">
+
           <div className="statCard">
             <span>🍺</span>
             <strong>
@@ -1810,7 +2183,7 @@ export default function Home() {
           <div className="statCard">
             <span>💶</span>
             <strong>
-              {totalCost.toFixed(
+              {totalDrinkCost.toFixed(
                 2
               )} €
             </strong>
@@ -1822,1266 +2195,1343 @@ export default function Home() {
           <div className="statCard">
             <span>👥</span>
             <strong>
-              {people.length}
+              {participants.length}
             </strong>
             <small>
               Teilnehmer
             </small>
           </div>
-        </section>
 
-        {/* =====================================================
-            TEILNEHMER
-        ===================================================== */}
+        </div>
 
-        <section className="card">
-          <div className="sectionTitle">
-            <div>
-              <span className="icon">
-                👥
-              </span>
+        {/* ==================================================
+            NAVIGATION
+            ================================================== */}
 
-              <div>
-                <h2>
-                  Teilnehmer
-                </h2>
-
-                <small>
-                  Wer ist heute
-                  dabei?
-                </small>
-              </div>
-            </div>
-
-            <div className="badge">
-              {people.length}
-            </div>
-          </div>
-
-          <div className="inputRow">
-            <input
-              placeholder="Name eingeben..."
-              value={
-                personName
-              }
-              onChange={(e) =>
-                setPersonName(
-                  e.target.value
-                )
-              }
-            />
-
-            <button
-              className="primaryButton"
-              onClick={
-                addPerson
-              }
-            >
-              ➕
-            </button>
-          </div>
-
-          {people.length ===
-            0 ? (
-            <div className="empty">
-              👻 Noch keiner
-              da...
-            </div>
-          ) : (
-            people.map(
-              (person) => {
-                const title =
-                  getRankingTitle(
-                    person.points
-                  );
-
-                return (
-                  <div
-                    className="personCard"
-                    key={
-                      person.id
-                    }
-                  >
-                    <div className="personAvatar">
-                      {title.emoji}
-                    </div>
-
-                    <div className="personMain">
-                      <strong>
-                        {
-                          person.name
-                        }
-                      </strong>
-
-                      <span>
-                        {
-                          title.title
-                        }
-                      </span>
-
-                      <small>
-                        🍺{" "}
-                        {
-                          person.drinks
-                        }{" "}
-                        · 💧{" "}
-                        {person.liters.toFixed(
-                          1
-                        )}{" "}
-                        L · 🏆{" "}
-                        {
-                          person.points
-                        }
-                      </small>
-                    </div>
-
-                    <button
-                      className="smallDanger"
-                      onClick={() =>
-                        removePerson(
-                          person
-                        )
-                      }
-                    >
-                      ×
-                    </button>
-                  </div>
-                );
-              }
-            )
-          )}
-        </section>
-
-        {/* =====================================================
-            GETRÄNK
-        ===================================================== */}
-
-        <section className="card">
-          <div className="sectionTitle">
-            <div>
-              <span className="icon">
-                🍺
-              </span>
-
-              <div>
-                <h2>
-                  Getränk hinzufügen
-                </h2>
-
-                <small>
-                  Mehr Getränke =
-                  mehr Chaos
-                </small>
-              </div>
-            </div>
-          </div>
-
-          <input
-            placeholder="Getränk, z. B. Pils"
-            value={
-              drinkName
-            }
-            onChange={(e) =>
-              setDrinkName(
-                e.target.value
-              )
-            }
-          />
-
-          <div className="threeGrid">
-            <input
-              placeholder="Marke"
-              value={
-                drinkBrand
-              }
-              onChange={(e) =>
-                setDrinkBrand(
-                  e.target.value
-                )
-              }
-            />
-
-            <select
-              value={
-                drinkCategory
-              }
-              onChange={(e) =>
-                setDrinkCategory(
-                  e.target.value
-                )
-              }
-            >
-              <option>
-                Bier
-              </option>
-              <option>
-                Radler
-              </option>
-              <option>
-                Wein
-              </option>
-              <option>
-                Sekt
-              </option>
-              <option>
-                Longdrink
-              </option>
-              <option>
-                Shot
-              </option>
-              <option>
-                Alkoholfrei
-              </option>
-              <option>
-                Sonstiges
-              </option>
-            </select>
-
-            <input
-              type="number"
-              step="0.1"
-              placeholder="Liter"
-              value={
-                liters
-              }
-              onChange={(e) =>
-                setLiters(
-                  e.target.value
-                )
-              }
-            />
-
-            <input
-              type="number"
-              step="0.1"
-              placeholder="Alkohol %"
-              value={
-                alcohol
-              }
-              onChange={(e) =>
-                setAlcohol(
-                  e.target.value
-                )
-              }
-            />
-
-            <input
-              type="number"
-              step="0.01"
-              placeholder="Preis €"
-              value={
-                price
-              }
-              onChange={(e) =>
-                setPrice(
-                  e.target.value
-                )
-              }
-            />
-          </div>
+        <nav className="tabs">
 
           <button
-            className="primaryButton full"
-            onClick={
-              saveDrink
+            className={
+              activeTab ===
+              "overview"
+                ? "active"
+                : ""
             }
-            disabled={loading}
+            onClick={() =>
+              setActiveTab(
+                "overview"
+              )
+            }
           >
-            🍻 Getränk speichern
+            🏠 Übersicht
           </button>
-        </section>
 
-        {/* =====================================================
-            GETRÄNKE ZUORDNEN
-        ===================================================== */}
+          <button
+            className={
+              activeTab ===
+              "drinks"
+                ? "active"
+                : ""
+            }
+            onClick={() =>
+              setActiveTab(
+                "drinks"
+              )
+            }
+          >
+            🍺 Getränke
+          </button>
 
-        <section className="card">
-          <div className="sectionTitle">
-            <div>
-              <span className="icon">
-                🔗
-              </span>
+          <button
+            className={
+              activeTab ===
+              "challenges"
+                ? "active"
+                : ""
+            }
+            onClick={() =>
+              setActiveTab(
+                "challenges"
+              )
+            }
+          >
+            🎯 Challenges
+          </button>
 
-              <div>
-                <h2>
-                  Wer trinkt was?
-                </h2>
+          <button
+            className={
+              activeTab ===
+              "ranking"
+                ? "active"
+                : ""
+            }
+            onClick={() =>
+              setActiveTab(
+                "ranking"
+              )
+            }
+          >
+            🏆 Ranking
+          </button>
 
-                <small>
-                  Getränk einer
-                  Person zuordnen
-                </small>
-              </div>
-            </div>
-          </div>
+        </nav>
 
-          {people.map(
-            (person) => (
-              <div
-                className="assignment"
-                key={
-                  person.id
-                }
-              >
+        {/* ==================================================
+            ÜBERSICHT
+            ================================================== */}
+
+        {activeTab ===
+          "overview" && (
+          <>
+            {/* TEILNEHMER */}
+
+            <section className="glassCard">
+
+              <div className="sectionTop">
                 <div>
-                  <strong>
-                    👤{" "}
-                    {
-                      person.name
-                    }
-                  </strong>
-                </div>
+                  <span className="sectionEmoji">
+                    👥
+                  </span>
 
-                <select
-                  defaultValue=""
-                  onChange={(
-                    e
+                  <div>
+                    <h2>
+                      Teilnehmer
+                    </h2>
+
+                    <p>
+                      Wer ist heute
+                      dabei?
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="inputRow">
+                <input
+                  placeholder="Name eingeben..."
+                  value={
+                    personName
+                  }
+                  onChange={(e) =>
+                    setPersonName(
+                      e.target.value
+                    )
+                  }
+                />
+
+                <button
+                  className="primaryButton"
+                  onClick={
+                    addParticipant
+                  }
+                >
+                  ➕
+                </button>
+              </div>
+
+              <div className="peopleList">
+
+                {participants.length ===
+                  0 && (
+                  <div className="empty">
+                    👻 Noch niemand
+                    dabei.
+                  </div>
+                )}
+
+                {participants.map(
+                  (
+                    person,
+                    index
                   ) => {
-                    if (
-                      e.target
-                        .value
-                    ) {
-                      assignDrink(
-                        person,
-                        e.target
-                          .value
+                    const title =
+                      getRankingTitle(
+                        Number(
+                          person.points ||
+                            0
+                        )
                       );
 
-                      e.target.value =
-                        "";
-                    }
-                  }}
-                >
-                  <option value="">
-                    🍺 Getränk auswählen
-                  </option>
-
-                  {drinks.map(
-                    (drink) => (
-                      <option
+                    return (
+                      <div
+                        className="person"
                         key={
-                          drink.id
-                        }
-                        value={
-                          drink.id
+                          person.id
                         }
                       >
-                        {getDrinkName(
-                          drink
-                        )}{" "}
-                        ·{" "}
-                        {getDrinkPrice(
-                          drink
-                        ).toFixed(
-                          2
-                        )}{" "}
-                        €
+
+                        <div className="personAvatar">
+                          {index ===
+                          0
+                            ? "👑"
+                            : "👤"}
+                        </div>
+
+                        <div className="personMain">
+
+                          <b>
+                            {person.username ||
+                              "Teilnehmer"}
+                          </b>
+
+                          <small>
+                            {title.emoji}{" "}
+                            {
+                              title.title
+                            }
+                          </small>
+
+                        </div>
+
+                        <div className="personPoints">
+                          <strong>
+                            {Number(
+                              person.points ||
+                                0
+                            )}
+                          </strong>
+
+                          <small>
+                            Punkte
+                          </small>
+                        </div>
+
+                        <button
+                          className="iconButton"
+                          onClick={() =>
+                            removeParticipant(
+                              person.id
+                            )
+                          }
+                        >
+                          ×
+                        </button>
+
+                      </div>
+                    );
+                  }
+                )}
+
+              </div>
+            </section>
+
+            {/* ZAHLUNG */}
+
+            <section className="glassCard">
+
+              <div className="sectionTop">
+                <div>
+                  <span className="sectionEmoji">
+                    💶
+                  </span>
+
+                  <div>
+                    <h2>
+                      Zahlung
+                    </h2>
+
+                    <p>
+                      Wer hat die
+                      Rechnung bezahlt?
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="two">
+
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Betrag €"
+                  value={
+                    paymentAmount
+                  }
+                  onChange={(e) =>
+                    setPaymentAmount(
+                      e.target.value
+                    )
+                  }
+                />
+
+                <select
+                  value={
+                    paymentProfileId
+                  }
+                  onChange={(e) =>
+                    setPaymentProfileId(
+                      e.target.value
+                    )
+                  }
+                >
+                  <option value="">
+                    Person auswählen
+                  </option>
+
+                  {participants.map(
+                    (person) => (
+                      <option
+                        key={
+                          person.id
+                        }
+                        value={
+                          person.id
+                        }
+                      >
+                        {person.username}
                       </option>
                     )
                   )}
                 </select>
+
               </div>
-            )
-          )}
-        </section>
 
-        {/* =====================================================
-            GETRÄNKE
-        ===================================================== */}
+              <button
+                className="moneyButton"
+                onClick={
+                  savePayment
+                }
+              >
+                💸 Zahlung speichern
+              </button>
 
-        <section className="card">
-          <div className="sectionTitle">
-            <div>
-              <span className="icon">
-                🍺
-              </span>
-
-              <div>
-                <h2>
-                  Getränke
-                </h2>
-
-                <small>
-                  Die komplette
-                  Getränkeliste
-                </small>
-              </div>
-            </div>
-          </div>
-
-          {drinks.length ===
-          0 ? (
-            <div className="empty">
-              🍺 Noch keine
-              Getränke.
-            </div>
-          ) : (
-            drinks.map(
-              (drink) => (
-                <div
-                  className="drinkCard"
-                  key={
-                    drink.id
-                  }
-                >
-                  <div className="drinkIcon">
-                    🍺
-                  </div>
-
-                  <div className="drinkInfo">
-                    <strong>
-                      {
-                        getDrinkName(
-                          drink
-                        )
-                      }
-                    </strong>
-
-                    <span>
-                      {drink.marke ||
-                        drink.brand ||
-                        "Keine Marke"}
-                    </span>
-
-                    <small>
-                      💧{" "}
-                      {getDrinkLiters(
-                        drink
-                      ).toFixed(
-                        1
-                      )}{" "}
-                      L ·{" "}
-                      {getDrinkAlcohol(
-                        drink
-                      ).toFixed(
-                        1
-                      )} %
-                    </small>
-                  </div>
-
-                  <div className="drinkPrice">
-                    {getDrinkPrice(
-                      drink
-                    ).toFixed(
-                      2
-                    )}{" "}
-                    €
-                  </div>
-
-                  <button
-                    className="smallDanger"
-                    onClick={() =>
-                      deleteDrink(
-                        drink.id
-                      )
-                    }
-                  >
-                    ×
-                  </button>
-                </div>
-              )
-            )
-          )}
-        </section>
-
-        {/* =====================================================
-            PROMILLE
-        ===================================================== */}
-
-        {selectedEvent
-          ?.show_promille !==
-          false && (
-          <section className="card promilleCard">
-            <div className="sectionTitle">
-              <div>
-                <span className="icon">
-                  🍷
-                </span>
+              <div className="paymentSummary">
 
                 <div>
-                  <h2>
-                    Promille
-                  </h2>
+                  <span>
+                    Gesamtkosten
+                  </span>
 
-                  <small>
-                    Näherungswert –
-                    kein medizinisches
-                    Messgerät
-                  </small>
+                  <b>
+                    {totalDrinkCost.toFixed(
+                      2
+                    )} €
+                  </b>
+                </div>
+
+                <div>
+                  <span>
+                    Bezahlt
+                  </span>
+
+                  <b>
+                    {totalPayments.toFixed(
+                      2
+                    )} €
+                  </b>
+                </div>
+
+                <div>
+                  <span>
+                    Offen
+                  </span>
+
+                  <b className="orange">
+                    {remainingCost.toFixed(
+                      2
+                    )} €
+                  </b>
+                </div>
+
+              </div>
+
+            </section>
+
+            {/* PROMILLE */}
+
+            <section className="glassCard">
+
+              <div className="sectionTop">
+                <div>
+                  <span className="sectionEmoji">
+                    🥴
+                  </span>
+
+                  <div>
+                    <h2>
+                      Promille
+                    </h2>
+
+                    <p>
+                      Nur als
+                      Party-Schätzung
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {ranking.map(
-              (person) => {
-                const personDrinks =
-                  drinks.filter(
-                    (drink) =>
-                      drink.profile_id ===
-                      person.profile_id
-                  );
+              {participants.map(
+                (person) => {
 
-                const promille =
-                  personDrinks.reduce(
-                    (
-                      sum,
-                      drink
-                    ) =>
-                      sum +
-                      calculatePromille(
-                        person,
+                  const personDrinks =
+                    drinks.filter(
+                      (drink) =>
+                        drink.profile_id ===
+                        person.id
+                    );
+
+                  const promille =
+                    personDrinks.reduce(
+                      (
+                        sum,
                         drink
-                      ),
-                    0
-                  );
+                      ) =>
+                        sum +
+                        calculateDrinkPromille(
+                          drink,
+                          person
+                        ),
+                      0
+                    );
 
-                return (
+                  return (
+                    <div
+                      className="promilleRow"
+                      key={
+                        person.id
+                      }
+                    >
+
+                      <div>
+                        <b>
+                          {person.username}
+                        </b>
+
+                        <small>
+                          {personDrinks.length}{" "}
+                          Getränke
+                        </small>
+                      </div>
+
+                      <strong>
+                        {promille.toFixed(
+                          2
+                        )} ‰
+                      </strong>
+
+                    </div>
+                  );
+                }
+              )}
+
+              <p className="disclaimer">
+                ⚠️ Die Anzeige ist
+                nur eine grobe
+                Party-Schätzung und
+                darf niemals zur
+                Beurteilung der
+                Fahrtüchtigkeit
+                verwendet werden.
+              </p>
+
+            </section>
+          </>
+        )}
+
+        {/* ==================================================
+            GETRÄNKE
+            ================================================== */}
+
+        {activeTab ===
+          "drinks" && (
+          <>
+
+            <section className="glassCard">
+
+              <div className="sectionTop">
+                <div>
+                  <span className="sectionEmoji">
+                    🍺
+                  </span>
+
+                  <div>
+                    <h2>
+                      Getränk
+                      hinzufügen
+                    </h2>
+
+                    <p>
+                      Alles was
+                      getrunken wird
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <input
+                placeholder="Getränk"
+                value={
+                  drinkName
+                }
+                onChange={(e) =>
+                  setDrinkName(
+                    e.target.value
+                  )
+                }
+              />
+
+              <div className="two">
+
+                <input
+                  placeholder="Marke"
+                  value={
+                    drinkBrand
+                  }
+                  onChange={(e) =>
+                    setDrinkBrand(
+                      e.target.value
+                    )
+                  }
+                />
+
+                <select
+                  value={
+                    drinkCategory
+                  }
+                  onChange={(e) =>
+                    setDrinkCategory(
+                      e.target.value
+                    )
+                  }
+                >
+                  <option>
+                    Bier
+                  </option>
+                  <option>
+                    Radler
+                  </option>
+                  <option>
+                    Wein
+                  </option>
+                  <option>
+                    Sekt
+                  </option>
+                  <option>
+                    Schnaps
+                  </option>
+                  <option>
+                    Cocktail
+                  </option>
+                  <option>
+                    Softdrink
+                  </option>
+                  <option>
+                    Sonstiges
+                  </option>
+                </select>
+
+              </div>
+
+              <div className="three">
+
+                <input
+                  type="number"
+                  step="0.05"
+                  placeholder="Liter"
+                  value={
+                    liters
+                  }
+                  onChange={(e) =>
+                    setLiters(
+                      e.target.value
+                    )
+                  }
+                />
+
+                <input
+                  type="number"
+                  step="0.1"
+                  placeholder="Alkohol %"
+                  value={
+                    alcohol
+                  }
+                  onChange={(e) =>
+                    setAlcohol(
+                      e.target.value
+                    )
+                  }
+                />
+
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Preis €"
+                  value={
+                    price
+                  }
+                  onChange={(e) =>
+                    setPrice(
+                      e.target.value
+                    )
+                  }
+                />
+
+              </div>
+
+              <button
+                className="primaryButton full"
+                onClick={
+                  saveDrink
+                }
+              >
+                🍻 Getränk speichern
+              </button>
+
+            </section>
+
+            {/* GETRÄNKE */}
+
+            <section className="glassCard">
+
+              <h2>
+                🍺 Getränkeliste
+              </h2>
+
+              {drinks.length ===
+                0 && (
+                <div className="empty">
+                  🍺 Noch keine
+                  Getränke.
+                </div>
+              )}
+
+              {drinks.map(
+                (drink) => (
                   <div
-                    className="promilleRow"
+                    className="drinkCard"
+                    key={
+                      drink.id
+                    }
+                  >
+
+                    <div className="drinkIcon">
+                      🍺
+                    </div>
+
+                    <div className="drinkInfo">
+
+                      <b>
+                        {drink.drink_name ||
+                          drink.getraenk ||
+                          "Getränk"}
+                      </b>
+
+                      <small>
+                        {drink.brand ||
+                          drink.marke ||
+                          ""}
+                        {" · "}
+                        {Number(
+                          drink.liters ??
+                            drink.menge ??
+                            0
+                        ).toFixed(
+                          1
+                        )}{" "}
+                        L
+                        {" · "}
+                        {Number(
+                          drink.alcohol_percent ??
+                            drink.alkohol ??
+                            0
+                        ).toFixed(
+                          1
+                        )}%
+                      </small>
+
+                    </div>
+
+                    <strong>
+                      {Number(
+                        drink.preis ||
+                          0
+                      ).toFixed(
+                        2
+                      )} €
+                    </strong>
+
+                  </div>
+                )
+              )}
+
+            </section>
+
+            {/* TRINKEN */}
+
+            <section className="glassCard">
+
+              <h2>
+                🍻 Getränk zuordnen
+              </h2>
+
+              <p>
+                Wer hat gerade
+                einen getrunken?
+              </p>
+
+              {participants.map(
+                (person) => (
+                  <div
+                    className="assignment"
                     key={
                       person.id
                     }
                   >
-                    <span>
-                      {
-                        person.name
-                      }
-                    </span>
 
-                    <strong
-                      className={
-                        promille >=
-                        1
-                          ? "dangerPromille"
-                          : promille >=
-                            0.5
-                          ? "warningPromille"
-                          : "safePromille"
-                      }
+                    <b>
+                      {person.username}
+                    </b>
+
+                    <select
+                      defaultValue=""
+                      onChange={(e) => {
+
+                        const drink =
+                          drinks.find(
+                            (item) =>
+                              item.id ===
+                              e.target
+                                .value
+                          );
+
+                        if (
+                          drink
+                        ) {
+                          drinkForPerson(
+                            person,
+                            drink
+                          );
+
+                          e.target.value =
+                            "";
+                        }
+
+                      }}
                     >
-                      {promille.toFixed(
-                        2
-                      )} ‰
-                    </strong>
+
+                      <option value="">
+                        🍺 Getränk
+                        auswählen
+                      </option>
+
+                      {drinks.map(
+                        (drink) => (
+                          <option
+                            key={
+                              drink.id
+                            }
+                            value={
+                              drink.id
+                            }
+                          >
+                            {drink.drink_name ||
+                              drink.getraenk ||
+                              "Getränk"}
+                            {" · "}
+                            {Number(
+                              drink.preis ||
+                                0
+                            ).toFixed(
+                              2
+                            )}{" "}
+                            €
+                          </option>
+                        )
+                      )}
+
+                    </select>
+
                   </div>
-                );
-              }
-            )}
-          </section>
+                )
+              )}
+
+            </section>
+
+          </>
         )}
 
-        {/* =====================================================
+        {/* ==================================================
             CHALLENGES
-        ===================================================== */}
+            ================================================== */}
 
-        <section className="card challengeCard">
-          <div className="sectionTitle">
-            <div>
-              <span className="icon">
+        {activeTab ===
+          "challenges" && (
+          <>
+
+            <section className="glassCard challengeHero">
+
+              <div className="challengeBig">
                 🎯
-              </span>
+              </div>
 
               <div>
                 <h2>
-                  Challenges
+                  Challenge-Zentrale
                 </h2>
 
-                <small>
-                  Wer traut sich?
-                  Punkte sammeln!
-                </small>
+                <p>
+                  Aufgaben machen.
+                  Abstimmen.
+                  Punkte kassieren.
+                </p>
               </div>
-            </div>
 
-            <div className="badge">
-              {openChallenges.length}
-            </div>
-          </div>
+            </section>
 
-          <div className="challengeCreate">
-            <input
-              placeholder="Challenge-Titel"
-              value={
-                challengeTitle
-              }
-              onChange={(e) =>
-                setChallengeTitle(
-                  e.target.value
-                )
-              }
-            />
+            {/* CHALLENGE ERSTELLEN */}
 
-            <textarea
-              placeholder="Was muss gemacht werden?"
-              value={
-                challengeDescription
-              }
-              onChange={(e) =>
-                setChallengeDescription(
-                  e.target.value
-                )
-              }
-            />
+            <section className="glassCard">
 
-            <div className="threeGrid">
+              <h2>
+                🚀 Neue Challenge
+              </h2>
+
               <input
-                type="number"
-                placeholder="Punkte"
+                placeholder="Was soll passieren?"
                 value={
-                  challengePoints
+                  challengeTitle
                 }
                 onChange={(e) =>
-                  setChallengePoints(
+                  setChallengeTitle(
                     e.target.value
                   )
                 }
               />
 
-              <select
+              <textarea
+                placeholder="Beschreibung"
                 value={
-                  challengeCategory
+                  challengeDescription
                 }
                 onChange={(e) =>
-                  setChallengeCategory(
+                  setChallengeDescription(
                     e.target.value
                   )
+                }
+              />
+
+              <div className="two">
+
+                <select
+                  value={
+                    challengeCategory
+                  }
+                  onChange={(e) =>
+                    setChallengeCategory(
+                      e.target.value
+                    )
+                  }
+                >
+                  <option>
+                    Quatsch
+                  </option>
+                  <option>
+                    Abstimmung
+                  </option>
+                  <option>
+                    Duell
+                  </option>
+                  <option>
+                    Geschicklichkeit
+                  </option>
+                  <option>
+                    Kreativ
+                  </option>
+                  <option>
+                    Lustig
+                  </option>
+                  <option>
+                    Mutprobe
+                  </option>
+                  <option>
+                    Party
+                  </option>
+                  <option>
+                    Team
+                  </option>
+                  <option>
+                    Trinken
+                  </option>
+                  <option>
+                    Wissen
+                  </option>
+                  <option>
+                    Zufall
+                  </option>
+                </select>
+
+                <input
+                  type="number"
+                  placeholder="Punkte"
+                  value={
+                    challengePoints
+                  }
+                  onChange={(e) =>
+                    setChallengePoints(
+                      e.target.value
+                    )
+                  }
+                />
+
+              </div>
+
+              <div className="two">
+
+                <select
+                  value={
+                    challengeTarget
+                  }
+                  onChange={(e) =>
+                    setChallengeTarget(
+                      e.target.value
+                    )
+                  }
+                >
+                  <option value="">
+                    Zielperson
+                    auswählen
+                  </option>
+
+                  {participants.map(
+                    (person) => (
+                      <option
+                        key={
+                          person.id
+                        }
+                        value={
+                          person.id
+                        }
+                      >
+                        {person.username}
+                      </option>
+                    )
+                  )}
+                </select>
+
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="Benötigte Stimmen"
+                  value={
+                    requiredVotes
+                  }
+                  onChange={(e) =>
+                    setRequiredVotes(
+                      e.target.value
+                    )
+                  }
+                />
+
+              </div>
+
+              <button
+                className="primaryButton full"
+                onClick={
+                  createChallenge
                 }
               >
-                <option>
-                  Quatsch
-                </option>
-                <option>
-                  Lustig
-                </option>
-                <option>
-                  Duell
-                </option>
-                <option>
-                  Mutprobe
-                </option>
-                <option>
-                  Kreativ
-                </option>
-                <option>
-                  Geschicklichkeit
-                </option>
-                <option>
-                  Abstimmung
-                </option>
-                <option>
-                  Team
-                </option>
-                <option>
-                  Party
-                </option>
-              </select>
+                🎯 Challenge starten
+              </button>
 
-              <input
-                type="number"
-                min="1"
-                placeholder="Stimmen"
-                value={
-                  challengeVotesRequired
-                }
-                onChange={(e) =>
-                  setChallengeVotesRequired(
-                    e.target.value
-                  )
-                }
-              />
-            </div>
+            </section>
 
-            <button
-              className="challengeButton"
-              onClick={() =>
-                createChallenge()
-              }
-            >
-              🎯 Challenge starten
-            </button>
-          </div>
+            {/* VORLAGEN */}
 
-          {challengeTemplates.length >
-            0 && (
-            <div className="templates">
-              <h3>
+            <section className="glassCard">
+
+              <h2>
                 🎲 Schnelle Challenges
-              </h3>
+              </h2>
 
               <div className="templateGrid">
+
                 {challengeTemplates
                   .slice(
                     0,
-                    8
+                    20
                   )
                   .map(
                     (
                       template
                     ) => (
                       <button
+                        className="template"
                         key={
                           template.id
                         }
-                        className="templateButton"
                         onClick={() =>
-                          createChallenge(
+                          useChallengeTemplate(
                             template
                           )
                         }
                       >
-                        <strong>
+
+                        <span>
+                          🎯
+                        </span>
+
+                        <b>
                           {
                             template.title
                           }
-                        </strong>
+                        </b>
 
-                        <span>
+                        <small>
                           +
                           {
-                            template.default_points
+                            template.default_points ||
+                              10
                           }{" "}
                           Punkte
-                        </span>
+                        </small>
+
                       </button>
                     )
                   )}
+
               </div>
-            </div>
-          )}
 
-          {openChallenges.map(
-            (challenge) => (
-              <div
-                className="challengeItem"
-                key={
-                  challenge.id
-                }
-              >
-                <div className="challengeIcon">
-                  🎯
+            </section>
+
+            {/* AKTIVE CHALLENGES */}
+
+            <section className="glassCard">
+
+              <h2>
+                🔥 Challenges
+              </h2>
+
+              {challenges.length ===
+                0 && (
+                <div className="empty">
+                  😴 Noch keine
+                  Challenges.
                 </div>
+              )}
 
-                <div className="challengeMain">
-                  <strong>
-                    {
-                      challenge.title
-                    }
-                  </strong>
-
-                  <span>
-                    {
-                      challenge.description
-                    }
-                  </span>
-
-                  <small>
-                    🏆{" "}
-                    {
-                      challenge.points
-                    }{" "}
-                    Punkte ·{" "}
-                    {
-                      challenge.category
-                    }
-                  </small>
-                </div>
-
-                <div className="challengeActions">
-                  {people.map(
-                    (
-                      person
-                    ) => (
-                      <button
-                        key={
-                          person.id
-                        }
-                        className="winnerButton"
-                        onClick={() =>
-                          completeChallenge(
-                            challenge,
-                            person
-                          )
-                        }
-                      >
-                        🏆{" "}
-                        {
-                          person.name
-                        }
-                      </button>
-                    )
-                  )}
-                </div>
-              </div>
-            )
-          )}
-
-          {completedChallenges.length >
-            0 && (
-            <div className="completedChallenges">
-              <h3>
-                ✅ Erledigt
-              </h3>
-
-              {completedChallenges.map(
+              {challenges.map(
                 (
                   challenge
+                ) => (
+                  <div
+                    className="challengeCard"
+                    key={
+                      challenge.id
+                    }
+                  >
+
+                    <div className="challengeIcon">
+                      🎯
+                    </div>
+
+                    <div className="challengeContent">
+
+                      <div className="challengeHeader">
+
+                        <b>
+                          {
+                            challenge.title
+                          }
+                        </b>
+
+                        <span className="pointsBadge">
+                          +
+                          {
+                            challenge.points ||
+                              0
+                          }
+                        </span>
+
+                      </div>
+
+                      <p>
+                        {
+                          challenge.description ||
+                          "Aufgabe starten!"
+                        }
+                      </p>
+
+                      <small>
+                        🏷️{" "}
+                        {
+                          challenge.category
+                        }
+                        {" · "}
+                        🗳️{" "}
+                        {
+                          challenge.required_votes ||
+                            1
+                        }{" "}
+                        Stimme(n)
+                      </small>
+
+                      {challenge.status !==
+                        "completed" && (
+                        <div className="challengeActions">
+
+                          <select
+                            defaultValue=""
+                            onChange={(
+                              e
+                            ) => {
+
+                              if (
+                                e.target
+                                  .value
+                              ) {
+                                completeChallenge(
+                                  challenge,
+                                  e.target
+                                    .value
+                                );
+
+                                e.target.value =
+                                  "";
+                              }
+
+                            }}
+                          >
+
+                            <option value="">
+                              🏆 Gewinner
+                              auswählen
+                            </option>
+
+                            {participants.map(
+                              (
+                                person
+                              ) => (
+                                <option
+                                  key={
+                                    person.id
+                                  }
+                                  value={
+                                    person.id
+                                  }
+                                >
+                                  {
+                                    person.username
+                                  }
+                                </option>
+                              )
+                            )}
+
+                          </select>
+
+                          <button
+                            className="deleteSmall"
+                            onClick={() =>
+                              deleteChallenge(
+                                challenge.id
+                              )
+                            }
+                          >
+                            🗑️
+                          </button>
+
+                        </div>
+                      )}
+
+                      {challenge.status ===
+                        "completed" && (
+                        <div className="completed">
+                          ✅ Challenge
+                          abgeschlossen
+                          {challenge.winner_profile_id &&
+                            " · 🏆 Gewinner festgelegt"}
+                        </div>
+                      )}
+
+                    </div>
+
+                  </div>
+                )
+              )}
+
+            </section>
+
+          </>
+        )}
+
+        {/* ==================================================
+            RANKING
+            ================================================== */}
+
+        {activeTab ===
+          "ranking" && (
+          <>
+
+            <section className="rankingHero">
+
+              <div className="trophy">
+                🏆
+              </div>
+
+              <h2>
+                Die Hall of Fame
+              </h2>
+
+              <p>
+                Wer ist die absolute
+                Zapfhahn-Legende?
+              </p>
+
+            </section>
+
+            <section className="glassCard">
+
+              {ranking.length ===
+                0 && (
+                <div className="empty">
+                  👻 Noch keine
+                  Punkte.
+                </div>
+              )}
+
+              {ranking.map(
+                (
+                  person,
+                  index
                 ) => {
-                  const winner =
-                    people.find(
-                      (person) =>
-                        person.profile_id ===
-                        challenge.winner_profile_id
+
+                  const title =
+                    getRankingTitle(
+                      Number(
+                        person.points ||
+                          0
+                      )
                     );
 
                   return (
                     <div
-                      className="completedItem"
+                      className={
+                        "rankingItem " +
+                        (index <
+                        3
+                          ? "podium"
+                          : "")
+                      }
                       key={
-                        challenge.id
+                        person.id
                       }
                     >
-                      <span>
-                        ✅{" "}
-                        {
-                          challenge.title
-                        }
-                      </span>
 
-                      <strong>
-                        🏆{" "}
-                        {
-                          winner?.name
-                        }
-                      </strong>
+                      <div className="rankNumber">
 
-                      <b>
-                        +
-                        {
-                          challenge.points
-                        }
-                      </b>
+                        {index ===
+                        0
+                          ? "🥇"
+                          : index ===
+                            1
+                          ? "🥈"
+                          : index ===
+                            2
+                          ? "🥉"
+                          : index +
+                            1}
+
+                      </div>
+
+                      <div className="rankPerson">
+
+                        <b>
+                          {person.username ||
+                            "Teilnehmer"}
+                        </b>
+
+                        <small>
+                          {
+                            title.emoji
+                          }{" "}
+                          {
+                            title.title
+                          }
+                        </small>
+
+                      </div>
+
+                      <div className="rankPoints">
+
+                        <strong>
+                          {Number(
+                            person.points ||
+                              0
+                          )}
+                        </strong>
+
+                        <small>
+                          Punkte
+                        </small>
+
+                      </div>
+
                     </div>
                   );
                 }
               )}
-            </div>
-          )}
-        </section>
 
-        {/* =====================================================
-            ZAHLUNGEN
-        ===================================================== */}
+            </section>
 
-        <section className="card paymentCard">
-          <div className="sectionTitle">
-            <div>
-              <span className="icon">
-                💶
-              </span>
+            <section className="glassCard">
 
-              <div>
-                <h2>
-                  Zahlungen
-                </h2>
-
-                <small>
-                  Wer hat die Rechnung
-                  gerettet?
-                </small>
-              </div>
-            </div>
-          </div>
-
-          <div className="inputRow">
-            <input
-              type="number"
-              step="0.01"
-              placeholder="Betrag €"
-              value={
-                paymentAmount
-              }
-              onChange={(e) =>
-                setPaymentAmount(
-                  e.target.value
-                )
-              }
-            />
-
-            <button
-              className="moneyButton"
-              onClick={() =>
-                savePayment()
-              }
-            >
-              💶 Bezahlt
-            </button>
-          </div>
-
-          <div className="paymentStats">
-            <div>
-              <span>
-                Rechnung
-              </span>
-              <strong>
-                {totalCost.toFixed(
-                  2
-                )} €
-              </strong>
-            </div>
-
-            <div>
-              <span>
-                Bezahlt
-              </span>
-              <strong>
-                {totalPaid.toFixed(
-                  2
-                )} €
-              </strong>
-            </div>
-
-            <div>
-              <span>
-                Differenz
-              </span>
-              <strong
-                className={
-                  paymentBalance >=
-                  0
-                    ? "positive"
-                    : "negative"
-                }
-              >
-                {paymentBalance.toFixed(
-                  2
-                )} €
-              </strong>
-            </div>
-          </div>
-
-          {people.length >
-            0 && (
-            <div className="payerList">
-              <h3>
-                Zahlung einer
-                Person zuordnen
-              </h3>
-
-              {people.map(
-                (person) => (
-                  <button
-                    key={
-                      person.id
-                    }
-                    className="payerButton"
-                    onClick={() =>
-                      savePayment(
-                        person
-                      )
-                    }
-                  >
-                    💶{" "}
-                    {
-                      person.name
-                    }{" "}
-                    bezahlen lassen
-                  </button>
-                )
-              )}
-            </div>
-          )}
-        </section>
-
-        {/* =====================================================
-            KOSTEN
-        ===================================================== */}
-
-        <section className="card costCard">
-          <div className="sectionTitle">
-            <div>
-              <span className="icon">
-                💰
-              </span>
-
-              <div>
-                <h2>
-                  Kostenübersicht
-                </h2>
-
-                <small>
-                  Die Rechnung des
-                  Grauens
-                </small>
-              </div>
-            </div>
-          </div>
-
-          <div className="bigMoney">
-            {totalCost.toFixed(
-              2
-            )} €
-          </div>
-
-          <p>
-            Gesamtkosten des
-            Events
-          </p>
-
-          <div className="costLine">
-            <span>
-              👥 Teilnehmer
-            </span>
-
-            <strong>
-              {people.length}
-            </strong>
-          </div>
-
-          <div className="costLine">
-            <span>
-              💶 Pro Person
-            </span>
-
-            <strong>
-              {costPerPerson.toFixed(
-                2
-              )} €
-            </strong>
-          </div>
-
-          <div className="costLine">
-            <span>
-              🏆 Gesamtpunkte
-            </span>
-
-            <strong>
-              {totalPoints}
-            </strong>
-          </div>
-
-          <div className="costLine">
-            <span>
-              🍺 Durchschnitt
-            </span>
-
-            <strong>
-              {averageDrinkAlcohol.toFixed(
-                1
-              )} %
-            </strong>
-          </div>
-        </section>
-
-        {/* =====================================================
-            RANKING
-        ===================================================== */}
-
-        <section className="card rankingCard">
-          <div className="rankingHeader">
-            <span>
-              🏆
-            </span>
-
-            <div>
               <h2>
-                Das große Ranking
+                😂 Die Titel
               </h2>
 
-              <p>
-                Wer ist die
-                absolute Legende?
-              </p>
-            </div>
-          </div>
+              <div className="titleGrid">
 
-          <div className="championTitle">
-            <span>
-              {
-                currentRankingTitle.emoji
-              }
-            </span>
-
-            <div>
-              <small>
-                AKTUELLER TITEL
-              </small>
-
-              <strong>
-                {
-                  currentRankingTitle.title
-                }
-              </strong>
-            </div>
-          </div>
-
-          {ranking.map(
-            (
-              person,
-              index
-            ) => {
-              const title =
-                getRankingTitle(
-                  person.points
-                );
-
-              return (
-                <div
-                  className={
-                    "rankItem " +
-                    (index ===
-                    0
-                      ? "rankFirst"
-                      : "")
-                  }
-                  key={
-                    person.id
-                  }
-                >
-                  <div className="rankPlace">
-                    {index ===
-                    0
-                      ? "🥇"
-                      : index ===
-                        1
-                      ? "🥈"
-                      : index ===
-                        2
-                      ? "🥉"
-                      : `${index + 1}.`}
-                  </div>
-
-                  <div className="rankPerson">
-                    <strong>
-                      {
-                        person.name
+                {[
+                  [
+                    "🍺",
+                    "Zapfhahn-Lehrling",
+                  ],
+                  [
+                    "😎",
+                    "Stimmungsmacher",
+                  ],
+                  [
+                    "🔥",
+                    "Party-Profi",
+                  ],
+                  [
+                    "🍻",
+                    "Bier-Baron",
+                  ],
+                  [
+                    "👑",
+                    "Zapfhahn-Legende",
+                  ],
+                ].map(
+                  (
+                    item
+                  ) => (
+                    <div
+                      className="titleCard"
+                      key={
+                        item[1]
                       }
-                    </strong>
+                    >
+                      <span>
+                        {item[0]}
+                      </span>
 
-                    <span>
-                      {
-                        title.emoji
-                      }{" "}
-                      {
-                        title.title
-                      }
-                    </span>
-                  </div>
-
-                  <div className="rankPoints">
-                    <strong>
-                      {
-                        person.points
-                      }
-                    </strong>
-
-                    <small>
-                      Punkte
-                    </small>
-                  </div>
-                </div>
-              );
-            }
-          )}
-
-          {ranking.length ===
-            0 && (
-            <div className="empty">
-              🏆 Das Ranking wartet
-              auf seine erste
-              Legende.
-            </div>
-          )}
-        </section>
-
-        {/* =====================================================
-            EVENT STATS
-        ===================================================== */}
-
-        <section className="card">
-          <div className="sectionTitle">
-            <div>
-              <span className="icon">
-                📊
-              </span>
-
-              <div>
-                <h2>
-                  Event-Statistik
-                </h2>
-
-                <small>
-                  Die wirklich wichtigen
-                  Zahlen
-                </small>
-              </div>
-            </div>
-          </div>
-
-          <div className="funStats">
-            <div>
-              <span>
-                🍺
-              </span>
-              <strong>
-                {
-                  drinks.length
-                }
-              </strong>
-              <small>
-                Getränke
-              </small>
-            </div>
-
-            <div>
-              <span>
-                🎯
-              </span>
-              <strong>
-                {
-                  challenges.length
-                }
-              </strong>
-              <small>
-                Challenges
-              </small>
-            </div>
-
-            <div>
-              <span>
-                🏆
-              </span>
-              <strong>
-                {
-                  completedChallenges.length
-                }
-              </strong>
-              <small>
-                geschafft
-              </small>
-            </div>
-
-            <div>
-              <span>
-                💶
-              </span>
-              <strong>
-                {
-                  totalPaid.toFixed(
-                    0
+                      <b>
+                        {item[1]}
+                      </b>
+                    </div>
                   )
-                }
-                €
-              </strong>
-              <small>
-                bezahlt
-              </small>
-            </div>
-          </div>
-        </section>
+                )}
 
-        {/* =====================================================
-            MESSAGE
-        ===================================================== */}
+              </div>
+
+            </section>
+
+          </>
+        )}
+
+        {/* ==================================================
+            STATUS
+            ================================================== */}
 
         {message && (
           <div className="message">
@@ -3089,33 +3539,41 @@ export default function Home() {
           </div>
         )}
 
-        {/* =====================================================
+        {loading && (
+          <div className="loading">
+            ⏳ Einen Moment...
+          </div>
+        )}
+
+        {/* ==================================================
             FOOTER
-        ===================================================== */}
+            ================================================== */}
 
         <footer>
           <div>
             🍻
           </div>
 
-          <strong>
+          <b>
             Güstener Zapfhahn
             Zentrale
-          </strong>
+          </b>
 
-          <span>
+          <small>
             Dein Event.
             Deine Getränke.
-            Deine Runde.
-          </span>
+            Dein Chaos.
+          </small>
         </footer>
+
       </div>
 
-      {/* =======================================================
-          CSS
-      ======================================================= */}
+      {/* ======================================================
+          STYLES
+          ====================================================== */}
 
-      <style jsx>{`
+      <style jsx global>{`
+
         * {
           box-sizing: border-box;
         }
@@ -3127,196 +3585,185 @@ export default function Home() {
           background: #070b10;
         }
 
-        .page {
+        body {
           min-height: 100vh;
-          width: 100%;
-          margin: 0;
-          padding: 0;
-          background:
-            radial-gradient(
-              circle at 50% -10%,
-              #293d51 0%,
-              #111a24 28%,
-              #070b10 65%
-            );
-          color: white;
-          font-family:
-            Inter,
-            Arial,
-            Helvetica,
-            sans-serif;
-          overflow-x: hidden;
+        }
+
+        button,
+        input,
+        select,
+        textarea {
+          font: inherit;
+        }
+
+        button {
+          cursor: pointer;
         }
 
         .app {
+          min-height: 100vh;
+          width: 100%;
+          overflow-x: hidden;
+          background:
+            radial-gradient(
+              circle at 50% -10%,
+              rgba(245,158,11,.20),
+              transparent 35%
+            ),
+            radial-gradient(
+              circle at 0% 30%,
+              rgba(59,130,246,.10),
+              transparent 30%
+            ),
+            linear-gradient(
+              180deg,
+              #0b1118 0%,
+              #070b10 100%
+            );
+          color: white;
+          padding: 20px 14px 50px;
+          font-family:
+            Arial,
+            Helvetica,
+            sans-serif;
+        }
+
+        .container {
           width: 100%;
           max-width: 920px;
           margin: 0 auto;
-          padding: 20px 16px 60px;
         }
 
         .hero {
           display: flex;
           align-items: center;
           gap: 18px;
-          padding: 15px 5px 28px;
+          padding: 15px 5px 30px;
         }
 
         .heroLogo {
           width: 75px;
           height: 75px;
+          flex-shrink: 0;
           display: flex;
           align-items: center;
           justify-content: center;
+          font-size: 40px;
           border-radius: 24px;
-          font-size: 42px;
           background:
             linear-gradient(
               145deg,
-              #26394b,
-              #121b25
+              #f59e0b,
+              #f97316
             );
           box-shadow:
-            0 15px 40px
-              rgba(
-                0,
-                0,
-                0,
-                0.35
-              ),
-            inset 0 1px
-              rgba(
-                255,
-                255,
-                255,
-                0.1
-              );
+            0 15px 35px
+            rgba(245,158,11,.25);
+          transform: rotate(-4deg);
         }
 
         .eyebrow {
-          color: #fbbf24;
-          font-size: 11px;
+          font-size: 10px;
           font-weight: 900;
           letter-spacing: 2px;
+          color: #fbbf24;
           margin-bottom: 5px;
         }
 
         h1 {
           margin: 0;
-          font-size: 31px;
-          line-height: 1.02;
-          font-weight: 950;
+          font-size: clamp(
+            27px,
+            6vw,
+            48px
+          );
+          line-height: .95;
           letter-spacing: -1.5px;
         }
 
-        .heroText p {
-          margin: 8px 0 0;
-          color: #94a3b8;
-          font-size: 13px;
-        }
-
-        .card {
-          position: relative;
-          margin-bottom: 16px;
-          padding: 20px;
-          border-radius: 24px;
-          background:
-            linear-gradient(
-              145deg,
-              rgba(
-                255,
-                255,
-                255,
-                0.075
-              ),
-              rgba(
-                255,
-                255,
-                255,
-                0.035
-              )
-            );
-          border: 1px solid
-            rgba(
-              255,
-              255,
-              255,
-              0.08
-            );
-          box-shadow:
-            0 18px 50px
-              rgba(
-                0,
-                0,
-                0,
-                0.2
-              );
-          backdrop-filter: blur(
-            14px
-          );
-        }
-
-        .sectionTitle {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          margin-bottom: 18px;
-        }
-
-        .sectionTitle > div:first-child {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .icon {
-          width: 45px;
-          height: 45px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 14px;
-          background: rgba(
-            255,
-            255,
-            255,
-            0.07
-          );
-          font-size: 23px;
+        .hero p {
+          margin: 12px 0 0;
+          color: #9ca8b5;
+          font-size: 14px;
         }
 
         h2 {
           margin: 0;
-          font-size: 19px;
-          font-weight: 900;
-        }
-
-        .sectionTitle small {
-          display: block;
-          margin-top: 3px;
-          color: #8190a0;
-          font-size: 11px;
+          font-size: 20px;
         }
 
         h3 {
-          margin: 0 0 12px;
-          font-size: 15px;
+          margin-top: 0;
+        }
+
+        p {
+          color: #929daa;
+          line-height: 1.5;
+        }
+
+        .glassCard {
+          position: relative;
+          background:
+            linear-gradient(
+              145deg,
+              rgba(255,255,255,.075),
+              rgba(255,255,255,.035)
+            );
+          border: 1px solid
+            rgba(255,255,255,.09);
+          border-radius: 24px;
+          padding: 20px;
+          margin-bottom: 15px;
+          box-shadow:
+            0 15px 50px
+            rgba(0,0,0,.20);
+          backdrop-filter:
+            blur(14px);
+        }
+
+        .sectionTop {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 15px;
+        }
+
+        .sectionTop > div:first-child {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .sectionEmoji {
+          width: 48px;
+          height: 48px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 15px;
+          background:
+            rgba(245,158,11,.12);
+          font-size: 25px;
+        }
+
+        .sectionTop p {
+          margin: 3px 0 0;
+          font-size: 12px;
         }
 
         input,
         select,
         textarea {
           width: 100%;
-          padding: 14px;
-          margin-bottom: 10px;
-          border-radius: 14px;
           border: 1px solid
-            #2c3948;
-          background: #111923;
+            rgba(255,255,255,.10);
+          border-radius: 14px;
+          background: #111922;
           color: white;
+          padding: 13px 14px;
           outline: none;
-          font-size: 14px;
+          margin-bottom: 9px;
         }
 
         textarea {
@@ -3330,154 +3777,147 @@ export default function Home() {
           border-color: #f59e0b;
           box-shadow:
             0 0 0 3px
-              rgba(
-                245,
-                158,
-                11,
-                0.12
-              );
+            rgba(245,158,11,.08);
+        }
+
+        option {
+          background: #111922;
+          color: white;
+        }
+
+        .bigSelect {
+          font-size: 16px;
+          padding: 15px;
+        }
+
+        .two {
+          display: grid;
+          grid-template-columns:
+            repeat(2, 1fr);
+          gap: 9px;
+        }
+
+        .three {
+          display: grid;
+          grid-template-columns:
+            repeat(3, 1fr);
+          gap: 9px;
+        }
+
+        .inputRow {
+          display: grid;
+          grid-template-columns:
+            1fr auto;
+          gap: 9px;
+        }
+
+        .inputRow input {
+          margin: 0;
         }
 
         button {
           border: none;
-          cursor: pointer;
-          font-family: inherit;
           transition:
-            transform
-              0.15s
-              ease,
-            filter
-              0.15s
-              ease;
+            transform .15s ease,
+            filter .15s ease;
         }
 
         button:hover {
-          filter: brightness(
-            1.1
-          );
-          transform: translateY(
-            -1px
-          );
+          filter: brightness(1.08);
         }
 
         button:active {
-          transform: scale(
-            0.97
-          );
-        }
-
-        button:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
+          transform:
+            scale(.96);
         }
 
         .primaryButton {
-          padding: 14px 18px;
-          border-radius: 14px;
           background:
             linear-gradient(
               135deg,
-              #fbbf24,
-              #f59e0b
+              #f59e0b,
+              #f97316
             );
           color: #111;
-          font-weight: 950;
+          font-weight: 900;
+          padding: 13px 17px;
+          border-radius: 14px;
+          box-shadow:
+            0 8px 20px
+            rgba(245,158,11,.18);
         }
 
         .primaryButton.full {
           width: 100%;
-          margin-top: 5px;
+          margin-top: 3px;
         }
 
-        .dangerButton,
-        .smallDanger {
-          background: #293442;
-          color: white;
-          border-radius: 11px;
+        .smallButton {
+          background: #f59e0b;
+          color: #111;
+          border-radius: 12px;
+          padding: 9px 12px;
+          font-weight: 900;
         }
 
         .dangerButton {
-          padding: 10px 13px;
-        }
-
-        .smallDanger {
-          padding: 7px 11px;
-        }
-
-        .bigSelect {
-          font-size: 15px;
+          background:
+            rgba(239,68,68,.12);
+          color: #fca5a5;
+          border: 1px solid
+            rgba(239,68,68,.20);
+          border-radius: 10px;
+          padding: 8px 10px;
+          font-size: 11px;
           font-weight: 800;
         }
 
         .eventInfo {
           display: flex;
-          flex-wrap: wrap;
+          justify-content: space-between;
+          align-items: center;
           gap: 10px;
-          padding: 12px;
+          background:
+            rgba(255,255,255,.045);
           border-radius: 14px;
-          background: rgba(
-            255,
-            255,
-            255,
-            0.04
-          );
-          margin-bottom: 14px;
+          padding: 12px;
+        }
+
+        .eventInfo b {
+          display: block;
         }
 
         .eventInfo span {
-          color: #aeb9c6;
+          display: block;
+          color: #8995a3;
           font-size: 12px;
+          margin-top: 3px;
         }
 
-        .createEventBox {
-          margin-top: 15px;
-          padding-top: 16px;
-          border-top: 1px solid
-            rgba(
-              255,
-              255,
-              255,
-              0.08
-            );
+        .formBox {
+          margin-top: 12px;
+          padding: 15px;
+          background:
+            rgba(0,0,0,.18);
+          border-radius: 17px;
         }
 
         .statsGrid {
           display: grid;
-          grid-template-columns: repeat(
-            4,
-            1fr
-          );
+          grid-template-columns:
+            repeat(4, 1fr);
           gap: 10px;
-          margin-bottom: 16px;
+          margin-bottom: 15px;
         }
 
         .statCard {
-          padding: 16px 10px;
+          padding: 15px 8px;
           text-align: center;
-          border-radius: 19px;
+          border-radius: 18px;
           background:
-            linear-gradient(
-              145deg,
-              rgba(
-                255,
-                255,
-                255,
-                0.075
-              ),
-              rgba(
-                255,
-                255,
-                255,
-                0.035
-              )
-            );
+            rgba(255,255,255,.055);
           border: 1px solid
-            rgba(
-              255,
-              255,
-              255,
-              0.07
-            );
+            rgba(255,255,255,.06);
         }
 
         .statCard span {
@@ -3487,379 +3927,171 @@ export default function Home() {
 
         .statCard strong {
           display: block;
-          margin-top: 5px;
           font-size: 20px;
+          margin: 5px 0;
         }
 
         .statCard small {
-          color: #7f8c9b;
+          color: #7e8b99;
           font-size: 10px;
         }
 
-        .badge {
-          min-width: 32px;
-          height: 32px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 0 9px;
-          border-radius: 50px;
-          background: #f59e0b;
-          color: #111;
-          font-weight: 950;
-        }
-
-        .inputRow {
+        .tabs {
           display: grid;
-          grid-template-columns: 1fr auto;
-          gap: 8px;
+          grid-template-columns:
+            repeat(4, 1fr);
+          gap: 6px;
+          padding: 5px;
+          margin-bottom: 15px;
+          border-radius: 17px;
+          background:
+            rgba(255,255,255,.045);
+          border: 1px solid
+            rgba(255,255,255,.06);
         }
 
-        .inputRow input {
-          margin: 0;
+        .tabs button {
+          background: transparent;
+          color: #8995a3;
+          border-radius: 13px;
+          padding: 11px 5px;
+          font-size: 11px;
+          font-weight: 900;
         }
 
-        .personCard {
+        .tabs button.active {
+          background:
+            rgba(245,158,11,.16);
+          color: #fbbf24;
+        }
+
+        .peopleList {
           display: flex;
+          flex-direction: column;
+          gap: 7px;
+        }
+
+        .person {
+          display: grid;
+          grid-template-columns:
+            45px 1fr auto auto;
           align-items: center;
-          gap: 12px;
-          margin-top: 9px;
-          padding: 12px;
-          border-radius: 16px;
-          background: rgba(
-            255,
-            255,
-            255,
-            0.045
-          );
+          gap: 10px;
+          padding: 11px;
+          border-radius: 15px;
+          background:
+            rgba(255,255,255,.045);
         }
 
         .personAvatar {
-          width: 48px;
-          height: 48px;
+          width: 40px;
+          height: 40px;
           display: flex;
           align-items: center;
           justify-content: center;
-          border-radius: 15px;
-          background: #1e2b38;
-          font-size: 24px;
+          border-radius: 13px;
+          background:
+            rgba(245,158,11,.12);
+          font-size: 20px;
         }
 
-        .personMain {
-          flex: 1;
-          min-width: 0;
-        }
-
-        .personMain strong,
-        .personMain span,
+        .personMain b,
         .personMain small {
           display: block;
         }
 
-        .personMain strong {
-          font-size: 15px;
-        }
-
-        .personMain span {
-          margin-top: 2px;
-          color: #fbbf24;
-          font-size: 11px;
-          font-weight: 800;
-        }
-
         .personMain small {
-          margin-top: 4px;
-          color: #7f8c9b;
-          font-size: 11px;
+          margin-top: 3px;
+          color: #8995a3;
+          font-size: 10px;
         }
 
-        .threeGrid {
-          display: grid;
-          grid-template-columns: repeat(
-            3,
-            1fr
-          );
-          gap: 8px;
+        .personPoints {
+          text-align: right;
+        }
+
+        .personPoints strong {
+          display: block;
+          color: #fbbf24;
+        }
+
+        .personPoints small {
+          color: #707d8b;
+          font-size: 9px;
+        }
+
+        .iconButton {
+          width: 30px;
+          height: 30px;
+          border-radius: 9px;
+          background:
+            #252e38;
+          color: #aab3bd;
+          font-size: 18px;
+        }
+
+        .drinkCard {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 13px;
+          margin-top: 8px;
+          border-radius: 15px;
+          background:
+            rgba(255,255,255,.045);
+        }
+
+        .drinkIcon {
+          width: 43px;
+          height: 43px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 13px;
+          background:
+            rgba(245,158,11,.10);
+          font-size: 22px;
+        }
+
+        .drinkInfo {
+          flex: 1;
+        }
+
+        .drinkInfo b,
+        .drinkInfo small {
+          display: block;
+        }
+
+        .drinkInfo small {
+          color: #8995a3;
+          font-size: 10px;
+          margin-top: 4px;
+        }
+
+        .drinkCard > strong {
+          color: #fbbf24;
         }
 
         .assignment {
           display: grid;
-          grid-template-columns: 0.8fr 1.5fr;
-          align-items: center;
+          grid-template-columns:
+            .8fr 1.2fr;
           gap: 10px;
+          align-items: center;
           margin-top: 8px;
-          padding: 11px;
-          border-radius: 14px;
-          background: rgba(
-            255,
-            255,
-            255,
-            0.04
-          );
+          padding: 10px;
+          border-radius: 13px;
+          background:
+            rgba(255,255,255,.045);
         }
 
         .assignment select {
           margin: 0;
         }
 
-        .drinkCard {
-          display: flex;
-          align-items: center;
-          gap: 11px;
-          margin-top: 9px;
-          padding: 12px;
-          border-radius: 16px;
-          background: rgba(
-            255,
-            255,
-            255,
-            0.045
-          );
-        }
-
-        .drinkIcon {
-          width: 45px;
-          height: 45px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 14px;
-          background: #1e2b38;
-          font-size: 22px;
-        }
-
-        .drinkInfo {
-          flex: 1;
-          min-width: 0;
-        }
-
-        .drinkInfo strong,
-        .drinkInfo span,
-        .drinkInfo small {
-          display: block;
-        }
-
-        .drinkInfo strong {
-          font-size: 14px;
-        }
-
-        .drinkInfo span {
-          color: #a0adbb;
-          font-size: 11px;
-        }
-
-        .drinkInfo small {
-          margin-top: 3px;
-          color: #748292;
-          font-size: 10px;
-        }
-
-        .drinkPrice {
-          font-weight: 950;
-          color: #fbbf24;
-        }
-
-        .promilleCard {
-          background:
-            linear-gradient(
-              145deg,
-              rgba(
-                120,
-                53,
-                15,
-                0.22
-              ),
-              rgba(
-                255,
-                255,
-                255,
-                0.04
-              )
-            );
-        }
-
-        .promilleRow {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 13px;
-          margin-top: 8px;
-          border-radius: 13px;
-          background: rgba(
-            0,
-            0,
-            0,
-            0.18
-          );
-        }
-
-        .safePromille {
-          color: #4ade80;
-        }
-
-        .warningPromille {
-          color: #fbbf24;
-        }
-
-        .dangerPromille {
-          color: #fb7185;
-        }
-
-        .challengeCard {
-          background:
-            linear-gradient(
-              145deg,
-              rgba(
-                99,
-                102,
-                241,
-                0.13
-              ),
-              rgba(
-                255,
-                255,
-                255,
-                0.035
-              )
-            );
-        }
-
-        .challengeButton {
-          width: 100%;
-          padding: 15px;
-          border-radius: 15px;
-          background:
-            linear-gradient(
-              135deg,
-              #8b5cf6,
-              #6366f1
-            );
-          color: white;
-          font-weight: 950;
-        }
-
-        .templates {
-          margin-top: 20px;
-        }
-
-        .templateGrid {
-          display: grid;
-          grid-template-columns: repeat(
-            2,
-            1fr
-          );
-          gap: 8px;
-        }
-
-        .templateButton {
-          text-align: left;
-          padding: 12px;
-          border-radius: 13px;
-          background: #182331;
-          color: white;
-        }
-
-        .templateButton strong,
-        .templateButton span {
-          display: block;
-        }
-
-        .templateButton span {
-          margin-top: 4px;
-          color: #fbbf24;
-          font-size: 11px;
-        }
-
-        .challengeItem {
-          margin-top: 12px;
-          padding: 14px;
-          display: grid;
-          grid-template-columns: auto 1fr;
-          gap: 12px;
-          border-radius: 17px;
-          background: rgba(
-            255,
-            255,
-            255,
-            0.045
-          );
-        }
-
-        .challengeIcon {
-          width: 45px;
-          height: 45px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 14px;
-          background: #202b43;
-          font-size: 23px;
-        }
-
-        .challengeMain strong,
-        .challengeMain span,
-        .challengeMain small {
-          display: block;
-        }
-
-        .challengeMain strong {
-          font-size: 15px;
-        }
-
-        .challengeMain span {
-          margin-top: 4px;
-          color: #aeb9c6;
-          font-size: 12px;
-        }
-
-        .challengeMain small {
-          margin-top: 6px;
-          color: #a78bfa;
-          font-size: 10px;
-        }
-
-        .challengeActions {
-          grid-column: 1 / -1;
-          display: flex;
-          flex-wrap: wrap;
-          gap: 7px;
-        }
-
-        .winnerButton {
-          padding: 9px 12px;
-          border-radius: 11px;
-          background: #273247;
-          color: white;
-          font-size: 11px;
-          font-weight: 800;
-        }
-
-        .completedChallenges {
-          margin-top: 20px;
-        }
-
-        .completedItem {
-          display: grid;
-          grid-template-columns: 1fr auto auto;
-          gap: 10px;
-          align-items: center;
-          padding: 11px;
-          margin-top: 7px;
-          border-radius: 13px;
-          background: rgba(
-            74,
-            222,
-            128,
-            0.08
-          );
-        }
-
-        .completedItem b {
-          color: #4ade80;
-        }
-
         .moneyButton {
-          padding: 14px 17px;
+          width: 100%;
+          padding: 14px;
           border-radius: 14px;
           background:
             linear-gradient(
@@ -3868,360 +4100,404 @@ export default function Home() {
               #16a34a
             );
           color: white;
-          font-weight: 950;
+          font-weight: 900;
         }
 
-        .paymentStats {
+        .paymentSummary {
           display: grid;
-          grid-template-columns: repeat(
-            3,
-            1fr
-          );
+          grid-template-columns:
+            repeat(3, 1fr);
           gap: 8px;
-          margin-top: 15px;
+          margin-top: 12px;
         }
 
-        .paymentStats div {
-          padding: 13px;
-          text-align: center;
+        .paymentSummary div {
+          padding: 12px;
           border-radius: 13px;
-          background: rgba(
-            255,
-            255,
-            255,
-            0.04
-          );
+          background:
+            rgba(255,255,255,.045);
+          text-align: center;
         }
 
-        .paymentStats span,
-        .paymentStats strong {
+        .paymentSummary span,
+        .paymentSummary b {
           display: block;
         }
 
-        .paymentStats span {
-          color: #7f8c9b;
+        .paymentSummary span {
+          color: #7d8996;
           font-size: 10px;
         }
 
-        .paymentStats strong {
+        .paymentSummary b {
           margin-top: 5px;
         }
 
-        .positive {
-          color: #4ade80;
-        }
-
-        .negative {
-          color: #fb7185;
-        }
-
-        .payerList {
-          margin-top: 20px;
-        }
-
-        .payerButton {
-          width: 100%;
-          margin-top: 7px;
-          padding: 11px;
-          border-radius: 12px;
-          background: #1b2936;
-          color: white;
-          font-weight: 800;
-        }
-
-        .bigMoney {
-          text-align: center;
-          font-size: 42px;
-          font-weight: 950;
+        .orange {
           color: #fbbf24;
         }
 
-        .costCard {
-          text-align: center;
-        }
-
-        .costCard p {
-          color: #7f8c9b;
-          font-size: 12px;
-        }
-
-        .costLine {
+        .promilleRow {
           display: flex;
           justify-content: space-between;
+          align-items: center;
           padding: 13px;
           margin-top: 8px;
-          border-radius: 13px;
-          background: rgba(
-            255,
-            255,
-            255,
-            0.045
-          );
-        }
-
-        .rankingCard {
-          overflow: hidden;
-        }
-
-        .rankingHeader {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-        }
-
-        .rankingHeader > span {
-          font-size: 42px;
-        }
-
-        .rankingHeader h2 {
-          margin: 0;
-        }
-
-        .rankingHeader p {
-          margin: 4px 0 0;
-          color: #8491a0;
-          font-size: 11px;
-        }
-
-        .championTitle {
-          display: flex;
-          align-items: center;
-          gap: 13px;
-          margin: 18px 0;
-          padding: 14px;
-          border-radius: 16px;
+          border-radius: 14px;
           background:
-            linear-gradient(
-              135deg,
-              rgba(
-                251,
-                191,
-                36,
-                0.13
-              ),
-              rgba(
-                245,
-                158,
-                11,
-                0.04
-              )
-            );
-          border: 1px solid
-            rgba(
-              251,
-              191,
-              36,
-              0.14
-            );
+            rgba(255,255,255,.045);
         }
 
-        .championTitle > span {
-          font-size: 35px;
-        }
-
-        .championTitle small,
-        .championTitle strong {
+        .promilleRow b,
+        .promilleRow small {
           display: block;
         }
 
-        .championTitle small {
-          color: #9aa6b4;
-          font-size: 9px;
-          letter-spacing: 1px;
-        }
-
-        .championTitle strong {
+        .promilleRow small {
+          color: #7e8b99;
           margin-top: 3px;
+          font-size: 10px;
+        }
+
+        .promilleRow strong {
+          font-size: 21px;
           color: #fbbf24;
-          font-size: 16px;
         }
 
-        .rankItem {
-          display: grid;
-          grid-template-columns: 45px 1fr auto;
+        .disclaimer {
+          margin-bottom: 0;
+          font-size: 10px;
+        }
+
+        .challengeHero {
+          display: flex;
           align-items: center;
-          gap: 10px;
-          padding: 13px;
-          margin-top: 8px;
-          border-radius: 15px;
-          background: rgba(
-            255,
-            255,
-            255,
-            0.045
-          );
-        }
-
-        .rankFirst {
+          gap: 15px;
           background:
             linear-gradient(
               135deg,
-              rgba(
-                251,
-                191,
-                36,
-                0.13
-              ),
-              rgba(
-                255,
-                255,
-                255,
-                0.045
-              )
+              rgba(168,85,247,.18),
+              rgba(245,158,11,.08)
             );
-          transform: scale(
-            1.01
-          );
         }
 
-        .rankPlace {
+        .challengeBig {
+          width: 65px;
+          height: 65px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 20px;
+          background:
+            rgba(168,85,247,.15);
+          font-size: 35px;
+        }
+
+        .templateGrid {
+          display: grid;
+          grid-template-columns:
+            repeat(2, 1fr);
+          gap: 8px;
+        }
+
+        .template {
+          display: grid;
+          grid-template-columns:
+            35px 1fr;
+          align-items: center;
+          text-align: left;
+          gap: 7px;
+          padding: 11px;
+          border-radius: 14px;
+          background:
+            rgba(255,255,255,.045);
+          color: white;
+        }
+
+        .template span {
+          grid-row: span 2;
+          font-size: 21px;
+        }
+
+        .template b {
+          font-size: 11px;
+        }
+
+        .template small {
+          color: #8995a3;
+          font-size: 9px;
+        }
+
+        .challengeCard {
+          display: flex;
+          gap: 12px;
+          padding: 14px;
+          margin-top: 9px;
+          border-radius: 17px;
+          background:
+            rgba(255,255,255,.045);
+          border: 1px solid
+            rgba(255,255,255,.055);
+        }
+
+        .challengeIcon {
+          width: 45px;
+          height: 45px;
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 14px;
+          background:
+            rgba(168,85,247,.13);
+          font-size: 22px;
+        }
+
+        .challengeContent {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .challengeHeader {
+          display: flex;
+          justify-content: space-between;
+          gap: 8px;
+        }
+
+        .pointsBadge {
+          color: #fbbf24;
+          font-weight: 900;
+          white-space: nowrap;
+        }
+
+        .challengeContent p {
+          margin: 6px 0;
+          font-size: 12px;
+        }
+
+        .challengeContent > small {
+          color: #7e8b99;
+          font-size: 9px;
+        }
+
+        .challengeActions {
+          display: grid;
+          grid-template-columns:
+            1fr auto;
+          gap: 7px;
+          margin-top: 10px;
+        }
+
+        .challengeActions select {
+          margin: 0;
+        }
+
+        .deleteSmall {
+          width: 42px;
+          border-radius: 12px;
+          background:
+            rgba(239,68,68,.10);
+          color: #fca5a5;
+        }
+
+        .completed {
+          margin-top: 9px;
+          padding: 9px;
+          border-radius: 10px;
+          background:
+            rgba(34,197,94,.10);
+          color: #86efac;
+          font-size: 11px;
+          font-weight: 800;
+        }
+
+        .rankingHero {
+          text-align: center;
+          padding: 30px 20px;
+          margin-bottom: 15px;
+          border-radius: 25px;
+          background:
+            radial-gradient(
+              circle at center,
+              rgba(245,158,11,.18),
+              rgba(255,255,255,.03)
+            );
+          border: 1px solid
+            rgba(245,158,11,.12);
+        }
+
+        .trophy {
+          font-size: 65px;
+          animation:
+            trophyFloat 2.4s
+            ease-in-out
+            infinite;
+        }
+
+        .rankingHero h2 {
+          font-size: 28px;
+          margin-top: 5px;
+        }
+
+        .rankingHero p {
+          margin-bottom: 0;
+        }
+
+        .rankingItem {
+          display: grid;
+          grid-template-columns:
+            50px 1fr auto;
+          align-items: center;
+          gap: 10px;
+          padding: 14px;
+          margin-top: 8px;
+          border-radius: 16px;
+          background:
+            rgba(255,255,255,.045);
+        }
+
+        .rankingItem.podium {
+          background:
+            linear-gradient(
+              90deg,
+              rgba(245,158,11,.12),
+              rgba(255,255,255,.045)
+            );
+        }
+
+        .rankNumber {
           font-size: 22px;
           text-align: center;
         }
 
-        .rankPerson strong,
-        .rankPerson span {
+        .rankPerson b,
+        .rankPerson small {
           display: block;
         }
 
-        .rankPerson span {
-          color: #fbbf24;
-          font-size: 10px;
+        .rankPerson small {
+          color: #8995a3;
           margin-top: 3px;
+          font-size: 10px;
         }
 
         .rankPoints {
           text-align: right;
         }
 
-        .rankPoints strong,
-        .rankPoints small {
-          display: block;
-        }
-
         .rankPoints strong {
-          font-size: 19px;
-        }
-
-        .rankPoints small {
-          color: #778493;
-          font-size: 9px;
-        }
-
-        .funStats {
-          display: grid;
-          grid-template-columns: repeat(
-            4,
-            1fr
-          );
-          gap: 8px;
-        }
-
-        .funStats > div {
-          padding: 14px 7px;
-          text-align: center;
-          border-radius: 14px;
-          background: rgba(
-            255,
-            255,
-            255,
-            0.045
-          );
-        }
-
-        .funStats span,
-        .funStats strong,
-        .funStats small {
-          display: block;
-        }
-
-        .funStats span {
+          color: #fbbf24;
           font-size: 20px;
         }
 
-        .funStats strong {
-          margin-top: 4px;
-          font-size: 18px;
-        }
-
-        .funStats small {
-          margin-top: 2px;
-          color: #788695;
+        .rankPoints small {
+          display: block;
+          color: #737f8d;
           font-size: 9px;
         }
 
-        .empty {
-          padding: 25px 10px;
-          text-align: center;
-          color: #758392;
-          font-size: 13px;
+        .titleGrid {
+          display: grid;
+          grid-template-columns:
+            repeat(2, 1fr);
+          gap: 8px;
+        }
+
+        .titleCard {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          padding: 12px;
+          border-radius: 13px;
+          background:
+            rgba(255,255,255,.045);
+        }
+
+        .titleCard span {
+          font-size: 23px;
+        }
+
+        .titleCard b {
+          font-size: 11px;
         }
 
         .message {
           position: fixed;
-          left: 50%;
-          bottom: 22px;
           z-index: 1000;
-          transform: translateX(
-            -50%
-          );
-          width: min(
-            90%,
-            500px
-          );
+          left: 50%;
+          bottom: 20px;
+          transform:
+            translateX(-50%);
+          width:
+            min(
+              calc(100% - 30px),
+              600px
+            );
           padding: 14px 17px;
           border-radius: 15px;
-          background: #182331;
+          background:
+            rgba(17,25,34,.96);
           border: 1px solid
-            #344454;
+            rgba(245,158,11,.25);
           color: #fbbf24;
+          box-shadow:
+            0 20px 60px
+            rgba(0,0,0,.45);
+          backdrop-filter:
+            blur(15px);
           text-align: center;
           font-weight: 800;
-          box-shadow:
-            0 15px 50px
-              rgba(
-                0,
-                0,
-                0,
-                0.4
-              );
-          animation: messageIn
-            0.3s ease;
+          font-size: 13px;
+        }
+
+        .loading {
+          position: fixed;
+          z-index: 999;
+          top: 15px;
+          left: 50%;
+          transform:
+            translateX(-50%);
+          padding: 9px 14px;
+          border-radius: 12px;
+          background:
+            rgba(17,25,34,.95);
+          color: #fbbf24;
+          font-size: 11px;
+        }
+
+        .empty {
+          text-align: center;
+          padding: 25px 10px;
+          color: #687585;
+          font-size: 13px;
         }
 
         footer {
-          padding: 35px 10px 10px;
           text-align: center;
-          color: #536170;
+          color: #53606e;
+          padding: 30px 10px 10px;
         }
 
         footer div {
           font-size: 30px;
+          margin-bottom: 8px;
         }
 
-        footer strong,
-        footer span {
+        footer b,
+        footer small {
           display: block;
         }
 
-        footer strong {
-          margin-top: 8px;
-          color: #657383;
-        }
-
-        footer span {
+        footer small {
           margin-top: 4px;
           font-size: 10px;
         }
 
-        /* =====================================================
+        /* ====================================================
            PROST ANIMATION
-        ===================================================== */
+           ==================================================== */
 
-        .animationOverlay,
-        .moneyOverlay,
-        .pointsOverlay,
-        .challengeAnimation {
+        .animationOverlay {
           position: fixed;
           inset: 0;
           z-index: 5000;
@@ -4229,188 +4505,219 @@ export default function Home() {
           align-items: center;
           justify-content: center;
           pointer-events: none;
-        }
-
-        .prostOverlay {
           background:
-            radial-gradient(
-              circle,
-              rgba(
-                251,
-                191,
-                36,
-                0.22
-              ),
-              rgba(
-                0,
-                0,
-                0,
-                0.88
-              )
-            );
-          animation: overlayFade
-            2.5s ease forwards;
+            rgba(0,0,0,.18);
+          animation:
+            overlayFade 2.3s
+            ease forwards;
         }
 
-        .beerLeft,
-        .beerRight {
-          position: absolute;
-          font-size: 105px;
+        .beerClash {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 35px;
+          animation:
+            beerClash 1.7s
+            cubic-bezier(.2,.8,.2,1)
+            forwards;
+        }
+
+        .beer {
+          font-size: 80px;
           filter:
             drop-shadow(
-              0 15px 20px
-                rgba(
-                  0,
-                  0,
-                  0,
-                  0.4
-                )
+              0 10px 20px
+              rgba(0,0,0,.35)
             );
         }
 
         .beerLeft {
-          animation: beerLeft
-            1.2s
-            ease
-            forwards;
+          transform:
+            rotate(-18deg);
         }
 
         .beerRight {
-          animation: beerRight
-            1.2s
-            ease
-            forwards;
+          transform:
+            rotate(18deg);
         }
 
         .prostText {
-          position: relative;
-          z-index: 2;
-          color: #fbbf24;
-          font-size: 68px;
-          font-weight: 1000;
-          letter-spacing: 4px;
-          text-shadow:
-            0 0 20px
-              rgba(
-                251,
-                191,
-                36,
-                0.8
-              ),
-            0 8px 30px
-              rgba(
-                0,
-                0,
-                0,
-                0.7
-              );
-          animation: prostText
-            2.3s
-            ease
-            forwards;
-        }
-
-        .animationPoints {
           position: absolute;
-          margin-top: 150px;
-          color: #4ade80;
-          font-size: 22px;
-          font-weight: 950;
-          animation: pointsPop
-            2.2s
-            ease
+          top: 105px;
+          left: 50%;
+          transform:
+            translateX(-50%)
+            scale(.4);
+          white-space: nowrap;
+          font-size: 48px;
+          font-weight: 1000;
+          color: #fbbf24;
+          text-shadow:
+            0 4px 0 #7c4a03,
+            0 10px 30px
+            rgba(0,0,0,.5);
+          animation:
+            prostText .7s
+            .55s
+            ease forwards;
+        }
+
+        .spark {
+          position: absolute;
+          font-size: 30px;
+          opacity: 0;
+          animation:
+            spark .9s
+            .6s
+            ease forwards;
+        }
+
+        .spark1 {
+          left: 38%;
+          top: 39%;
+        }
+
+        .spark2 {
+          right: 38%;
+          top: 45%;
+        }
+
+        .spark3 {
+          left: 50%;
+          top: 34%;
+        }
+
+        /* ====================================================
+           MONEY ANIMATION
+           ==================================================== */
+
+        .moneyOverlay {
+          position: fixed;
+          inset: 0;
+          z-index: 5000;
+          overflow: hidden;
+          pointer-events: none;
+          background:
+            rgba(0,0,0,.08);
+          animation:
+            overlayFade 2.3s
+            ease forwards;
+        }
+
+        .money {
+          position: absolute;
+          top: -70px;
+          font-size: 35px;
+          animation:
+            moneyFall 1.8s
+            linear
             forwards;
         }
 
-        @keyframes beerLeft {
-          0% {
-            left: -160px;
-            transform: rotate(
-              -25deg
-            );
-          }
-
-          70% {
-            left: calc(
-              50% - 65px
-            );
-            transform: rotate(
-              15deg
-            );
-          }
-
-          100% {
-            left: calc(
-              50% - 65px
-            );
-            transform: rotate(
-              5deg
-            );
-          }
+        .moneyText {
+          position: absolute;
+          left: 50%;
+          top: 45%;
+          transform:
+            translate(-50%,-50%)
+            scale(.3);
+          white-space: nowrap;
+          font-size: 46px;
+          font-weight: 1000;
+          color: #4ade80;
+          text-shadow:
+            0 4px 0 #166534,
+            0 10px 35px
+            rgba(0,0,0,.6);
+          animation:
+            moneyText .8s
+            .35s
+            ease forwards;
         }
 
-        @keyframes beerRight {
+        @keyframes beerClash {
+
           0% {
-            right: -160px;
-            transform: rotate(
-              25deg
-            );
+            transform:
+              scale(.4)
+              translateX(-100px);
           }
 
-          70% {
-            right: calc(
-              50% - 65px
-            );
-            transform: rotate(
-              -15deg
-            );
+          35% {
+            transform:
+              scale(1.05)
+              translateX(0);
+          }
+
+          55% {
+            transform:
+              scale(1.12);
           }
 
           100% {
-            right: calc(
-              50% - 65px
-            );
-            transform: rotate(
-              -5deg
-            );
+            transform:
+              scale(.95)
+              translateY(-20px);
           }
         }
 
         @keyframes prostText {
+
           0% {
             opacity: 0;
-            transform: scale(
-              0.2
-            );
+            transform:
+              translateX(-50%)
+              scale(.3)
+              rotate(-8deg);
           }
 
-          45% {
+          60% {
             opacity: 1;
-            transform: scale(
-              1.15
-            );
+            transform:
+              translateX(-50%)
+              scale(1.15)
+              rotate(2deg);
           }
 
-          70% {
-            transform: scale(
-              1
-            );
+          100% {
+            opacity: 1;
+            transform:
+              translateX(-50%)
+              scale(1);
+          }
+        }
+
+        @keyframes spark {
+
+          0% {
+            opacity: 0;
+            transform:
+              scale(.2)
+              rotate(0);
+          }
+
+          50% {
+            opacity: 1;
           }
 
           100% {
             opacity: 0;
-            transform: scale(
-              1.35
-            );
+            transform:
+              scale(1.8)
+              rotate(90deg)
+              translateY(-25px);
           }
         }
 
         @keyframes overlayFade {
+
           0% {
             opacity: 0;
           }
 
-          12% {
+          10% {
             opacity: 1;
           }
 
@@ -4423,407 +4730,191 @@ export default function Home() {
           }
         }
 
-        /* =====================================================
-           GELD ANIMATION
-        ===================================================== */
+        @keyframes moneyFall {
 
-        .moneyOverlay {
-          overflow: hidden;
-          background: rgba(
-            0,
-            0,
-            0,
-            0.48
-          );
-          animation: overlayFade
-            2.5s ease forwards;
-        }
-
-        .money {
-          position: absolute;
-          top: -80px;
-          font-size: 32px;
-          animation: moneyRain
-            2s
-            linear
-            forwards;
-        }
-
-        .moneyText {
-          position: relative;
-          z-index: 2;
-          padding: 20px 30px;
-          border-radius: 25px;
-          background: rgba(
-            17,
-            24,
-            39,
-            0.92
-          );
-          color: #4ade80;
-          font-size: 38px;
-          font-weight: 1000;
-          box-shadow:
-            0 20px 80px
-              rgba(
-                0,
-                0,
-                0,
-                0.6
-              );
-          animation: moneyPop
-            2.2s
-            ease
-            forwards;
-        }
-
-        @keyframes moneyRain {
-          to {
-            top: 110%;
+          0% {
             transform:
+              translateY(-80px)
+              rotate(0deg);
+            opacity: 0;
+          }
+
+          10% {
+            opacity: 1;
+          }
+
+          100% {
+            transform:
+              translateY(
+                115vh
+              )
               rotate(
                 720deg
               );
+            opacity: 0;
           }
         }
 
-        @keyframes moneyPop {
+        @keyframes moneyText {
+
           0% {
-            opacity: 0;
-            transform: scale(
-              0.5
-            )
-              rotate(
-                -8deg
-              );
-          }
-
-          30% {
-            opacity: 1;
-            transform: scale(
-              1.08
-            )
-              rotate(
-                2deg
-              );
-          }
-
-          70% {
-            opacity: 1;
-          }
-
-          100% {
-            opacity: 0;
-            transform: scale(
-              1.2
-            );
-          }
-        }
-
-        /* =====================================================
-           POINTS ANIMATION
-        ===================================================== */
-
-        .pointsOverlay {
-          flex-direction: column;
-          gap: 8px;
-          background:
-            radial-gradient(
-              circle,
-              rgba(
-                74,
-                222,
-                128,
-                0.15
-              ),
-              rgba(
-                0,
-                0,
-                0,
-                0.8
-              )
-            );
-          animation: overlayFade
-            2.5s ease forwards;
-        }
-
-        .pointsEmoji {
-          font-size: 90px;
-          animation: trophyBounce
-            2s
-            ease
-            forwards;
-        }
-
-        .pointsText {
-          color: #4ade80;
-          font-size: 25px;
-          font-weight: 950;
-          text-align: center;
-          animation: pointsPop
-            2.2s
-            ease
-            forwards;
-        }
-
-        @keyframes trophyBounce {
-          0% {
-            opacity: 0;
-            transform: scale(
-              0.2
-            )
-              rotate(
-                -20deg
-              );
-          }
-
-          35% {
-            opacity: 1;
-            transform: scale(
-              1.25
-            )
-              rotate(
-                8deg
-              );
-          }
-
-          55% {
-            transform: scale(
-              0.95
-            );
-          }
-
-          75% {
-            transform: scale(
-              1.05
-            );
-          }
-
-          100% {
-            opacity: 0;
-            transform: scale(
-              1.2
-            );
-          }
-        }
-
-        /* =====================================================
-           CHALLENGE ANIMATION
-        ===================================================== */
-
-        .challengeAnimation {
-          flex-direction: column;
-          background:
-            radial-gradient(
-              circle,
-              rgba(
-                139,
-                92,
-                246,
-                0.3
-              ),
-              rgba(
-                0,
-                0,
-                0,
-                0.9
-              )
-            );
-          animation: overlayFade
-            2.5s ease forwards;
-        }
-
-        .challengeAnimation div {
-          font-size: 100px;
-          animation: challengeBounce
-            2s
-            ease
-            forwards;
-        }
-
-        .challengeAnimation strong {
-          color: #c4b5fd;
-          font-size: 50px;
-          font-weight: 1000;
-          animation: pointsPop
-            2.2s
-            ease
-            forwards;
-        }
-
-        .challengeAnimation span {
-          color: white;
-          font-size: 15px;
-        }
-
-        @keyframes challengeBounce {
-          0% {
-            opacity: 0;
-            transform: scale(
-              0
-            )
-              rotate(
-                -30deg
-              );
-          }
-
-          40% {
-            opacity: 1;
-            transform: scale(
-              1.25
-            )
-              rotate(
-                10deg
-              );
-          }
-
-          65% {
-            transform: scale(
-              0.95
-            );
-          }
-
-          100% {
-            opacity: 0;
-            transform: scale(
-              1.15
-            );
-          }
-        }
-
-        @keyframes messageIn {
-          from {
             opacity: 0;
             transform:
-              translate(
-                -50%,
-                20px
-              );
+              translate(-50%,-50%)
+              scale(.3)
+              rotate(-8deg);
           }
 
-          to {
+          60% {
             opacity: 1;
             transform:
-              translate(
-                -50%,
-                0
-              );
+              translate(-50%,-50%)
+              scale(1.12)
+              rotate(2deg);
+          }
+
+          100% {
+            opacity: 1;
+            transform:
+              translate(-50%,-50%)
+              scale(1);
+          }
+        }
+
+        @keyframes trophyFloat {
+
+          0%,
+          100% {
+            transform:
+              translateY(0)
+              rotate(-3deg);
+          }
+
+          50% {
+            transform:
+              translateY(-9px)
+              rotate(3deg);
           }
         }
 
         @media (
-          max-width: 700px
+          max-width: 650px
         ) {
+
           .app {
-            padding: 12px 10px
-              50px;
+            padding:
+              10px
+              10px
+              40px;
           }
 
           .hero {
-            padding-top: 8px;
+            padding:
+              10px
+              3px
+              20px;
           }
 
           .heroLogo {
-            width: 60px;
-            height: 60px;
-            font-size: 32px;
-            border-radius: 19px;
+            width: 58px;
+            height: 58px;
+            font-size: 30px;
+            border-radius: 18px;
           }
 
           h1 {
-            font-size: 24px;
+            font-size: 29px;
           }
 
-          .statsGrid {
-            grid-template-columns: repeat(
-              2,
-              1fr
-            );
+          .hero p {
+            font-size: 11px;
           }
 
-          .threeGrid {
-            grid-template-columns: 1fr;
-          }
-
-          .assignment {
-            grid-template-columns: 1fr;
-          }
-
-          .paymentStats {
-            grid-template-columns: 1fr;
-          }
-
-          .funStats {
-            grid-template-columns: repeat(
-              2,
-              1fr
-            );
-          }
-
-          .beerLeft,
-          .beerRight {
-            font-size: 80px;
-          }
-
-          .prostText {
-            font-size: 52px;
-          }
-        }
-
-        @media (
-          max-width: 450px
-        ) {
-          .card {
+          .glassCard {
             padding: 15px;
             border-radius: 20px;
           }
 
-          .hero {
-            gap: 11px;
+          .statsGrid {
+            grid-template-columns:
+              repeat(2, 1fr);
           }
 
-          h1 {
-            font-size: 21px;
+          .tabs button {
+            font-size: 9px;
+            padding:
+              10px
+              2px;
           }
 
-          .heroText p {
-            font-size: 11px;
+          .two,
+          .three {
+            grid-template-columns: 1fr;
+            gap: 0;
           }
 
-          .statCard {
-            padding: 13px 7px;
-          }
-
-          .statCard strong {
-            font-size: 17px;
-          }
-
-          .templateGrid {
+          .inputRow {
             grid-template-columns: 1fr;
           }
 
-          .rankItem {
-            grid-template-columns:
-              38px 1fr auto;
+          .inputRow button {
+            width: 100%;
           }
 
-          .bigMoney {
+          .person {
+            grid-template-columns:
+              40px 1fr auto;
+          }
+
+          .person .iconButton {
+            grid-column: 3;
+            grid-row: 1;
+          }
+
+          .personPoints {
+            grid-column: 2;
+            text-align: left;
+          }
+
+          .assignment {
+            grid-template-columns:
+              1fr;
+          }
+
+          .paymentSummary {
+            grid-template-columns:
+              1fr;
+          }
+
+          .templateGrid {
+            grid-template-columns:
+              1fr;
+          }
+
+          .titleGrid {
+            grid-template-columns:
+              1fr;
+          }
+
+          .beer {
+            font-size: 65px;
+          }
+
+          .beerClash {
+            gap: 20px;
+          }
+
+          .prostText {
+            font-size: 39px;
+            top: 95px;
+          }
+
+          .moneyText {
             font-size: 35px;
           }
+
         }
 
-        @media (
-          prefers-reduced-motion:
-            reduce
-        ) {
-          *,
-          *::before,
-          *::after {
-            animation-duration: 0.01ms !important;
-            animation-iteration-count: 1 !important;
-            scroll-behavior: auto !important;
-          }
-        }
       `}</style>
     </main>
   );
