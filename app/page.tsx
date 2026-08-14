@@ -3,120 +3,78 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 
-type EventItem = {
+type Event = {
   id: string;
   title: string;
-  description?: string | null;
-  location?: string | null;
-  start_date?: string | null;
-  end_date?: string | null;
-  is_active?: boolean | null;
 };
 
 type Person = {
   id: string;
   name: string;
-  username?: string | null;
+  points: number;
   drinks: number;
   liters: number;
   cost: number;
-  points: number;
   promille?: number;
 };
 
 type Drink = {
   id: string;
-  event_id?: string;
-  getraenk?: string | null;
-  drink_name?: string | null;
-  menge?: number | null;
-  liters?: number | null;
-  alkohol?: number | null;
-  alcohol_percent?: number | null;
-  preis?: number | null;
-  price?: number | null;
-  quantity?: number | null;
-  profile_id?: string | null;
+  getraenk?: string;
+  drink_name?: string;
+  liters?: number;
+  menge?: number;
+  alkohol?: number;
+  alcohol_percent?: number;
+  preis?: number;
+};
+
+type BeerRequest = {
+  id: string;
+  event_id: string;
+  requester_profile_id: string;
+  status: string;
+  message?: string;
+  created_at: string;
+  requester_name?: string;
+};
+
+type BeerResponse = {
+  request_id: string;
+  profile_id: string;
+  response: string;
 };
 
 type Payment = {
   id: string;
-  event_id?: string | null;
-  profile_id?: string | null;
-  amount?: number | null;
-  betrag?: number | null;
-  description?: string | null;
-  beschreibung?: string | null;
-  status?: string | null;
-  created_at?: string | null;
-};
-
-type Challenge = {
-  id: string;
-  event_id?: string | null;
-  title?: string | null;
-  description?: string | null;
-  points?: number | null;
-  category?: string | null;
-  status?: string | null;
-  assigned_profile_id?: string | null;
-  winner_profile_id?: string | null;
-  required_votes?: number | null;
-  is_active?: boolean | null;
+  profile_id?: string;
+  amount?: number;
+  description?: string;
+  status?: string;
+  created_at?: string;
+  person_name?: string;
 };
 
 type PointHistory = {
   id?: string;
-  profile_id?: string | null;
-  event_id?: string | null;
-  points?: number | null;
-  amount?: number | null;
-  reason?: string | null;
-  description?: string | null;
-  source?: string | null;
-  created_at?: string | null;
-};
-
-type RankingTitle = {
-  min_points: number;
-  title: string;
-  emoji?: string | null;
-  description?: string | null;
+  profile_id?: string;
+  points?: number;
+  reason?: string;
+  description?: string;
+  created_at?: string;
 };
 
 export default function Home() {
-  const [events, setEvents] = useState<EventItem[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [eventId, setEventId] = useState("");
 
-  const [drinks, setDrinks] = useState<Drink[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
+  const [drinks, setDrinks] = useState<Drink[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [pointHistory, setPointHistory] = useState<PointHistory[]>([]);
-  const [rankingTitles, setRankingTitles] = useState<RankingTitle[]>([]);
 
-  const [selectedPerson, setSelectedPerson] =
-    useState<Person | null>(null);
-
-  const [showCreateEvent, setShowCreateEvent] =
-    useState(false);
-
-  const [showChallenge, setShowChallenge] =
-    useState(false);
-
-  const [showPayment, setShowPayment] =
-    useState(false);
-
-  const [showDrinkAnimation, setShowDrinkAnimation] =
-    useState(false);
-
-  const [showMoneyAnimation, setShowMoneyAnimation] =
-    useState(false);
-
-  const [showPointsAnimation, setShowPointsAnimation] =
-    useState(false);
-
-  const [message, setMessage] = useState("");
+  const [beerRequests, setBeerRequests] = useState<BeerRequest[]>([]);
+  const [beerResponses, setBeerResponses] = useState<BeerResponse[]>([]);
 
   const [drinkName, setDrinkName] = useState("");
   const [liters, setLiters] = useState("0.5");
@@ -124,39 +82,18 @@ export default function Home() {
   const [price, setPrice] = useState("0");
 
   const [personName, setPersonName] = useState("");
-
-  const [paymentPerson, setPaymentPerson] =
-    useState("");
-
-  const [paymentAmount, setPaymentAmount] =
-    useState("");
-
+  const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentDescription, setPaymentDescription] =
     useState("Getränkeeinkauf");
 
-  const [eventTitle, setEventTitle] =
-    useState("");
+  const [message, setMessage] = useState("");
 
-  const [eventDescription, setEventDescription] =
-    useState("");
+  const [animation, setAnimation] = useState<
+    "prost" | "money" | "beer" | null
+  >(null);
 
-  const [eventLocation, setEventLocation] =
-    useState("");
-
-  const [challengeTitle, setChallengeTitle] =
-    useState("");
-
-  const [challengeDescription, setChallengeDescription] =
-    useState("");
-
-  const [challengePoints, setChallengePoints] =
-    useState("10");
-
-  const [challengeCategory, setChallengeCategory] =
-    useState("Lustig");
-
-  const [challengeVotes, setChallengeVotes] =
-    useState("1");
+  const [selectedPerson, setSelectedPerson] =
+    useState<Person | null>(null);
 
   const [loading, setLoading] = useState(false);
 
@@ -169,13 +106,11 @@ export default function Home() {
   async function loadEvents() {
     const { data, error } = await supabase
       .from("events")
-      .select("*")
-      .order("created_at", {
-        ascending: false,
-      });
+      .select("id,title")
+      .order("created_at", { ascending: false });
 
     if (error) {
-      console.error(error);
+      setMessage("❌ Events konnten nicht geladen werden.");
       return;
     }
 
@@ -189,29 +124,17 @@ export default function Home() {
   }
 
   async function createEvent() {
-    setMessage("");
+    const title = window.prompt("🍻 Name des neuen Events:");
 
-    if (!eventTitle.trim()) {
-      setMessage("❌ Bitte einen Eventnamen eingeben.");
-      return;
-    }
-
-    setLoading(true);
+    if (!title?.trim()) return;
 
     const { data, error } = await supabase
       .from("events")
       .insert({
-        title: eventTitle.trim(),
-        description:
-          eventDescription.trim() || null,
-        location:
-          eventLocation.trim() || null,
-        is_active: true,
+        title: title.trim(),
       })
-      .select()
+      .select("id,title")
       .single();
-
-    setLoading(false);
 
     if (error) {
       setMessage(
@@ -221,41 +144,30 @@ export default function Home() {
       return;
     }
 
-    setEventTitle("");
-    setEventDescription("");
-    setEventLocation("");
-    setShowCreateEvent(false);
-
-    await loadEvents();
-
-    if (data?.id) {
+    if (data) {
+      setEvents((old) => [data, ...old]);
       setEventId(data.id);
+      setMessage("✅ Event erstellt!");
     }
-
-    setMessage("🎉 Event erfolgreich erstellt!");
   }
 
   async function deleteEvent() {
     if (!eventId) return;
 
-    const event = events.find(
-      (item) => item.id === eventId
-    );
+    const event = events.find((e) => e.id === eventId);
 
-    const confirmed = window.confirm(
-      `Soll das Event "${event?.title || ""}" wirklich gelöscht werden?`
-    );
-
-    if (!confirmed) return;
-
-    setLoading(true);
+    if (
+      !window.confirm(
+        `⚠️ Event "${event?.title}" wirklich löschen?`
+      )
+    ) {
+      return;
+    }
 
     const { error } = await supabase
       .from("events")
       .delete()
       .eq("id", eventId);
-
-    setLoading(false);
 
     if (error) {
       setMessage(
@@ -265,10 +177,17 @@ export default function Home() {
       return;
     }
 
-    setEventId("");
-    setMessage("🗑️ Event gelöscht.");
+    setEvents((old) =>
+      old.filter((e) => e.id !== eventId)
+    );
 
-    await loadEvents();
+    setEventId("");
+    setPeople([]);
+    setDrinks([]);
+    setPayments([]);
+    setBeerRequests([]);
+
+    setMessage("🗑️ Event gelöscht.");
   }
 
   /*
@@ -278,10 +197,7 @@ export default function Home() {
    */
 
   async function loadDrinks() {
-    if (!eventId) {
-      setDrinks([]);
-      return;
-    }
+    if (!eventId) return;
 
     const { data, error } = await supabase
       .from("drinks")
@@ -291,34 +207,23 @@ export default function Home() {
         ascending: false,
       });
 
-    if (error) {
-      console.error(error);
-      return;
+    if (!error && data) {
+      setDrinks(data);
     }
-
-    setDrinks(data || []);
   }
 
   async function saveDrink() {
     setMessage("");
 
     if (!eventId) {
-      setMessage(
-        "❌ Bitte zuerst ein Event auswählen."
-      );
+      setMessage("❌ Bitte zuerst ein Event auswählen.");
       return;
     }
 
     if (!drinkName.trim()) {
-      setMessage(
-        "❌ Bitte ein Getränk eingeben."
-      );
+      setMessage("❌ Bitte ein Getränk eingeben.");
       return;
     }
-
-    const litersNumber = Number(liters);
-    const alcoholNumber = Number(alcohol);
-    const priceNumber = Number(price);
 
     const { error } = await supabase
       .from("drinks")
@@ -326,11 +231,11 @@ export default function Home() {
         event_id: eventId,
         getraenk: drinkName.trim(),
         drink_name: drinkName.trim(),
-        menge: litersNumber,
-        liters: litersNumber,
-        alkohol: alcoholNumber,
-        alcohol_percent: alcoholNumber,
-        preis: priceNumber,
+        menge: Number(liters),
+        liters: Number(liters),
+        alkohol: Number(alcohol),
+        alcohol_percent: Number(alcohol),
+        preis: Number(price),
         quantity: 1,
       });
 
@@ -359,139 +264,108 @@ export default function Home() {
    */
 
   async function loadPeople() {
-    if (!eventId) {
+    if (!eventId) return;
+
+    const { data: members } = await supabase
+      .from("event_members")
+      .select("profile_id")
+      .eq("event_id", eventId);
+
+    if (!members) {
       setPeople([]);
       return;
     }
 
-    /*
-     * Profiles werden zunächst geladen.
-     * Event-Mitglieder bestimmen anschließend,
-     * welche Personen zum Event gehören.
-     */
-
-    const { data: members, error } =
-      await supabase
-        .from("event_members")
-        .select("*")
-        .eq("event_id", eventId);
-
-    if (error) {
-      console.error(error);
-    }
-
-    if (!members || members.length === 0) {
-      setPeople([]);
-      return;
-    }
-
-    const ids = members
-      .map(
-        (member: any) =>
-          member.profile_id ||
-          member.user_id
-      )
-      .filter(Boolean);
+    const ids = members.map(
+      (m) => m.profile_id
+    );
 
     if (ids.length === 0) {
       setPeople([]);
       return;
     }
 
-    const { data: profiles } =
-      await supabase
-        .from("profiles")
-        .select("*")
-        .in("id", ids);
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("*")
+      .in("id", ids);
 
-    const result: Person[] =
-      (profiles || []).map(
-        (profile: any) => ({
-          id: profile.id,
-          name:
-            profile.name ||
-            profile.username ||
-            "Unbekannt",
-          username: profile.username,
-          drinks: 0,
-          liters: 0,
-          cost: 0,
-          points: Number(
-            profile.points || 0
-          ),
-          promille: Number(
-            profile.promille || 0
-          ),
-        })
-      );
+    if (!profiles) {
+      setPeople([]);
+      return;
+    }
+
+    const result: Person[] = profiles.map(
+      (profile: any) => ({
+        id: profile.id,
+        name:
+          profile.username ||
+          profile.name ||
+          "Teilnehmer",
+        points: Number(
+          profile.points || 0
+        ),
+        drinks: Number(
+          profile.drinks_count || 0
+        ),
+        liters: Number(
+          profile.liters || 0
+        ),
+        cost: Number(
+          profile.cost || 0
+        ),
+        promille: Number(
+          profile.promille || 0
+        ),
+      })
+    );
 
     setPeople(result);
   }
 
   async function addPerson() {
-    setMessage("");
-
     if (!personName.trim()) {
-      setMessage(
-        "❌ Bitte einen Namen eingeben."
-      );
+      setMessage("❌ Bitte einen Namen eingeben.");
       return;
     }
 
     if (!eventId) {
-      setMessage(
-        "❌ Bitte zuerst ein Event auswählen."
-      );
+      setMessage("❌ Bitte zuerst ein Event auswählen.");
       return;
     }
 
-    const existing = people.find(
-      (person) =>
-        person.name.toLowerCase() ===
-        personName
-          .trim()
-          .toLowerCase()
+    const name = personName.trim();
+
+    const existing = people.some(
+      (p) =>
+        p.name.toLowerCase() ===
+        name.toLowerCase()
     );
 
     if (existing) {
-      setMessage(
-        "❌ Teilnehmer bereits vorhanden."
-      );
+      setMessage("❌ Teilnehmer bereits vorhanden.");
       return;
     }
-
-    setLoading(true);
-
-    /*
-     * Erst Profil erstellen.
-     */
 
     const { data: profile, error } =
       await supabase
         .from("profiles")
         .insert({
-          name: personName.trim(),
-          username: personName.trim(),
+          username: name,
+          name,
           points: 0,
           drinks_count: 0,
         })
-        .select()
+        .select("id")
         .single();
 
-    if (error) {
-      setLoading(false);
-
+    if (error || !profile) {
       setMessage(
         "❌ Teilnehmer konnte nicht hinzugefügt werden: " +
-          error.message
+          (error?.message || "Unbekannter Fehler")
       );
-
       return;
     }
-
-    /*
-     * Danach Event-Mitglied.
-     */
 
     const { error: memberError } =
       await supabase
@@ -501,11 +375,9 @@ export default function Home() {
           profile_id: profile.id,
         });
 
-    setLoading(false);
-
     if (memberError) {
       setMessage(
-        "❌ Teilnehmer konnte nicht hinzugefügt werden: " +
+        "❌ Teilnehmer konnte nicht dem Event hinzugefügt werden: " +
           memberError.message
       );
       return;
@@ -515,11 +387,7 @@ export default function Home() {
 
     await loadPeople();
 
-    setMessage(
-      "🎉 " +
-        personName.trim() +
-        " ist jetzt dabei!"
-    );
+    setMessage("✅ Teilnehmer hinzugefügt!");
   }
 
   /*
@@ -530,14 +398,8 @@ export default function Home() {
 
   async function assignDrink(
     person: Person,
-    drinkId: string
+    drink: Drink
   ) {
-    const drink = drinks.find(
-      (item) => item.id === drinkId
-    );
-
-    if (!drink) return;
-
     const drinkLiters = Number(
       drink.liters ??
         drink.menge ??
@@ -545,82 +407,53 @@ export default function Home() {
     );
 
     const drinkPrice = Number(
-      drink.preis ??
-        drink.price ??
-        0
+      drink.preis ?? 0
     );
 
-    const newPerson = {
-      ...person,
-      drinks: person.drinks + 1,
-      liters:
-        person.liters + drinkLiters,
-      cost:
-        person.cost + drinkPrice,
-      points:
-        person.points + 10,
-    };
+    const newPoints = person.points + 10;
+    const newDrinks = person.drinks + 1;
+    const newLiters =
+      person.liters + drinkLiters;
+    const newCost =
+      person.cost + drinkPrice;
 
-    setPeople((current) =>
-      current.map((item) =>
-        item.id === person.id
-          ? newPerson
-          : item
-      )
-    );
-
-    setShowDrinkAnimation(true);
-
-    setTimeout(() => {
-      setShowDrinkAnimation(false);
-    }, 2200);
-
-    setShowPointsAnimation(true);
-
-    setTimeout(() => {
-      setShowPointsAnimation(false);
-    }, 1600);
-
-    /*
-     * Profilpunkte aktualisieren.
-     */
-
-    const { error } = await supabase
+    await supabase
       .from("profiles")
       .update({
-        points: newPerson.points,
-        drinks_count:
-          newPerson.drinks,
+        points: newPoints,
+        drinks_count: newDrinks,
+        liters: newLiters,
+        cost: newCost,
       })
       .eq("id", person.id);
-
-    if (error) {
-      console.error(error);
-    }
-
-    /*
-     * Punkte-Historie.
-     */
 
     await supabase
       .from("point_history")
       .insert({
         profile_id: person.id,
-        event_id: eventId,
         points: 10,
-        amount: 10,
-        reason:
-          "Getränk getrunken",
+        reason: "Getränk",
         description:
-          "🍺 Getränk: " +
-          (drink.getraenk ||
+          `Getränk getrunken: ${
+            drink.getraenk ||
             drink.drink_name ||
-            "Getränk"),
-        source: "drink",
-      });
+            "Getränk"
+          }`,
+      })
+      .then(() => {});
 
-    await loadPointHistory();
+    setAnimation("prost");
+
+    setTimeout(() => {
+      setAnimation(null);
+    }, 2200);
+
     await loadPeople();
+    await loadPointHistory();
+
+    setMessage(
+      `🍺 ${person.name} hat ein Getränk bekommen! +10 Punkte`
+    );
   }
 
   /*
@@ -630,58 +463,24 @@ export default function Home() {
    */
 
   async function loadPayments() {
-    if (!eventId) {
-      setPayments([]);
-      return;
+    if (!eventId) return;
+
+    const { data } = await supabase
+      .from("payments")
+      .select("*")
+      .eq("event_id", eventId)
+      .order("created_at", {
+        ascending: false,
+      });
+
+    if (data) {
+      setPayments(data);
     }
-
-    const { data, error } =
-      await supabase
-        .from("payments")
-        .select("*")
-        .eq("event_id", eventId)
-        .order("created_at", {
-          ascending: false,
-        });
-
-    if (error) {
-      console.error(error);
-      return;
-    }
-
-    setPayments(data || []);
-  }
-
-  function getPersonName(
-    profileId?: string | null
-  ) {
-    if (!profileId) {
-      return "Unbekannt";
-    }
-
-    return (
-      people.find(
-        (person) =>
-          person.id === profileId
-      )?.name ||
-      "Unbekannt"
-    );
   }
 
   async function savePayment() {
-    setMessage("");
-
     if (!eventId) {
-      setMessage(
-        "❌ Bitte zuerst ein Event auswählen."
-      );
-      return;
-    }
-
-    if (!paymentPerson) {
-      setMessage(
-        "❌ Bitte eine Person auswählen."
-      );
+      setMessage("❌ Bitte Event auswählen.");
       return;
     }
 
@@ -696,27 +495,19 @@ export default function Home() {
       return;
     }
 
-    /*
-     * WICHTIG:
-     * Status ist bewusst "completed",
-     * da die Datenbank einen
-     * payments_status_check besitzt.
-     */
+    const firstPerson = people[0];
 
     const { error } = await supabase
       .from("payments")
       .insert({
         event_id: eventId,
-        profile_id: paymentPerson,
+        profile_id:
+          firstPerson?.id || null,
         amount,
-        betrag: amount,
         description:
           paymentDescription ||
           "Getränkeeinkauf",
-        beschreibung:
-          paymentDescription ||
-          "Getränkeeinkauf",
-        status: "completed",
+        status: "paid",
       });
 
     if (error) {
@@ -727,173 +518,21 @@ export default function Home() {
       return;
     }
 
-    /*
-     * Sonderbonus:
-     * Kiste Bier / größere Spende.
-     */
+    setPaymentAmount("");
 
-    const isCrate =
-      paymentDescription
-        .toLowerCase()
-        .includes("kiste");
-
-    if (isCrate) {
-      const person = people.find(
-        (item) =>
-          item.id === paymentPerson
-      );
-
-      if (person) {
-        const bonus = 50;
-        const newPoints =
-          person.points + bonus;
-
-        await supabase
-          .from("profiles")
-          .update({
-            points: newPoints,
-          })
-          .eq(
-            "id",
-            paymentPerson
-          );
-
-        await supabase
-          .from("point_history")
-          .insert({
-            profile_id:
-              paymentPerson,
-            event_id: eventId,
-            points: bonus,
-            amount: bonus,
-            reason:
-              "Kiste Bier spendiert",
-            description:
-              "🍺 Kiste Bier spendiert",
-            source: "crate",
-          });
-
-        setMessage(
-          "🍺💶 Kiste spendiert! +50 Punkte!"
-        );
-
-        setShowPointsAnimation(true);
-
-        setTimeout(() => {
-          setShowPointsAnimation(false);
-        }, 1600);
-      }
-    } else {
-      setMessage(
-        "💶 Zahlung gespeichert!"
-      );
-    }
-
-    setShowMoneyAnimation(true);
+    setAnimation("money");
 
     setTimeout(() => {
-      setShowMoneyAnimation(false);
-    }, 2600);
-
-    setPaymentPerson("");
-    setPaymentAmount("");
-    setPaymentDescription(
-      "Getränkeeinkauf"
-    );
-    setShowPayment(false);
+      setAnimation(null);
+    }, 2500);
 
     await loadPayments();
-    await loadPeople();
-    await loadPointHistory();
-  }
-
-  /*
-   * ---------------------------------------------------------
-   * CHALLENGES
-   * ---------------------------------------------------------
-   */
-
-  async function loadChallenges() {
-    if (!eventId) {
-      setChallenges([]);
-      return;
-    }
-
-    const { data, error } =
-      await supabase
-        .from("challenges")
-        .select("*")
-        .eq("event_id", eventId)
-        .order("created_at", {
-          ascending: false,
-        });
-
-    if (error) {
-      console.error(error);
-      return;
-    }
-
-    setChallenges(data || []);
-  }
-
-  async function createChallenge() {
-    setMessage("");
-
-    if (!eventId) {
-      setMessage(
-        "❌ Bitte zuerst ein Event auswählen."
-      );
-      return;
-    }
-
-    if (!challengeTitle.trim()) {
-      setMessage(
-        "❌ Bitte einen Challenge-Titel eingeben."
-      );
-      return;
-    }
-
-    const { error } = await supabase
-      .from("challenges")
-      .insert({
-        event_id: eventId,
-        title:
-          challengeTitle.trim(),
-        description:
-          challengeDescription.trim() ||
-          null,
-        points:
-          Number(challengePoints) ||
-          10,
-        category:
-          challengeCategory,
-        status: "open",
-        required_votes:
-          Number(challengeVotes) ||
-          1,
-        is_active: true,
-      });
-
-    if (error) {
-      setMessage(
-        "❌ Challenge konnte nicht erstellt werden: " +
-          error.message
-      );
-      return;
-    }
-
-    setChallengeTitle("");
-    setChallengeDescription("");
-    setChallengePoints("10");
-    setChallengeVotes("1");
-
-    setShowChallenge(false);
 
     setMessage(
-      "🔥 Challenge erstellt!"
+      `💶 Zahlung über ${amount.toFixed(
+        2
+      )} € gespeichert!`
     );
-
-    await loadChallenges();
   }
 
   /*
@@ -903,141 +542,264 @@ export default function Home() {
    */
 
   async function loadPointHistory() {
-    if (!eventId) {
-      setPointHistory([]);
-      return;
-    }
+    if (!selectedPerson) return;
 
-    const { data, error } =
+    const { data } = await supabase
+      .from("point_history")
+      .select("*")
+      .eq(
+        "profile_id",
+        selectedPerson.id
+      )
+      .order("created_at", {
+        ascending: false,
+      });
+
+    if (data) {
+      setPointHistory(data);
+    }
+  }
+
+  /*
+   * ---------------------------------------------------------
+   * BEER SYSTEM
+   * ---------------------------------------------------------
+   */
+
+  async function loadBeerRequests() {
+    if (!eventId) return;
+
+    const { data: requests } =
       await supabase
-        .from("point_history")
+        .from("beer_requests")
         .select("*")
         .eq("event_id", eventId)
         .order("created_at", {
           ascending: false,
         });
 
-    if (error) {
-      /*
-       * Falls die Tabelle noch nicht existiert,
-       * soll die komplette App trotzdem funktionieren.
-       */
-      console.error(error);
+    if (!requests) {
+      setBeerRequests([]);
       return;
     }
 
-    setPointHistory(data || []);
-  }
+    const ids = requests.map(
+      (r) => r.requester_profile_id
+    );
 
-  /*
-   * ---------------------------------------------------------
-   * RANKING TITLES
-   * ---------------------------------------------------------
-   */
+    let names: Record<string, string> =
+      {};
 
-  async function loadRankingTitles() {
-    const { data, error } =
-      await supabase
-        .from("ranking_titles")
-        .select("*")
-        .order("min_points", {
-          ascending: true,
-        });
+    if (ids.length > 0) {
+      const { data: profiles } =
+        await supabase
+          .from("profiles")
+          .select("id,username,name")
+          .in("id", ids);
 
-    if (error) {
-      console.error(error);
-      return;
+      profiles?.forEach((p: any) => {
+        names[p.id] =
+          p.username ||
+          p.name ||
+          "Teilnehmer";
+      });
     }
 
-    setRankingTitles(data || []);
-  }
+    setBeerRequests(
+      requests.map((r) => ({
+        ...r,
+        requester_name:
+          names[r.requester_profile_id] ||
+          "Teilnehmer",
+      }))
+    );
 
-  function getRankingTitle(
-    points: number
-  ) {
-    if (rankingTitles.length > 0) {
-      const available =
-        rankingTitles
-          .filter(
-            (item) =>
-              Number(
-                item.min_points
-              ) <= points
-          )
-          .sort(
-            (a, b) =>
-              Number(b.min_points) -
-              Number(a.min_points)
+    const requestIds = requests.map(
+      (r) => r.id
+    );
+
+    if (requestIds.length > 0) {
+      const { data: responses } =
+        await supabase
+          .from("beer_request_responses")
+          .select("*")
+          .in(
+            "request_id",
+            requestIds
           );
 
-      if (available[0]) {
-        return available[0];
+      if (responses) {
+        setBeerResponses(responses);
       }
     }
+  }
 
-    if (points >= 500) {
-      return {
-        title:
-          "🍻 Absolute Party-Legende",
-        emoji: "👑",
-        description:
-          "Niemand kommt an dir vorbei.",
-      };
+  async function requestBeer() {
+    if (!eventId || people.length < 2) {
+      setMessage(
+        "🍺 Es müssen mindestens zwei Teilnehmer im Event sein."
+      );
+      return;
     }
 
-    if (points >= 300) {
-      return {
-        title: "🍺 Bierbaron",
-        emoji: "🍺",
-        description:
-          "Der Zapfhahn kennt deinen Namen.",
-      };
+    const requester = people[0];
+
+    const { error } = await supabase.rpc(
+      "create_beer_request",
+      {
+        input_event_id: eventId,
+        input_requester_profile_id:
+          requester.id,
+        input_message:
+          `${requester.name} möchte ein Bier mit dir trinken 🍻`,
+      }
+    );
+
+    if (error) {
+      setMessage(
+        "❌ Bier-Anfrage konnte nicht erstellt werden: " +
+          error.message
+      );
+      return;
     }
 
-    if (points >= 200) {
-      return {
-        title: "🎉 Partymaschine",
-        emoji: "🎉",
-        description:
-          "Du bist nicht zum Zuschauen hier.",
-      };
+    setAnimation("beer");
+
+    setTimeout(() => {
+      setAnimation(null);
+    }, 2200);
+
+    await loadBeerRequests();
+
+    setMessage(
+      `🍻 ${requester.name} möchte ein Bier mit dir trinken!`
+    );
+  }
+
+  async function respondBeer(
+    requestId: string,
+    response: "accepted" | "declined",
+    personId: string
+  ) {
+    const { error } = await supabase.rpc(
+      "respond_to_beer_request",
+      {
+        input_request_id: requestId,
+        input_profile_id: personId,
+        input_response: response,
+      }
+    );
+
+    if (error) {
+      setMessage(
+        "❌ Antwort konnte nicht gespeichert werden: " +
+          error.message
+      );
+      return;
     }
 
-    if (points >= 100) {
-      return {
-        title: "😈 Partyprofi",
-        emoji: "😈",
-        description:
-          "Da geht noch einiges.",
-      };
+    if (response === "accepted") {
+      await supabase
+        .from("profiles")
+        .update({
+          points: 10,
+        })
+        .eq("id", personId);
+
+      await supabase
+        .from("point_history")
+        .insert({
+          profile_id: personId,
+          points: 10,
+          reason: "Bier-Runde",
+          description:
+            "Bier-Anfrage angenommen 🍻",
+        })
+        .then(() => {});
     }
 
-    if (points >= 50) {
-      return {
-        title: "🍻 Zapfhahn-Lehrling",
-        emoji: "🍻",
-        description:
-          "Du bist auf dem richtigen Weg.",
-      };
+    await loadBeerRequests();
+    await loadPeople();
+
+    setMessage(
+      response === "accepted"
+        ? "🍻 Bier-Anfrage angenommen! +10 Punkte"
+        : "❌ Bier-Anfrage abgelehnt."
+    );
+  }
+
+  async function sponsorCrate(
+    person: Person
+  ) {
+    if (!eventId) return;
+
+    const crates = Number(
+      window.prompt(
+        "🍺 Wie viele Kisten Bier möchtest du spendieren?",
+        "1"
+      )
+    );
+
+    if (!crates || crates < 1) return;
+
+    const points = crates * 50;
+
+    const { error } = await supabase.rpc(
+      "sponsor_beer_crate",
+      {
+        input_event_id: eventId,
+        input_profile_id: person.id,
+        input_crates: crates,
+      }
+    );
+
+    if (error) {
+      setMessage(
+        "❌ Kiste konnte nicht gespeichert werden: " +
+          error.message
+      );
+      return;
     }
 
-    return {
-      title: "🌱 Party-Anfänger",
-      emoji: "🌱",
-      description:
-        "Jeder große Abend beginnt klein.",
-    };
+    await supabase
+      .from("profiles")
+      .update({
+        points:
+          person.points + points,
+      })
+      .eq("id", person.id);
+
+    await supabase
+      .from("point_history")
+      .insert({
+        profile_id: person.id,
+        points,
+        reason: "Kiste Bier",
+        description:
+          `${crates} Kiste${
+            crates > 1 ? "n" : ""
+          } Bier spendiert 🍺`,
+      })
+      .then(() => {});
+
+    await loadPeople();
+    await loadPointHistory();
+
+    setMessage(
+      `🍺 ${person.name} spendiert ${crates} Kiste${
+        crates > 1 ? "n" : ""
+      }! +${points} Punkte`
+    );
   }
 
   /*
    * ---------------------------------------------------------
-   * LOAD EVERYTHING
+   * EFFECTS
    * ---------------------------------------------------------
    */
 
   useEffect(() => {
     loadEvents();
-    loadRankingTitles();
   }, []);
 
   useEffect(() => {
@@ -1046,9 +808,14 @@ export default function Home() {
     loadDrinks();
     loadPeople();
     loadPayments();
-    loadChallenges();
-    loadPointHistory();
+    loadBeerRequests();
   }, [eventId]);
+
+  useEffect(() => {
+    if (selectedPerson) {
+      loadPointHistory();
+    }
+  }, [selectedPerson]);
 
   /*
    * ---------------------------------------------------------
@@ -1077,9 +844,7 @@ export default function Home() {
         (sum, drink) =>
           sum +
           Number(
-            drink.preis ??
-              drink.price ??
-              0
+            drink.preis || 0
           ),
         0
       ),
@@ -1092,92 +857,64 @@ export default function Home() {
         (sum, payment) =>
           sum +
           Number(
-            payment.amount ??
-              payment.betrag ??
-              0
+            payment.amount || 0
           ),
         0
       ),
     [payments]
   );
 
-  const totalPoints = useMemo(
-    () =>
-      people.reduce(
-        (sum, person) =>
-          sum +
-          Number(person.points || 0),
-        0
-      ),
-    [people]
+  const totalPoints = people.reduce(
+    (sum, person) =>
+      sum + person.points,
+    0
   );
 
-  const ranking = useMemo(
-    () =>
-      [...people].sort(
-        (a, b) =>
-          b.points - a.points
-      ),
-    [people]
-  );
-
-  const currentEvent = events.find(
-    (event) =>
-      event.id === eventId
+  const ranking = [...people].sort(
+    (a, b) =>
+      b.points - a.points
   );
 
   /*
    * ---------------------------------------------------------
-   * UI
+   * RENDER
    * ---------------------------------------------------------
    */
 
   return (
-    <main className="app">
-      <div className="backgroundGlow glow1" />
-      <div className="backgroundGlow glow2" />
+    <main className="page">
 
-      {showDrinkAnimation && (
-        <div className="partyOverlay">
-          <div className="beerClash">
-            <span>🍺</span>
-            <span>🍻</span>
-            <span>🍺</span>
+      {/* ANIMATION */}
+
+      {animation === "prost" && (
+        <div className="overlayAnimation">
+          <div className="beerClink">
+            🍺 🥂 🍺
           </div>
-
-          <div className="prost">
-            PROST!
-          </div>
-
-          <div className="prostSub">
-            +10 Punkte
+          <div className="prostText">
+            PROST! 🍻
           </div>
         </div>
       )}
 
-      {showMoneyAnimation && (
+      {animation === "money" && (
         <div className="moneyRain">
-          {Array.from({
-            length: 18,
-          }).map((_, index) => (
-            <span
-              key={index}
-              style={{
-                left:
-                  `${(index * 17) % 100}%`,
-                animationDelay:
-                  `${(index % 6) * 0.12}s`,
-              }}
-            >
-              💶
-            </span>
-          ))}
+          💶 💵 💶 💵 💶
+          <br />
+          💵 💶 💵 💶 💵
+          <br />
+          💶 💵 💶 💵 💶
         </div>
       )}
 
-      {showPointsAnimation && (
-        <div className="pointsPop">
-          ⭐ +PUNKTE!
+      {animation === "beer" && (
+        <div className="overlayAnimation">
+          <div className="bigBeer">
+            🍺
+          </div>
+          <div className="prostText">
+            BIER? 🍻
+          </div>
         </div>
       )}
 
@@ -1185,26 +922,19 @@ export default function Home() {
 
         {/* HEADER */}
 
-        <header className="hero">
-          <div className="logoBox">
+        <header>
+          <div className="logo">
             🍻
           </div>
 
-          <div className="heroText">
-            <div className="eyebrow">
-              🍺 PARTY · FREUNDE · CHAOS
-            </div>
-
+          <div>
             <h1>
-              Güstener
-              <br />
-              <span>Zapfhahn Zentrale</span>
+              Güstener Zapfhahn Zentrale
             </h1>
 
             <p>
-              Dein Event.
-              Deine Getränke.
-              Dein Ranking.
+              Dein Event. Deine Getränke.
+              Deine Runde. 🍺
             </p>
           </div>
         </header>
@@ -1212,35 +942,21 @@ export default function Home() {
         {/* EVENT */}
 
         <section className="card eventCard">
+
           <div className="sectionTitle">
-            <div>
-              <span className="sectionEmoji">
-                📅
-              </span>
-
-              <div>
-                <h2>Aktuelles Event</h2>
-
-                <small>
-                  Wo das Chaos beginnt
-                </small>
-              </div>
-            </div>
+            <h2>
+              📅 Event
+            </h2>
 
             <button
-              className="iconButton"
-              onClick={() =>
-                setShowCreateEvent(
-                  !showCreateEvent
-                )
-              }
+              className="smallButton"
+              onClick={createEvent}
             >
-              ➕
+              ➕ Neues Event
             </button>
           </div>
 
           <select
-            className="bigSelect"
             value={eventId}
             onChange={(e) =>
               setEventId(
@@ -1262,72 +978,9 @@ export default function Home() {
             ))}
           </select>
 
-          {currentEvent && (
-            <div className="eventInfo">
-              <div>
-                📍{" "}
-                {currentEvent.location ||
-                  "Geheimer Partyort"}
-              </div>
-
-              {currentEvent.description && (
-                <div>
-                  💬{" "}
-                  {currentEvent.description}
-                </div>
-              )}
-            </div>
-          )}
-
-          {showCreateEvent && (
-            <div className="modalBox">
-              <h3>
-                🎉 Neues Event
-              </h3>
-
-              <input
-                placeholder="Eventname"
-                value={eventTitle}
-                onChange={(e) =>
-                  setEventTitle(
-                    e.target.value
-                  )
-                }
-              />
-
-              <input
-                placeholder="Ort"
-                value={eventLocation}
-                onChange={(e) =>
-                  setEventLocation(
-                    e.target.value
-                  )
-                }
-              />
-
-              <textarea
-                placeholder="Beschreibung"
-                value={eventDescription}
-                onChange={(e) =>
-                  setEventDescription(
-                    e.target.value
-                  )
-                }
-              />
-
-              <button
-                className="primaryButton"
-                onClick={createEvent}
-                disabled={loading}
-              >
-                🚀 Event erstellen
-              </button>
-            </div>
-          )}
-
           {eventId && (
             <button
-              className="dangerButton"
+              className="deleteEvent"
               onClick={deleteEvent}
             >
               🗑️ Event löschen
@@ -1337,61 +990,204 @@ export default function Home() {
 
         {/* STATS */}
 
-        <section className="stats">
-          <div className="statCard">
-            <span>🍺</span>
-            <strong>
+        <div className="stats">
+
+          <div>
+            🍺
+            <b>
               {drinks.length}
-            </strong>
-            <small>Getränke</small>
+            </b>
+            <small>
+              Getränke
+            </small>
           </div>
 
-          <div className="statCard">
-            <span>💧</span>
-            <strong>
+          <div>
+            💧
+            <b>
               {totalLiters.toFixed(1)}
-            </strong>
-            <small>Liter</small>
+            </b>
+            <small>
+              Liter
+            </small>
           </div>
 
-          <div className="statCard">
-            <span>💶</span>
-            <strong>
-              {totalPayments.toFixed(2)} €
-            </strong>
-            <small>Bezahlt</small>
+          <div>
+            💶
+            <b>
+              {totalDrinkCost.toFixed(
+                2
+              )} €
+            </b>
+            <small>
+              Getränke
+            </small>
           </div>
 
-          <div className="statCard">
-            <span>🏆</span>
-            <strong>
-              {totalPoints}
-            </strong>
-            <small>Punkte</small>
+          <div>
+            👥
+            <b>
+              {people.length}
+            </b>
+            <small>
+              Teilnehmer
+            </small>
           </div>
+
+        </div>
+
+        {/* BIG BEER BUTTON */}
+
+        <section className="beerHero">
+
+          <button
+            className="beerButton"
+            onClick={requestBeer}
+          >
+            <span className="beerIcon">
+              🍺
+            </span>
+
+            <span>
+              BIER
+            </span>
+
+            <small>
+              Wer trinkt ein Bier
+              mit mir?
+            </small>
+          </button>
+
         </section>
+
+        {/* BEER REQUESTS */}
+
+        {beerRequests.length > 0 && (
+          <section className="card">
+
+            <h2>
+              🔔 Bier-Anfragen
+            </h2>
+
+            {beerRequests.map(
+              (request) => {
+
+                const myResponses =
+                  beerResponses.filter(
+                    (r) =>
+                      r.request_id ===
+                      request.id
+                  );
+
+                return (
+                  <div
+                    className="beerRequest"
+                    key={request.id}
+                  >
+
+                    <div>
+                      <strong>
+                        🍻{" "}
+                        {
+                          request.requester_name
+                        }
+                      </strong>
+
+                      <p>
+                        möchte ein Bier
+                        mit dir trinken.
+                      </p>
+                    </div>
+
+                    <div className="requestButtons">
+
+                      {people
+                        .filter(
+                          (p) =>
+                            p.id !==
+                            request.requester_profile_id
+                        )
+                        .map((person) => {
+
+                          const answer =
+                            myResponses.find(
+                              (r) =>
+                                r.profile_id ===
+                                person.id
+                            );
+
+                          return (
+                            <div
+                              key={person.id}
+                              className="responseRow"
+                            >
+
+                              <span>
+                                {person.name}
+                              </span>
+
+                              {answer ? (
+                                <b>
+                                  {answer.response ===
+                                  "accepted"
+                                    ? "✅"
+                                    : "❌"}
+                                </b>
+                              ) : (
+                                <>
+                                  <button
+                                    className="accept"
+                                    onClick={() =>
+                                      respondBeer(
+                                        request.id,
+                                        "accepted",
+                                        person.id
+                                      )
+                                    }
+                                  >
+                                    ✅
+                                  </button>
+
+                                  <button
+                                    className="decline"
+                                    onClick={() =>
+                                      respondBeer(
+                                        request.id,
+                                        "declined",
+                                        person.id
+                                      )
+                                    }
+                                  >
+                                    ❌
+                                  </button>
+                                </>
+                              )}
+
+                            </div>
+                          );
+                        })}
+
+                    </div>
+                  </div>
+                );
+              }
+            )}
+
+          </section>
+        )}
 
         {/* PEOPLE */}
 
         <section className="card">
-          <div className="sectionTitle">
-            <div>
-              <span className="sectionEmoji">
-                👥
-              </span>
 
-              <div>
-                <h2>Teilnehmer</h2>
-                <small>
-                  Wer ist dabei?
-                </small>
-              </div>
-            </div>
-          </div>
+          <h2>
+            👥 Teilnehmer
+          </h2>
 
-          <div className="addRow">
+          <div className="row">
+
             <input
-              placeholder="Name eingeben..."
+              placeholder="Name"
               value={personName}
               onChange={(e) =>
                 setPersonName(
@@ -1401,107 +1197,86 @@ export default function Home() {
             />
 
             <button
-              className="primaryButton"
               onClick={addPerson}
-              disabled={loading}
             >
-              ➕
+              ➕ Hinzufügen
             </button>
+
           </div>
 
-          {people.length === 0 ? (
-            <div className="empty">
-              👀 Noch niemand da.
-              <br />
-              Sei der Erste!
-            </div>
-          ) : (
-            <div className="peopleList">
-              {people.map(
-                (person) => {
-                  const title =
-                    getRankingTitle(
-                      person.points
-                    );
+          {people.map((person) => (
 
-                  return (
-                    <button
-                      className="personCard"
-                      key={person.id}
-                      onClick={() =>
-                        setSelectedPerson(
-                          person
-                        )
-                      }
-                    >
-                      <div className="avatar">
-                        {person.name
-                          .charAt(0)
-                          .toUpperCase()}
-                      </div>
-
-                      <div className="personInfo">
-                        <strong>
-                          {person.name}
-                        </strong>
-
-                        <small>
-                          {title.emoji}{" "}
-                          {title.title}
-                        </small>
-
-                        <div className="miniStats">
-                          🍺{" "}
-                          {person.drinks}
-                          {" · "}
-                          💧{" "}
-                          {person.liters.toFixed(
-                            1
-                          )}{" "}
-                          L
-                        </div>
-                      </div>
-
-                      <div className="personPoints">
-                        <strong>
-                          {person.points}
-                        </strong>
-
-                        <small>
-                          Punkte
-                        </small>
-                      </div>
-                    </button>
-                  );
-                }
-              )}
-            </div>
-          )}
-        </section>
-
-        {/* DRINK */}
-
-        <section className="card">
-          <div className="sectionTitle">
-            <div>
-              <span className="sectionEmoji">
-                🍺
-              </span>
+            <div
+              className="personItem"
+              key={person.id}
+            >
 
               <div>
-                <h2>
-                  Getränk hinzufügen
-                </h2>
+                <strong>
+                  👤 {person.name}
+                </strong>
 
                 <small>
-                  Jeder Schluck zählt
+                  🍺 {person.drinks}
+                  {" · "}
+                  💧{" "}
+                  {person.liters.toFixed(
+                    1
+                  )} L
+                  {" · "}
+                  🏆{" "}
+                  {person.points}
+                  {" · "}
+                  🍺{" "}
+                  {(
+                    person.promille ||
+                    0
+                  ).toFixed(2)} ‰
                 </small>
               </div>
+
+              <div className="personActions">
+
+                <button
+                  className="crateButton"
+                  onClick={() =>
+                    sponsorCrate(
+                      person
+                    )
+                  }
+                >
+                  🍺 Kiste
+                </button>
+
+                <button
+                  className="historyButton"
+                  onClick={() =>
+                    setSelectedPerson(
+                      person
+                    )
+                  }
+                >
+                  🏆
+                </button>
+
+              </div>
+
             </div>
-          </div>
+
+          ))}
+
+        </section>
+
+        {/* DRINK ADD */}
+
+        <section className="card">
+
+          <h2>
+            🍺 Getränk hinzufügen
+          </h2>
 
           <input
-            placeholder="z.B. Krombacher Pils"
+            placeholder="Getränk"
             value={drinkName}
             onChange={(e) =>
               setDrinkName(
@@ -1511,735 +1286,346 @@ export default function Home() {
           />
 
           <div className="three">
+
             <input
               type="number"
-              placeholder="Liter"
               value={liters}
               onChange={(e) =>
                 setLiters(
                   e.target.value
                 )
               }
+              placeholder="Liter"
             />
 
             <input
               type="number"
-              placeholder="Alkohol %"
               value={alcohol}
               onChange={(e) =>
                 setAlcohol(
                   e.target.value
                 )
               }
+              placeholder="Alkohol %"
             />
 
             <input
               type="number"
-              placeholder="Preis €"
               value={price}
               onChange={(e) =>
                 setPrice(
                   e.target.value
                 )
               }
+              placeholder="Preis €"
             />
+
           </div>
 
           <button
-            className="primaryButton full"
+            className="save"
             onClick={saveDrink}
           >
             🍻 Getränk speichern
           </button>
+
         </section>
 
-        {/* ASSIGN DRINK */}
+        {/* ASSIGN */}
 
         <section className="card">
-          <div className="sectionTitle">
-            <div>
-              <span className="sectionEmoji">
-                🍻
-              </span>
 
-              <div>
-                <h2>
-                  Wer trinkt was?
-                </h2>
-
-                <small>
-                  10 Punkte pro Getränk
-                </small>
-              </div>
-            </div>
-          </div>
+          <h2>
+            🔗 Getränk zuordnen
+          </h2>
 
           {people.length === 0 ? (
-            <div className="empty">
-              👥 Erst Teilnehmer
+            <p>
+              👥 Zuerst Teilnehmer
               hinzufügen.
-            </div>
-          ) : drinks.length === 0 ? (
-            <div className="empty">
-              🍺 Noch keine Getränke.
-            </div>
+            </p>
           ) : (
-            <div>
-              {people.map(
-                (person) => (
-                  <div
-                    className="assignment"
-                    key={person.id}
-                  >
-                    <div>
-                      <strong>
-                        {person.name}
-                      </strong>
 
-                      <small>
-                        🏆{" "}
-                        {person.points}{" "}
-                        Punkte
-                      </small>
-                    </div>
+            people.map((person) => (
 
-                    <select
-                      defaultValue=""
-                      onChange={(e) => {
-                        if (
-                          e.target
-                            .value
-                        ) {
-                          assignDrink(
-                            person,
-                            e.target
-                              .value
-                          );
+              <div
+                className="assignment"
+                key={person.id}
+              >
 
-                          e.target.value =
-                            "";
-                        }
-                      }}
-                    >
-                      <option value="">
-                        🍺 Getränk auswählen
+                <strong>
+                  {person.name}
+                </strong>
+
+                <select
+                  defaultValue=""
+                  onChange={(e) => {
+
+                    const drink =
+                      drinks.find(
+                        (d) =>
+                          d.id ===
+                          e.target.value
+                      );
+
+                    if (drink) {
+                      assignDrink(
+                        person,
+                        drink
+                      );
+
+                      e.target.value =
+                        "";
+                    }
+
+                  }}
+                >
+
+                  <option value="">
+                    🍺 Getränk auswählen
+                  </option>
+
+                  {drinks.map(
+                    (drink) => (
+
+                      <option
+                        key={drink.id}
+                        value={drink.id}
+                      >
+                        {drink.getraenk ||
+                          drink.drink_name ||
+                          "Getränk"}
+                        {" · "}
+                        {Number(
+                          drink.preis ||
+                            0
+                        ).toFixed(2)}
+                        €
                       </option>
 
-                      {drinks.map(
-                        (drink) => (
-                          <option
-                            key={
-                              drink.id
-                            }
-                            value={
-                              drink.id
-                            }
-                          >
-                            {drink.getraenk ||
-                              drink.drink_name ||
-                              "Getränk"}{" "}
-                            ·{" "}
-                            {Number(
-                              drink.preis ??
-                                drink.price ??
-                                0
-                            ).toFixed(
-                              2
-                            )}{" "}
-                            €
-                          </option>
-                        )
-                      )}
-                    </select>
-                  </div>
-                )
-              )}
-            </div>
+                    )
+                  )}
+
+                </select>
+
+              </div>
+
+            ))
+
           )}
+
         </section>
 
-        {/* DRINK LIST */}
+        {/* DRINKS */}
 
         <section className="card">
-          <div className="sectionTitle">
-            <div>
-              <span className="sectionEmoji">
-                🍺
-              </span>
 
-              <div>
-                <h2>
-                  Getränke
-                </h2>
+          <h2>
+            🍺 Getränke
+          </h2>
 
-                <small>
-                  {totalDrinkCost.toFixed(
-                    2
-                  )}{" "}
-                  € Gesamtwert
-                </small>
-              </div>
-            </div>
-          </div>
+          {drinks.map((drink) => (
 
-          {drinks.length === 0 ? (
-            <div className="empty">
-              🍻 Noch keine Getränke.
-            </div>
-          ) : (
-            drinks.map(
-              (drink) => (
-                <div
-                  className="drinkItem"
-                  key={drink.id}
-                >
-                  <div className="drinkIcon">
-                    🍺
-                  </div>
-
-                  <div>
-                    <strong>
-                      {drink.getraenk ||
-                        drink.drink_name ||
-                        "Getränk"}
-                    </strong>
-
-                    <small>
-                      {Number(
-                        drink.liters ??
-                          drink.menge ??
-                          0
-                      ).toFixed(
-                        1
-                      )}{" "}
-                      L ·{" "}
-                      {Number(
-                        drink.alcohol_percent ??
-                          drink.alkohol ??
-                          0
-                      ).toFixed(
-                        1
-                      )}
-                      %
-                    </small>
-                  </div>
-
-                  <strong>
-                    {Number(
-                      drink.preis ??
-                        drink.price ??
-                        0
-                    ).toFixed(2)}{" "}
-                    €
-                  </strong>
-                </div>
-              )
-            )
-          )}
-        </section>
-
-        {/* PAYMENTS */}
-
-        <section className="card">
-          <div className="sectionTitle">
-            <div>
-              <span className="sectionEmoji">
-                💶
-              </span>
-
-              <div>
-                <h2>
-                  Zahlungen
-                </h2>
-
-                <small>
-                  Wer hat was bezahlt?
-                </small>
-              </div>
-            </div>
-
-            <button
-              className="iconButton"
-              onClick={() =>
-                setShowPayment(
-                  !showPayment
-                )
-              }
+            <div
+              className="item"
+              key={drink.id}
             >
-              ➕
-            </button>
-          </div>
 
-          {showPayment && (
-            <div className="modalBox">
-              <h3>
-                💶 Zahlung eintragen
-              </h3>
+              <div>
 
-              <select
-                value={paymentPerson}
-                onChange={(e) =>
-                  setPaymentPerson(
-                    e.target.value
-                  )
-                }
-              >
-                <option value="">
-                  Person auswählen
-                </option>
-
-                {people.map(
-                  (person) => (
-                    <option
-                      key={
-                        person.id
-                      }
-                      value={
-                        person.id
-                      }
-                    >
-                      {person.name}
-                    </option>
-                  )
-                )}
-              </select>
-
-              <input
-                type="number"
-                step="0.01"
-                placeholder="Betrag €"
-                value={
-                  paymentAmount
-                }
-                onChange={(e) =>
-                  setPaymentAmount(
-                    e.target.value
-                  )
-                }
-              />
-
-              <input
-                placeholder="Wofür?"
-                value={
-                  paymentDescription
-                }
-                onChange={(e) =>
-                  setPaymentDescription(
-                    e.target.value
-                  )
-                }
-              />
-
-              <div className="bonusHint">
-                🍺 Tipp: Schreibe
-                „Kiste Bier“, um
                 <strong>
-                  +50 Punkte
-                </strong>{" "}
-                zu vergeben.
-              </div>
-
-              <button
-                className="primaryButton full"
-                onClick={
-                  savePayment
-                }
-              >
-                💶 Zahlung speichern
-              </button>
-            </div>
-          )}
-
-          {payments.length === 0 ? (
-            <div className="empty">
-              💸 Noch keine Zahlungen.
-            </div>
-          ) : (
-            payments.map(
-              (payment) => (
-                <div
-                  className="paymentItem"
-                  key={
-                    payment.id
-                  }
-                >
-                  <div className="moneyIcon">
-                    💶
-                  </div>
-
-                  <div className="paymentInfo">
-                    <strong>
-                      {getPersonName(
-                        payment.profile_id
-                      )}
-                    </strong>
-
-                    <small>
-                      {payment.description ||
-                        payment.beschreibung ||
-                        "Zahlung"}
-                    </small>
-                  </div>
-
-                  <strong className="paymentAmount">
-                    +
-                    {Number(
-                      payment.amount ??
-                        payment.betrag ??
-                        0
-                    ).toFixed(2)}{" "}
-                    €
-                  </strong>
-                </div>
-              )
-            )
-          )}
-        </section>
-
-        {/* CHALLENGES */}
-
-        <section className="card challengeCard">
-          <div className="sectionTitle">
-            <div>
-              <span className="sectionEmoji">
-                🔥
-              </span>
-
-              <div>
-                <h2>
-                  Challenges
-                </h2>
+                  🍺{" "}
+                  {drink.getraenk ||
+                    drink.drink_name ||
+                    "Getränk"}
+                </strong>
 
                 <small>
-                  Aufgaben = Punkte
+                  {Number(
+                    drink.liters ??
+                      drink.menge ??
+                      0
+                  ).toFixed(1)}
+                  {" L · "}
+                  {Number(
+                    drink.alcohol_percent ??
+                      drink.alkohol ??
+                      0
+                  ).toFixed(1)}
+                  {" %"}
                 </small>
+
               </div>
+
+              <b>
+                {Number(
+                  drink.preis || 0
+                ).toFixed(2)}
+                €
+              </b>
+
             </div>
 
-            <button
-              className="iconButton"
-              onClick={() =>
-                setShowChallenge(
-                  !showChallenge
-                )
-              }
-            >
-              ➕
-            </button>
+          ))}
+
+        </section>
+
+        {/* PAYMENT */}
+
+        <section className="card">
+
+          <h2>
+            💶 Zahlung
+          </h2>
+
+          <input
+            type="number"
+            step="0.01"
+            placeholder="Betrag €"
+            value={paymentAmount}
+            onChange={(e) =>
+              setPaymentAmount(
+                e.target.value
+              )
+            }
+          />
+
+          <input
+            placeholder="Wofür?"
+            value={
+              paymentDescription
+            }
+            onChange={(e) =>
+              setPaymentDescription(
+                e.target.value
+              )
+            }
+          />
+
+          <button
+            className="save"
+            onClick={savePayment}
+          >
+            💶 Zahlung speichern
+          </button>
+
+          <div className="paymentTotal">
+            <span>
+              💰 Gesamt bezahlt
+            </span>
+
+            <b>
+              {totalPayments.toFixed(
+                2
+              )} €
+            </b>
           </div>
 
-          {showChallenge && (
-            <div className="modalBox">
-              <h3>
-                🔥 Neue Challenge
-              </h3>
+          {payments.map(
+            (payment) => (
 
-              <input
-                placeholder="Challenge"
-                value={
-                  challengeTitle
-                }
-                onChange={(e) =>
-                  setChallengeTitle(
-                    e.target.value
-                  )
-                }
-              />
-
-              <textarea
-                placeholder="Was muss gemacht werden?"
-                value={
-                  challengeDescription
-                }
-                onChange={(e) =>
-                  setChallengeDescription(
-                    e.target.value
-                  )
-                }
-              />
-
-              <select
-                value={
-                  challengeCategory
-                }
-                onChange={(e) =>
-                  setChallengeCategory(
-                    e.target.value
-                  )
-                }
+              <div
+                className="item"
+                key={payment.id}
               >
-                <option>
-                  Lustig
-                </option>
 
-                <option>
-                  Abstimmung
-                </option>
+                <div>
+                  <strong>
+                    💶{" "}
+                    {payment.person_name ||
+                      "Teilnehmer"}
+                  </strong>
 
-                <option>
-                  Duell
-                </option>
+                  <small>
+                    {payment.description ||
+                      "Zahlung"}
+                  </small>
+                </div>
 
-                <option>
-                  Geschicklichkeit
-                </option>
+                <b>
+                  {Number(
+                    payment.amount ||
+                      0
+                  ).toFixed(2)}
+                  €
+                </b>
 
-                <option>
-                  Kreativ
-                </option>
-
-                <option>
-                  Mutprobe
-                </option>
-
-                <option>
-                  Party
-                </option>
-
-                <option>
-                  Quatsch
-                </option>
-
-                <option>
-                  Team
-                </option>
-              </select>
-
-              <div className="three">
-                <input
-                  type="number"
-                  placeholder="Punkte"
-                  value={
-                    challengePoints
-                  }
-                  onChange={(e) =>
-                    setChallengePoints(
-                      e.target.value
-                    )
-                  }
-                />
-
-                <input
-                  type="number"
-                  placeholder="Stimmen"
-                  value={
-                    challengeVotes
-                  }
-                  onChange={(e) =>
-                    setChallengeVotes(
-                      e.target.value
-                    )
-                  }
-                />
               </div>
 
-              <button
-                className="primaryButton full"
-                onClick={
-                  createChallenge
-                }
-              >
-                🔥 Challenge starten
-              </button>
-            </div>
-          )}
-
-          {challenges.length ===
-          0 ? (
-            <div className="empty">
-              😈 Noch keine Challenge.
-              <br />
-              Zeit, jemanden
-              herauszufordern!
-            </div>
-          ) : (
-            challenges.map(
-              (challenge) => (
-                <div
-                  className="challengeItem"
-                  key={
-                    challenge.id
-                  }
-                >
-                  <div className="challengeEmoji">
-                    {challenge.category ===
-                    "Duell"
-                      ? "⚔️"
-                      : challenge.category ===
-                        "Mutprobe"
-                      ? "😈"
-                      : challenge.category ===
-                        "Geschicklichkeit"
-                      ? "🎯"
-                      : "🔥"}
-                  </div>
-
-                  <div>
-                    <strong>
-                      {challenge.title}
-                    </strong>
-
-                    <small>
-                      {challenge.description ||
-                        "Aufgabe wartet!"}
-                    </small>
-
-                    <span className="challengeCategory">
-                      {challenge.category ||
-                        "Fun"}
-                    </span>
-                  </div>
-
-                  <div className="challengePoints">
-                    +{" "}
-                    {Number(
-                      challenge.points ||
-                        0
-                    )}
-                  </div>
-                </div>
-              )
             )
           )}
+
         </section>
 
         {/* RANKING */}
 
-        <section className="card rankingCard">
-          <div className="sectionTitle">
-            <div>
-              <span className="sectionEmoji">
-                🏆
-              </span>
+        <section className="card">
 
-              <div>
-                <h2>
-                  Hall of Fame
-                </h2>
+          <h2>
+            🏆 Lustigste Rangliste
+          </h2>
 
-                <small>
-                  Wer regiert den
-                  Zapfhahn?
-                </small>
-              </div>
-            </div>
-          </div>
+          <p className="rankingSubtitle">
+            Wer wird zur Legende des
+            Abends? 😎
+          </p>
 
-          {ranking.length ===
-          0 ? (
-            <div className="empty">
-              🏆 Noch niemand im
-              Ranking.
-            </div>
-          ) : (
-            ranking.map(
-              (
-                person,
-                index
-              ) => {
-                const title =
-                  getRankingTitle(
-                    person.points
-                  );
+          {ranking.map(
+            (person, index) => (
 
-                return (
-                  <button
-                    className={
-                      "rankItem " +
-                      (index ===
-                      0
-                        ? "first"
-                        : "")
-                    }
-                    key={
-                      person.id
-                    }
-                    onClick={() =>
-                      setSelectedPerson(
-                        person
-                      )
-                    }
-                  >
-                    <div className="rankPlace">
-                      {index ===
-                      0
-                        ? "🥇"
-                        : index ===
-                          1
-                        ? "🥈"
-                        : index ===
-                          2
-                        ? "🥉"
-                        : index +
-                          1}
-                    </div>
+              <button
+                className="rank"
+                key={person.id}
+                onClick={() =>
+                  setSelectedPerson(
+                    person
+                  )
+                }
+              >
 
-                    <div className="rankAvatar">
-                      {person.name
-                        .charAt(
-                          0
-                        )
-                        .toUpperCase()}
-                    </div>
+                <strong>
+                  {index === 0
+                    ? "🥇"
+                    : index === 1
+                    ? "🥈"
+                    : index === 2
+                    ? "🥉"
+                    : `${index + 1}.`}
+                </strong>
 
-                    <div className="rankName">
-                      <strong>
-                        {person.name}
-                      </strong>
+                <span>
+                  {person.name}
+                </span>
 
-                      <small>
-                        {title.emoji}{" "}
-                        {
-                          title.title
-                        }
-                      </small>
-                    </div>
+                <b>
+                  {person.points} 🏆
+                </b>
 
-                    <div className="rankPoints">
-                      <strong>
-                        {
-                          person.points
-                        }
-                      </strong>
+              </button>
 
-                      <small>
-                        Punkte
-                      </small>
-                    </div>
-                  </button>
-                );
-              }
             )
           )}
-        </section>
 
-        {/* MESSAGE */}
-
-        {message && (
-          <div className="message">
-            {message}
+          <div className="totalPoints">
+            🏆 Insgesamt{" "}
+            <b>
+              {totalPoints}
+            </b>{" "}
+            Punkte
           </div>
-        )}
+
+        </section>
 
         {/* PERSON DETAIL */}
 
         {selectedPerson && (
-          <div
-            className="modalBackdrop"
-            onClick={() =>
-              setSelectedPerson(
-                null
-              )
-            }
-          >
-            <div
-              className="personModal"
-              onClick={(e) =>
-                e.stopPropagation()
-              }
-            >
+
+          <section className="modal">
+
+            <div className="modalBox">
+
               <button
-                className="closeButton"
+                className="close"
                 onClick={() =>
                   setSelectedPerson(
                     null
@@ -2249,1593 +1635,716 @@ export default function Home() {
                 ×
               </button>
 
-              <div className="bigAvatar">
-                {selectedPerson.name
-                  .charAt(
-                    0
-                  )
-                  .toUpperCase()}
-              </div>
-
               <h2>
-                {
-                  selectedPerson.name
-                }
+                🏆{" "}
+                {selectedPerson.name}
               </h2>
 
-              <div className="bigTitle">
-                {
-                  getRankingTitle(
-                    selectedPerson.points
-                  ).emoji
-                }{" "}
-                {
-                  getRankingTitle(
-                    selectedPerson.points
-                  ).title
-                }
-              </div>
-
-              <div className="detailStats">
-                <div>
-                  <strong>
-                    {
-                      selectedPerson.points
-                    }
-                  </strong>
-
-                  <small>
-                    Punkte
-                  </small>
-                </div>
-
-                <div>
-                  <strong>
-                    {
-                      selectedPerson.drinks
-                    }
-                  </strong>
-
-                  <small>
-                    Getränke
-                  </small>
-                </div>
-
-                <div>
-                  <strong>
-                    {selectedPerson.liters.toFixed(
-                      1
-                    )}
-                  </strong>
-
-                  <small>
-                    Liter
-                  </small>
-                </div>
-
-                <div>
-                  <strong>
-                    {selectedPerson.cost.toFixed(
-                      2
-                    )}{" "}
-                    €
-                  </strong>
-
-                  <small>
-                    Getränke
-                  </small>
-                </div>
+              <div className="profileBig">
+                {selectedPerson.points}
+                <small>
+                  Punkte
+                </small>
               </div>
 
               <h3>
-                ⭐ Punkte-Historie
+                📜 Punkte-Historie
               </h3>
 
-              <div className="history">
-                {pointHistory
-                  .filter(
-                    (item) =>
-                      item.profile_id ===
-                      selectedPerson.id
-                  )
-                  .map(
-                    (
-                      item,
-                      index
-                    ) => (
-                      <div
-                        className="historyItem"
-                        key={
-                          item.id ||
-                          index
-                        }
-                      >
-                        <span>
-                          ⭐
-                        </span>
+              {pointHistory.length ===
+              0 ? (
+                <p>
+                  Noch keine
+                  Punkte-Historie.
+                </p>
+              ) : (
 
-                        <div>
-                          <strong>
-                            {item.reason ||
-                              item.description ||
-                              item.source ||
-                              "Punkte"}
-                          </strong>
+                pointHistory.map(
+                  (entry, index) => (
 
-                          <small>
-                            {item.description &&
-                            item.reason
-                              ? item.description
-                              : ""}
-                          </small>
-                        </div>
+                    <div
+                      className="history"
+                      key={
+                        entry.id ||
+                        index
+                      }
+                    >
 
-                        <b>
-                          +
-                          {Number(
-                            item.points ??
-                              item.amount ??
-                              0
-                          )}
-                        </b>
+                      <div>
+                        <strong>
+                          {entry.reason ||
+                            "Punkte"}
+                        </strong>
+
+                        <small>
+                          {entry.description ||
+                            ""}
+                        </small>
                       </div>
-                    )
-                  )}
 
-                {pointHistory.filter(
-                  (item) =>
-                    item.profile_id ===
-                    selectedPerson.id
-                ).length ===
-                  0 && (
-                  <div className="empty">
-                    ⭐ Noch keine
-                    Punkte-Historie.
-                  </div>
-                )}
-              </div>
+                      <b>
+                        +
+                        {entry.points ||
+                          0}
+                      </b>
+
+                    </div>
+
+                  )
+                )
+
+              )}
+
             </div>
+
+          </section>
+
+        )}
+
+        {/* MESSAGE */}
+
+        {message && (
+          <div className="message">
+            {message}
           </div>
         )}
 
         <footer>
-          <div>
-            🍻
-          </div>
-
-          <strong>
-            Güstener
-            Zapfhahn Zentrale
-          </strong>
-
+          🍻 Güstener Zapfhahn
+          Zentrale
           <small>
-            Dein Event. Deine
-            Getränke. Deine
-            Runde.
+            Dein Event. Deine Getränke.
+            Deine Runde.
           </small>
         </footer>
+
       </div>
 
       <style jsx global>{`
-        /*
-        =====================================================
-        GLOBAL
-        =====================================================
-        */
 
         html,
         body {
-          margin: 0 !important;
-          padding: 0 !important;
+          margin: 0;
+          padding: 0;
           width: 100%;
           min-height: 100%;
-          background: #070b12 !important;
-          overflow-x: hidden;
+          background: #080b10;
         }
 
         body {
+          overflow-x: hidden;
+        }
+
+        * {
+          box-sizing: border-box;
+        }
+
+        .page {
+          min-height: 100vh;
+          width: 100%;
+          margin: 0;
+          padding: 18px;
           color: white;
           font-family:
             Arial,
             Helvetica,
             sans-serif;
-        }
-
-        *,
-        *::before,
-        *::after {
-          box-sizing: border-box;
-        }
-
-        button,
-        input,
-        select,
-        textarea {
-          font: inherit;
-        }
-
-        button {
-          -webkit-tap-highlight-color:
-            transparent;
-        }
-
-        /*
-        =====================================================
-        APP
-        =====================================================
-        */
-
-        .app {
-          position: relative;
-          min-height: 100vh;
-          width: 100%;
-          margin: 0;
-          padding: 0 14px 40px;
-          overflow: hidden;
 
           background:
             radial-gradient(
-              circle at 50% -10%,
-              #263d55 0%,
-              #111a26 30%,
-              #070b12 70%
+              circle at 20% 0%,
+              #49320d 0,
+              transparent 30%
+            ),
+            radial-gradient(
+              circle at 90% 20%,
+              #162c3d 0,
+              transparent 35%
+            ),
+            linear-gradient(
+              145deg,
+              #070a0e,
+              #101821 50%,
+              #07090d
             );
-
-          color: #fff;
         }
 
         .container {
-          position: relative;
-          z-index: 2;
           width: 100%;
           max-width: 900px;
           margin: 0 auto;
         }
 
-        .backgroundGlow {
-          position: fixed;
-          width: 350px;
-          height: 350px;
-          border-radius: 50%;
-          filter: blur(90px);
-          opacity: 0.18;
-          pointer-events: none;
-          z-index: 0;
-        }
-
-        .glow1 {
-          background: #f59e0b;
-          top: -150px;
-          left: -120px;
-        }
-
-        .glow2 {
-          background: #8b5cf6;
-          right: -150px;
-          top: 400px;
-        }
-
-        /*
-        =====================================================
-        HERO
-        =====================================================
-        */
-
-        .hero {
+        header {
           display: flex;
           align-items: center;
-          gap: 18px;
-          padding: 32px 4px 24px;
+          gap: 15px;
+          padding:
+            10px 4px 25px;
         }
 
-        .logoBox {
-          flex-shrink: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 76px;
-          height: 76px;
-          border-radius: 24px;
-
+        .logo {
+          font-size: 42px;
           background:
             linear-gradient(
               145deg,
-              #fbbf24,
-              #f59e0b
+              #f59e0b,
+              #d97706
             );
-
+          padding: 12px;
+          border-radius: 20px;
           box-shadow:
-            0 15px 40px
-              rgba(245, 158, 11, 0.25),
-            inset 0 1px 0
-              rgba(255, 255, 255, 0.35);
-
-          font-size: 40px;
-          transform: rotate(-4deg);
-        }
-
-        .eyebrow {
-          color: #fbbf24;
-          font-size: 10px;
-          font-weight: 900;
-          letter-spacing: 1.8px;
-          margin-bottom: 4px;
+            0 10px 30px
+              rgba(245,158,11,.25);
         }
 
         h1 {
+          font-size: 26px;
           margin: 0;
-          font-size: clamp(
-            25px,
-            6vw,
-            43px
-          );
-          line-height: 0.98;
-          letter-spacing: -1.8px;
         }
 
-        h1 span {
-          color: #fbbf24;
+        h2 {
+          margin:
+            0 0 15px;
         }
 
-        .hero p {
-          margin: 9px 0 0;
-          color: #94a3b8;
-          font-size: 14px;
+        h3 {
+          margin-top: 25px;
         }
 
-        /*
-        =====================================================
-        CARDS
-        =====================================================
-        */
+        p {
+          color: #9aa6b2;
+        }
 
         .card {
-          position: relative;
-          margin-bottom: 14px;
-          padding: 19px;
-
           background:
-            linear-gradient(
-              145deg,
-              rgba(255,255,255,0.075),
-              rgba(255,255,255,0.035)
-            );
-
+            rgba(255,255,255,.055);
           border:
             1px solid
-            rgba(255,255,255,0.09);
-
-          border-radius: 24px;
-
+            rgba(255,255,255,.09);
+          border-radius: 22px;
+          padding: 18px;
+          margin-bottom: 15px;
+          backdrop-filter: blur(10px);
           box-shadow:
-            0 18px 50px
-              rgba(0,0,0,0.18);
-
-          backdrop-filter:
-            blur(15px);
+            0 15px 35px
+              rgba(0,0,0,.18);
         }
 
         .sectionTitle {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          gap: 12px;
-          margin-bottom: 16px;
+          gap: 10px;
         }
-
-        .sectionTitle > div:first-child {
-          display: flex;
-          align-items: center;
-          gap: 11px;
-        }
-
-        .sectionEmoji {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          width: 45px;
-          height: 45px;
-
-          border-radius: 15px;
-
-          background:
-            rgba(251,191,36,0.11);
-
-          font-size: 23px;
-        }
-
-        h2 {
-          margin: 0;
-          font-size: 20px;
-        }
-
-        .sectionTitle small {
-          display: block;
-          margin-top: 3px;
-          color: #7f8da0;
-          font-size: 11px;
-        }
-
-        /*
-        =====================================================
-        INPUTS
-        =====================================================
-        */
 
         input,
-        select,
-        textarea {
+        select {
           width: 100%;
+          padding: 14px;
           margin-bottom: 10px;
-          padding: 13px 14px;
-
-          color: white;
-
-          background:
-            rgba(5,9,15,0.72);
-
+          border-radius: 13px;
           border:
             1px solid
-            rgba(255,255,255,0.1);
-
-          border-radius: 13px;
+            #303b48;
+          background: #111820;
+          color: white;
           outline: none;
-
-          transition:
-            0.2s ease;
-        }
-
-        textarea {
-          min-height: 90px;
-          resize: vertical;
         }
 
         input:focus,
-        select:focus,
-        textarea:focus {
-          border-color: #fbbf24;
-
-          box-shadow:
-            0 0 0 3px
-              rgba(251,191,36,0.08);
+        select:focus {
+          border-color:
+            #f59e0b;
         }
-
-        option {
-          background: #111827;
-          color: white;
-        }
-
-        /*
-        =====================================================
-        BUTTONS
-        =====================================================
-        */
 
         button {
           border: 0;
           cursor: pointer;
+          border-radius: 13px;
+          padding: 13px 17px;
+          font-weight: 800;
         }
 
-        .primaryButton {
-          padding: 13px 18px;
+        .smallButton {
+          background: #f59e0b;
+          color: #111;
+        }
 
-          color: #17120a;
+        .deleteEvent {
+          background: #3b1616;
+          color: #ff8b8b;
+          width: 100%;
+        }
 
-          font-weight: 900;
+        .stats {
+          display:
+            grid;
+          grid-template-columns:
+            repeat(4, 1fr);
+          gap: 10px;
+          margin-bottom: 15px;
+        }
 
+        .stats div {
+          text-align: center;
+          padding: 16px 8px;
+          border-radius: 18px;
+          background:
+            rgba(255,255,255,.055);
+          border:
+            1px solid
+            rgba(255,255,255,.07);
+        }
+
+        .stats b,
+        .stats small {
+          display: block;
+        }
+
+        .stats b {
+          font-size: 20px;
+          margin: 5px 0;
+        }
+
+        .stats small {
+          color: #8995a3;
+          font-size: 11px;
+        }
+
+        .beerHero {
+          margin-bottom: 15px;
+        }
+
+        .beerButton {
+          width: 100%;
+          min-height: 190px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          gap: 3px;
+
+          color: white;
+
+          background:
+            radial-gradient(
+              circle at 50% 20%,
+              #ff5757,
+              #b81414 55%,
+              #710b0b
+            );
+
+          border:
+            3px solid
+            rgba(255,255,255,.18);
+
+          box-shadow:
+            0 15px 45px
+              rgba(200,20,20,.35);
+
+          transition:
+            transform .15s,
+            box-shadow .15s;
+        }
+
+        .beerButton:hover {
+          transform:
+            translateY(-3px)
+            scale(1.01);
+
+          box-shadow:
+            0 20px 55px
+              rgba(255,40,40,.45);
+        }
+
+        .beerButton:active {
+          transform:
+            scale(.97);
+        }
+
+        .beerIcon {
+          font-size: 55px;
+        }
+
+        .beerButton span:not(.beerIcon) {
+          font-size: 42px;
+          letter-spacing: 5px;
+        }
+
+        .beerButton small {
+          font-size: 13px;
+          opacity: .85;
+        }
+
+        .beerRequest {
+          background:
+            rgba(255,255,255,.05);
+          border-radius: 16px;
+          padding: 14px;
+          margin-top: 10px;
+        }
+
+        .requestButtons {
+          margin-top: 12px;
+        }
+
+        .responseRow {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 0;
+        }
+
+        .responseRow span {
+          flex: 1;
+        }
+
+        .accept {
+          background: #16a34a;
+          color: white;
+        }
+
+        .decline {
+          background: #991b1b;
+          color: white;
+        }
+
+        .row {
+          display:
+            grid;
+          grid-template-columns:
+            1fr auto;
+          gap: 8px;
+        }
+
+        .three {
+          display:
+            grid;
+          grid-template-columns:
+            repeat(3,1fr);
+          gap: 8px;
+        }
+
+        .save {
+          width: 100%;
           background:
             linear-gradient(
               135deg,
               #fbbf24,
               #f59e0b
             );
-
-          border-radius: 13px;
-
-          box-shadow:
-            0 10px 25px
-              rgba(245,158,11,0.15);
-
-          transition:
-            transform 0.15s ease,
-            box-shadow 0.15s ease;
-        }
-
-        .primaryButton:hover {
-          transform:
-            translateY(-2px);
-        }
-
-        .primaryButton:active {
-          transform:
-            translateY(1px);
-        }
-
-        .primaryButton.full {
-          width: 100%;
-        }
-
-        .iconButton {
-          width: 43px;
-          height: 43px;
-
-          border-radius: 14px;
-
           color: #111;
-          background: #fbbf24;
-
-          font-size: 18px;
-          font-weight: 900;
         }
 
-        .dangerButton {
-          width: 100%;
-          padding: 10px;
-
-          color: #fca5a5;
+        .personItem,
+        .item,
+        .history {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          padding: 13px;
+          margin-top: 8px;
+          border-radius: 15px;
           background:
-            rgba(239,68,68,0.08);
+            rgba(255,255,255,.045);
+        }
 
-          border:
-            1px solid
-            rgba(239,68,68,0.18);
-
-          border-radius: 12px;
+        .personItem small,
+        .item small,
+        .history small {
+          display: block;
+          color: #8995a3;
           margin-top: 4px;
         }
 
-        /*
-        =====================================================
-        EVENT
-        =====================================================
-        */
-
-        .bigSelect {
-          font-size: 16px;
-          font-weight: 700;
-          padding: 15px;
-        }
-
-        .eventInfo {
+        .personActions {
           display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-          margin-bottom: 10px;
-          color: #94a3b8;
-          font-size: 12px;
+          gap: 6px;
         }
 
-        .eventInfo div {
-          padding: 7px 10px;
-          background:
-            rgba(255,255,255,0.04);
-          border-radius: 9px;
-        }
-
-        .modalBox {
-          margin-top: 12px;
-          padding: 15px;
-
-          background:
-            rgba(0,0,0,0.22);
-
-          border-radius: 17px;
-          border:
-            1px solid
-            rgba(255,255,255,0.07);
-        }
-
-        .modalBox h3 {
-          margin-top: 0;
-        }
-
-        /*
-        =====================================================
-        STATS
-        =====================================================
-        */
-
-        .stats {
-          display: grid;
-          grid-template-columns:
-            repeat(4,1fr);
-          gap: 9px;
-          margin-bottom: 14px;
-        }
-
-        .statCard {
-          padding: 15px 8px;
-          text-align: center;
-
-          background:
-            rgba(255,255,255,0.055);
-
-          border:
-            1px solid
-            rgba(255,255,255,0.07);
-
-          border-radius: 18px;
-        }
-
-        .statCard span {
-          display: block;
-          font-size: 21px;
-        }
-
-        .statCard strong {
-          display: block;
-          margin: 4px 0;
-
-          color: #fbbf24;
-
-          font-size: 19px;
-        }
-
-        .statCard small {
-          color: #718096;
-          font-size: 10px;
-        }
-
-        /*
-        =====================================================
-        PEOPLE
-        =====================================================
-        */
-
-        .addRow {
-          display: grid;
-          grid-template-columns: 1fr auto;
-          gap: 8px;
-        }
-
-        .addRow input {
-          margin: 0;
-        }
-
-        .peopleList {
-          display: grid;
-          gap: 8px;
-          margin-top: 12px;
-        }
-
-        .personCard {
-          display: grid;
-          grid-template-columns:
-            48px 1fr auto;
-          align-items: center;
-          gap: 11px;
-
-          width: 100%;
-          padding: 11px;
-
-          text-align: left;
-          color: white;
-
-          background:
-            rgba(255,255,255,0.045);
-
-          border:
-            1px solid
-            rgba(255,255,255,0.06);
-
-          border-radius: 16px;
-
-          transition:
-            transform 0.15s ease,
-            background 0.15s ease;
-        }
-
-        .personCard:hover {
-          transform:
-            translateX(3px);
-
-          background:
-            rgba(255,255,255,0.07);
-        }
-
-        .avatar,
-        .rankAvatar {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          width: 48px;
-          height: 48px;
-
-          border-radius: 15px;
-
+        .crateButton {
+          background: #f59e0b;
           color: #111;
-          background:
-            linear-gradient(
-              135deg,
-              #fbbf24,
-              #fb923c
-            );
-
-          font-weight: 900;
-          font-size: 19px;
         }
 
-        .personInfo strong,
-        .personInfo small {
-          display: block;
+        .historyButton {
+          background: #303944;
+          color: white;
         }
-
-        .personInfo small {
-          color: #fbbf24;
-          margin-top: 2px;
-          font-size: 11px;
-        }
-
-        .miniStats {
-          margin-top: 5px;
-          color: #718096;
-          font-size: 10px;
-        }
-
-        .personPoints {
-          text-align: right;
-        }
-
-        .personPoints strong {
-          display: block;
-          color: #fbbf24;
-          font-size: 21px;
-        }
-
-        .personPoints small {
-          color: #64748b;
-          font-size: 9px;
-        }
-
-        /*
-        =====================================================
-        ASSIGNMENTS
-        =====================================================
-        */
 
         .assignment {
-          display: grid;
+          display:
+            grid;
           grid-template-columns:
-            1fr 1.4fr;
-          align-items: center;
+            1fr 1.5fr;
           gap: 10px;
-
+          align-items: center;
           margin-bottom: 8px;
-          padding: 10px 12px;
-
-          background:
-            rgba(255,255,255,0.035);
-
-          border-radius: 14px;
-        }
-
-        .assignment strong,
-        .assignment small {
-          display: block;
-        }
-
-        .assignment small {
-          color: #fbbf24;
-          font-size: 10px;
-          margin-top: 3px;
         }
 
         .assignment select {
           margin: 0;
         }
 
-        /*
-        =====================================================
-        DRINKS
-        =====================================================
-        */
-
-        .drinkItem {
-          display: grid;
-          grid-template-columns:
-            45px 1fr auto;
-          align-items: center;
-          gap: 10px;
-
-          margin-top: 8px;
-          padding: 11px;
-
-          background:
-            rgba(255,255,255,0.04);
-
-          border-radius: 15px;
-        }
-
-        .drinkIcon {
+        .paymentTotal {
           display: flex;
-          align-items: center;
-          justify-content: center;
-
-          width: 43px;
-          height: 43px;
-
-          border-radius: 13px;
-
+          justify-content: space-between;
+          padding: 15px;
+          margin-top: 10px;
+          border-radius: 14px;
           background:
-            rgba(251,191,36,0.1);
-
-          font-size: 21px;
+            rgba(245,158,11,.1);
         }
 
-        .drinkItem strong,
-        .drinkItem small {
-          display: block;
-        }
-
-        .drinkItem small {
-          margin-top: 3px;
-          color: #718096;
-          font-size: 10px;
-        }
-
-        /*
-        =====================================================
-        PAYMENTS
-        =====================================================
-        */
-
-        .paymentItem {
-          display: grid;
-          grid-template-columns:
-            45px 1fr auto;
-          align-items: center;
-          gap: 10px;
-
-          padding: 12px;
-          margin-top: 8px;
-
-          background:
-            rgba(255,255,255,0.04);
-
-          border-radius: 15px;
-        }
-
-        .moneyIcon {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          width: 43px;
-          height: 43px;
-
-          border-radius: 13px;
-
-          background:
-            rgba(34,197,94,0.09);
-
-          font-size: 21px;
-        }
-
-        .paymentInfo strong,
-        .paymentInfo small {
-          display: block;
-        }
-
-        .paymentInfo small {
-          margin-top: 3px;
-          color: #718096;
-          font-size: 10px;
-        }
-
-        .paymentAmount {
-          color: #4ade80;
-        }
-
-        .bonusHint {
-          margin: 4px 0 12px;
-          padding: 10px;
-
-          color: #fbbf24;
-          background:
-            rgba(251,191,36,0.06);
-
-          border-radius: 10px;
-          font-size: 11px;
-        }
-
-        /*
-        =====================================================
-        CHALLENGES
-        =====================================================
-        */
-
-        .challengeCard {
-          background:
-            linear-gradient(
-              145deg,
-              rgba(139,92,246,0.12),
-              rgba(255,255,255,0.035)
-            );
-        }
-
-        .challengeItem {
-          display: grid;
-          grid-template-columns:
-            45px 1fr auto;
-          align-items: center;
-          gap: 10px;
-
-          margin-top: 8px;
-          padding: 12px;
-
-          background:
-            rgba(255,255,255,0.045);
-
-          border:
-            1px solid
-            rgba(139,92,246,0.12);
-
-          border-radius: 15px;
-        }
-
-        .challengeEmoji {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          width: 43px;
-          height: 43px;
-
-          border-radius: 13px;
-
-          background:
-            rgba(139,92,246,0.13);
-
-          font-size: 21px;
-        }
-
-        .challengeItem strong,
-        .challengeItem small {
-          display: block;
-        }
-
-        .challengeItem small {
-          margin-top: 3px;
-          color: #94a3b8;
-          font-size: 10px;
-        }
-
-        .challengeCategory {
-          display: inline-block;
-          margin-top: 5px;
-          padding: 3px 7px;
-
-          color: #c4b5fd;
-          background:
-            rgba(139,92,246,0.12);
-
-          border-radius: 6px;
-          font-size: 8px;
-        }
-
-        .challengePoints {
-          color: #fbbf24;
-          font-size: 18px;
-          font-weight: 900;
-        }
-
-        /*
-        =====================================================
-        RANKING
-        =====================================================
-        */
-
-        .rankingCard {
-          background:
-            linear-gradient(
-              145deg,
-              rgba(251,191,36,0.09),
-              rgba(255,255,255,0.035)
-            );
-        }
-
-        .rankItem {
-          display: grid;
-          grid-template-columns:
-            38px 43px 1fr auto;
-          align-items: center;
-          gap: 9px;
-
+        .rank {
           width: 100%;
-
+          display:
+            grid;
+          grid-template-columns:
+            45px 1fr auto;
+          align-items: center;
+          gap: 10px;
           margin-top: 8px;
-          padding: 10px;
-
+          background:
+            rgba(255,255,255,.05);
           color: white;
           text-align: left;
+        }
 
+        .rank:hover {
           background:
-            rgba(255,255,255,0.04);
-
-          border:
-            1px solid
-            rgba(255,255,255,0.06);
-
-          border-radius: 15px;
+            rgba(245,158,11,.15);
         }
 
-        .rankItem.first {
-          background:
-            linear-gradient(
-              100deg,
-              rgba(251,191,36,0.14),
-              rgba(255,255,255,0.04)
-            );
-
-          border-color:
-            rgba(251,191,36,0.22);
+        .rankingSubtitle {
+          margin-top: -5px;
         }
 
-        .rankPlace {
+        .totalPoints {
           text-align: center;
-          font-size: 19px;
-        }
-
-        .rankAvatar {
-          width: 43px;
-          height: 43px;
-          border-radius: 13px;
-          font-size: 16px;
-        }
-
-        .rankName strong,
-        .rankName small {
-          display: block;
-        }
-
-        .rankName small {
+          margin-top: 15px;
           color: #fbbf24;
-          font-size: 9px;
-          margin-top: 3px;
-        }
-
-        .rankPoints {
-          text-align: right;
-        }
-
-        .rankPoints strong {
-          display: block;
-          color: #fbbf24;
-          font-size: 18px;
-        }
-
-        .rankPoints small {
-          color: #64748b;
-          font-size: 8px;
-        }
-
-        /*
-        =====================================================
-        EMPTY / MESSAGE
-        =====================================================
-        */
-
-        .empty {
-          padding: 24px 10px;
-          text-align: center;
-          color: #64748b;
-          font-size: 13px;
-          line-height: 1.6;
         }
 
         .message {
-          position: sticky;
-          bottom: 15px;
-          z-index: 30;
-
-          margin: 12px 0;
-          padding: 13px 15px;
-
-          color: #fbbf24;
-
+          position: fixed;
+          left: 50%;
+          bottom: 20px;
+          transform:
+            translateX(-50%);
+          z-index: 100;
+          width:
+            min(90%, 600px);
+          padding: 15px;
+          border-radius: 15px;
           background:
-            rgba(20,27,38,0.95);
-
+            #172230;
           border:
             1px solid
-            rgba(251,191,36,0.18);
-
-          border-radius: 14px;
-
+            #46586a;
+          color: #fbbf24;
+          text-align: center;
           box-shadow:
             0 15px 40px
-              rgba(0,0,0,0.3);
-
-          backdrop-filter:
-            blur(15px);
+              rgba(0,0,0,.35);
         }
 
-        /*
-        =====================================================
-        PERSON MODAL
-        =====================================================
-        */
-
-        .modalBackdrop {
+        .overlayAnimation {
           position: fixed;
           inset: 0;
-          z-index: 100;
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          padding: 18px;
-
-          background:
-            rgba(0,0,0,0.72);
-
-          backdrop-filter:
-            blur(10px);
-        }
-
-        .personModal {
-          position: relative;
-
-          width: 100%;
-          max-width: 560px;
-          max-height: 90vh;
-
-          overflow-y: auto;
-
-          padding: 24px;
-
-          text-align: center;
-
-          background:
-            linear-gradient(
-              145deg,
-              #172231,
-              #0b111a
-            );
-
-          border:
-            1px solid
-            rgba(255,255,255,0.1);
-
-          border-radius: 25px;
-
-          box-shadow:
-            0 30px 100px
-              rgba(0,0,0,0.55);
-        }
-
-        .closeButton {
-          position: absolute;
-          right: 15px;
-          top: 15px;
-
-          width: 35px;
-          height: 35px;
-
-          color: white;
-          background:
-            rgba(255,255,255,0.08);
-
-          border-radius: 50%;
-
-          font-size: 21px;
-        }
-
-        .bigAvatar {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          width: 82px;
-          height: 82px;
-
-          margin: 5px auto 12px;
-
-          border-radius: 25px;
-
-          color: #111;
-
-          background:
-            linear-gradient(
-              135deg,
-              #fbbf24,
-              #fb923c
-            );
-
-          font-size: 34px;
-          font-weight: 900;
-        }
-
-        .personModal h2 {
-          font-size: 27px;
-        }
-
-        .bigTitle {
-          margin-top: 5px;
-          color: #fbbf24;
-          font-weight: 800;
-        }
-
-        .detailStats {
-          display: grid;
-          grid-template-columns:
-            repeat(4,1fr);
-
-          gap: 7px;
-          margin: 20px 0;
-        }
-
-        .detailStats div {
-          padding: 10px 5px;
-
-          background:
-            rgba(255,255,255,0.045);
-
-          border-radius: 12px;
-        }
-
-        .detailStats strong,
-        .detailStats small {
-          display: block;
-        }
-
-        .detailStats strong {
-          color: #fbbf24;
-        }
-
-        .detailStats small {
-          color: #64748b;
-          margin-top: 3px;
-          font-size: 8px;
-        }
-
-        .personModal h3 {
-          text-align: left;
-          margin-top: 22px;
-        }
-
-        .history {
-          text-align: left;
-        }
-
-        .historyItem {
-          display: grid;
-          grid-template-columns:
-            30px 1fr auto;
-          align-items: center;
-          gap: 8px;
-
-          margin-top: 7px;
-          padding: 10px;
-
-          background:
-            rgba(255,255,255,0.045);
-
-          border-radius: 12px;
-        }
-
-        .historyItem span {
-          font-size: 17px;
-        }
-
-        .historyItem strong,
-        .historyItem small {
-          display: block;
-        }
-
-        .historyItem small {
-          color: #718096;
-          font-size: 9px;
-          margin-top: 2px;
-        }
-
-        .historyItem b {
-          color: #4ade80;
-        }
-
-        /*
-        =====================================================
-        PARTY ANIMATIONS
-        =====================================================
-        */
-
-        .partyOverlay {
-          position: fixed;
-          inset: 0;
-          z-index: 200;
-
+          z-index: 500;
           display: flex;
           flex-direction: column;
-          align-items: center;
           justify-content: center;
-
+          align-items: center;
           background:
-            rgba(3,7,12,0.7);
-
+            rgba(0,0,0,.78);
           backdrop-filter:
-            blur(8px);
-
+            blur(5px);
           animation:
-            overlayIn 0.2s ease;
+            fadeIn .2s ease;
+          pointer-events: none;
         }
 
-        .beerClash {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 4px;
-
-          font-size: 75px;
-
+        .beerClink {
+          font-size: 90px;
           animation:
-            cheers 1.5s
-            cubic-bezier(.2,.8,.2,1);
+            clink 1s ease-in-out
+            infinite alternate;
         }
 
-        .beerClash span:nth-child(1) {
-          transform: rotate(-22deg);
+        .bigBeer {
+          font-size: 130px;
+          animation:
+            bounceBeer .7s
+            infinite alternate;
         }
 
-        .beerClash span:nth-child(3) {
-          transform: rotate(22deg);
-        }
-
-        .prost {
-          margin-top: 5px;
-
+        .prostText {
+          margin-top: 20px;
+          font-size: 60px;
+          font-weight: 900;
           color: #fbbf24;
-
-          font-size: 54px;
-          font-weight: 1000;
-          letter-spacing: -2px;
-
           text-shadow:
-            0 0 25px
-              rgba(251,191,36,0.5);
-
-          animation:
-            popIn 0.45s
-            0.25s both;
-        }
-
-        .prostSub {
-          margin-top: 3px;
-          color: white;
-          font-size: 16px;
-          font-weight: 800;
-
-          animation:
-            popIn 0.45s
-            0.4s both;
+            0 5px 30px
+            rgba(245,158,11,.6);
         }
 
         .moneyRain {
           position: fixed;
           inset: 0;
-          z-index: 190;
-
+          z-index: 500;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          text-align: center;
+          font-size: 70px;
+          line-height: 1.4;
+          background:
+            rgba(0,0,0,.25);
+          animation:
+            moneyFall 2.5s
+            ease-in-out;
           pointer-events: none;
-          overflow: hidden;
         }
 
-        .moneyRain span {
-          position: absolute;
-          top: -60px;
-
-          font-size: 30px;
-
-          animation:
-            moneyFall 2.4s
-            linear both;
-        }
-
-        .pointsPop {
+        .modal {
           position: fixed;
-          left: 50%;
-          top: 28%;
-          z-index: 210;
-
-          transform:
-            translateX(-50%);
-
-          padding: 13px 21px;
-
-          color: #111;
-
-          background: #fbbf24;
-
-          border-radius: 999px;
-
-          font-size: 21px;
-          font-weight: 1000;
-
-          box-shadow:
-            0 15px 50px
-              rgba(251,191,36,0.4);
-
-          animation:
-            pointsFloat 1.5s ease both;
+          inset: 0;
+          z-index: 300;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+          background:
+            rgba(0,0,0,.75);
+          backdrop-filter:
+            blur(8px);
         }
 
-        /*
-        =====================================================
-        FOOTER
-        =====================================================
-        */
+        .modalBox {
+          position: relative;
+          width:
+            min(100%, 600px);
+          max-height: 85vh;
+          overflow: auto;
+          padding: 25px;
+          border-radius: 24px;
+          background:
+            #111820;
+          border:
+            1px solid
+            #344454;
+        }
+
+        .close {
+          position: absolute;
+          top: 12px;
+          right: 12px;
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          background:
+            #303944;
+          color: white;
+          font-size: 25px;
+        }
+
+        .profileBig {
+          text-align: center;
+          font-size: 55px;
+          font-weight: 900;
+          color: #fbbf24;
+          padding: 20px;
+        }
+
+        .profileBig small {
+          display: block;
+          color: #8995a3;
+          font-size: 13px;
+        }
+
+        .history b {
+          color: #4ade80;
+          font-size: 20px;
+        }
 
         footer {
-          padding: 35px 10px 10px;
           text-align: center;
-          color: #475569;
+          padding: 35px 10px;
+          color: #687686;
         }
 
-        footer div {
-          font-size: 28px;
-          margin-bottom: 5px;
-        }
-
-        footer strong,
         footer small {
           display: block;
+          margin-top: 5px;
         }
 
-        footer strong {
-          color: #64748b;
-        }
-
-        footer small {
-          margin-top: 4px;
-          font-size: 10px;
-        }
-
-        /*
-        =====================================================
-        ANIMATION KEYFRAMES
-        =====================================================
-        */
-
-        @keyframes cheers {
-          0% {
-            transform:
-              scale(0.4)
-              translateY(30px);
+        @keyframes fadeIn {
+          from {
             opacity: 0;
           }
+          to {
+            opacity: 1;
+          }
+        }
 
-          30% {
+        @keyframes clink {
+          from {
+            transform:
+              rotate(-12deg)
+              translateX(-15px);
+          }
+
+          to {
+            transform:
+              rotate(12deg)
+              translateX(15px);
+          }
+        }
+
+        @keyframes bounceBeer {
+          from {
+            transform:
+              scale(.9)
+              rotate(-8deg);
+          }
+
+          to {
             transform:
               scale(1.15)
-              translateY(0);
-            opacity: 1;
-          }
-
-          55% {
-            transform:
-              scale(0.96)
-              rotate(-3deg);
-          }
-
-          70% {
-            transform:
-              scale(1.03)
-              rotate(3deg);
-          }
-
-          100% {
-            transform:
-              scale(1)
-              rotate(0);
-          }
-        }
-
-        @keyframes popIn {
-          from {
-            opacity: 0;
-            transform:
-              translateY(20px)
-              scale(0.7);
-          }
-
-          to {
-            opacity: 1;
-            transform:
-              translateY(0)
-              scale(1);
-          }
-        }
-
-        @keyframes overlayIn {
-          from {
-            opacity: 0;
-          }
-
-          to {
-            opacity: 1;
+              rotate(8deg);
           }
         }
 
         @keyframes moneyFall {
           0% {
             transform:
-              translateY(-80px)
-              rotate(0deg);
+              translateY(-100vh);
             opacity: 0;
           }
 
-          10% {
+          15% {
             opacity: 1;
           }
 
           100% {
             transform:
-              translateY(110vh)
-              rotate(540deg);
+              translateY(100vh);
             opacity: 0;
           }
         }
 
-        @keyframes pointsFloat {
-          0% {
-            opacity: 0;
-            transform:
-              translate(-50%, 40px)
-              scale(0.6);
-          }
+        @media(max-width:650px) {
 
-          25% {
-            opacity: 1;
-            transform:
-              translate(-50%, 0)
-              scale(1.1);
-          }
-
-          70% {
-            opacity: 1;
-            transform:
-              translate(-50%, -20px)
-              scale(1);
-          }
-
-          100% {
-            opacity: 0;
-            transform:
-              translate(-50%, -80px)
-              scale(0.9);
-          }
-        }
-
-        /*
-        =====================================================
-        MOBILE
-        =====================================================
-        */
-
-        @media (max-width: 650px) {
-          .app {
-            padding-left: 10px;
-            padding-right: 10px;
-          }
-
-          .hero {
-            padding-top: 22px;
-          }
-
-          .logoBox {
-            width: 60px;
-            height: 60px;
-            border-radius: 19px;
-            font-size: 31px;
+          .page {
+            padding: 10px;
           }
 
           h1 {
-            font-size: 27px;
-          }
-
-          .hero p {
-            font-size: 12px;
+            font-size: 21px;
           }
 
           .stats {
@@ -3843,52 +2352,48 @@ export default function Home() {
               repeat(2,1fr);
           }
 
-          .three {
-            grid-template-columns:
-              1fr;
-          }
-
-          .addRow {
-            grid-template-columns:
-              1fr;
-          }
-
-          .addRow .primaryButton {
-            width: 100%;
-          }
-
+          .row,
+          .three,
           .assignment {
             grid-template-columns:
               1fr;
           }
 
-          .assignment select {
+          .sectionTitle {
+            align-items: stretch;
+            flex-direction: column;
+          }
+
+          .beerButton {
+            min-height: 170px;
+          }
+
+          .beerButton span:not(.beerIcon) {
+            font-size: 35px;
+          }
+
+          .prostText {
+            font-size: 42px;
+          }
+
+          .beerClink {
+            font-size: 65px;
+          }
+
+          .personItem {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .personActions {
             width: 100%;
           }
 
-          .detailStats {
-            grid-template-columns:
-              repeat(2,1fr);
-          }
-
-          .rankItem {
-            grid-template-columns:
-              35px 40px 1fr auto;
-          }
-
-          .rankAvatar {
-            width: 40px;
-            height: 40px;
-          }
-
-          .beerClash {
-            font-size: 58px;
-          }
-
-          .prost {
-            font-size: 43px;
+          .personActions button {
+            flex: 1;
           }
         }
+
       `}</style>
     </main>
   );
