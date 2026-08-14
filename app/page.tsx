@@ -6,6 +6,16 @@ import { supabase } from "../lib/supabase";
 type Event = {
   id: string;
   title: string;
+  created_at?: string;
+};
+
+type Profile = {
+  id: string;
+  username?: string | null;
+  name?: string | null;
+  points?: number | null;
+  drinks_count?: number | null;
+  promille?: number | null;
 };
 
 type Person = {
@@ -20,23 +30,26 @@ type Person = {
 
 type Drink = {
   id: string;
-  getraenk?: string;
-  drink_name?: string;
-  liters?: number;
-  menge?: number;
-  alkohol?: number;
-  alcohol_percent?: number;
-  preis?: number;
+  event_id?: string;
+  getraenk?: string | null;
+  drink_name?: string | null;
+  menge?: number | null;
+  liters?: number | null;
+  alkohol?: number | null;
+  alcohol_percent?: number | null;
+  preis?: number | null;
+  quantity?: number | null;
+  created_at?: string | null;
 };
 
 type Payment = {
   id: string;
-  event_id?: string;
-  betrag?: number;
-  bezahlt_von?: string;
-  profile_id?: string;
-  status?: string;
-  created_at?: string;
+  event_id?: string | null;
+  betrag?: number | null;
+  bezahlt_von?: string | null;
+  profile_id?: string | null;
+  status?: string | null;
+  created_at?: string | null;
   person_name?: string;
 };
 
@@ -49,33 +62,93 @@ type PointHistory = {
   created_at?: string;
 };
 
+type ChallengeCategory = {
+  id: string;
+  name: string;
+  emoji?: string | null;
+  description?: string | null;
+};
+
+type ChallengeTemplate = {
+  id: string;
+  title: string;
+  description?: string | null;
+  category?: string | null;
+  default_points?: number | null;
+  requires_vote?: boolean | null;
+  minimum_votes?: number | null;
+  is_active?: boolean | null;
+};
+
+type Challenge = {
+  id: string;
+  event_id?: string | null;
+  title?: string | null;
+  description?: string | null;
+  points?: number | null;
+  category?: string | null;
+  status?: string | null;
+  created_by_profile_id?: string | null;
+  assigned_profile_id?: string | null;
+  winner_profile_id?: string | null;
+  required_votes?: number | null;
+  duration_minutes?: number | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  completed_at?: string | null;
+  is_active?: boolean | null;
+  created_at?: string | null;
+};
+
 type BeerRequest = {
   id: string;
   event_id: string;
   requester_profile_id: string;
-  status?: string;
-  message?: string;
-  created_at?: string;
+  status?: string | null;
+  message?: string | null;
+  created_at?: string | null;
   requester_name?: string;
 };
 
 type BeerResponse = {
+  id?: string;
   request_id: string;
   profile_id: string;
   response: string;
 };
+
+type AnimationType =
+  | "prost"
+  | "money"
+  | "crate"
+  | "challenge"
+  | "beer"
+  | null;
 
 export default function Home() {
   const [events, setEvents] = useState<Event[]>([]);
   const [eventId, setEventId] = useState("");
 
   const [people, setPeople] = useState<Person[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [drinks, setDrinks] = useState<Drink[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [pointHistory, setPointHistory] = useState<PointHistory[]>([]);
 
-  const [beerRequests, setBeerRequests] = useState<BeerRequest[]>([]);
-  const [beerResponses, setBeerResponses] = useState<BeerResponse[]>([]);
+  const [challengeCategories, setChallengeCategories] =
+    useState<ChallengeCategory[]>([]);
+
+  const [challengeTemplates, setChallengeTemplates] =
+    useState<ChallengeTemplate[]>([]);
+
+  const [challenges, setChallenges] =
+    useState<Challenge[]>([]);
+
+  const [beerRequests, setBeerRequests] =
+    useState<BeerRequest[]>([]);
+
+  const [beerResponses, setBeerResponses] =
+    useState<BeerResponse[]>([]);
 
   const [drinkName, setDrinkName] = useState("");
   const [liters, setLiters] = useState("0.5");
@@ -88,14 +161,97 @@ export default function Home() {
   const [paymentDescription, setPaymentDescription] =
     useState("Getränkeeinkauf");
 
-  const [message, setMessage] = useState("");
-
-  const [animation, setAnimation] = useState<
-    "prost" | "money" | "beer" | null
-  >(null);
-
   const [selectedPerson, setSelectedPerson] =
     useState<Person | null>(null);
+
+  const [showChallenges, setShowChallenges] =
+    useState(false);
+
+  const [showPayments, setShowPayments] =
+    useState(false);
+
+  const [showDrinkHistory, setShowDrinkHistory] =
+    useState(false);
+
+  const [showPeople, setShowPeople] =
+    useState(true);
+
+  const [showDrinks, setShowDrinks] =
+    useState(false);
+
+  const [showBeerRequests, setShowBeerRequests] =
+    useState(true);
+
+  const [selectedCategory, setSelectedCategory] =
+    useState("");
+
+  const [message, setMessage] = useState("");
+
+  const [animation, setAnimation] =
+    useState<AnimationType>(null);
+
+  /*
+   * =========================================================
+   * HILFSFUNKTIONEN
+   * =========================================================
+   */
+
+  function getPersonName(profile: any) {
+    return (
+      profile?.username ||
+      profile?.name ||
+      "Unbekannt"
+    );
+  }
+
+  function getDrinkName(drink: Drink) {
+    return (
+      drink.getraenk ||
+      drink.drink_name ||
+      "Getränk"
+    );
+  }
+
+  function getDrinkLiters(drink: Drink) {
+    return Number(
+      drink.liters ??
+        drink.menge ??
+        0
+    );
+  }
+
+  function getDrinkAlcohol(drink: Drink) {
+    return Number(
+      drink.alcohol_percent ??
+        drink.alkohol ??
+        0
+    );
+  }
+
+  function getDrinkPrice(drink: Drink) {
+    return Number(
+      drink.preis ||
+        0
+    );
+  }
+
+  function showAnimation(
+    type: Exclude<AnimationType, null>
+  ) {
+    setAnimation(type);
+
+    window.setTimeout(() => {
+      setAnimation(null);
+    }, 2600);
+  }
+
+  function showMessage(text: string) {
+    setMessage(text);
+
+    window.setTimeout(() => {
+      setMessage("");
+    }, 4000);
+  }
 
   /*
    * =========================================================
@@ -104,15 +260,18 @@ export default function Home() {
    */
 
   async function loadEvents() {
-    const { data, error } = await supabase
+    const {
+      data,
+      error,
+    } = await supabase
       .from("events")
-      .select("id,title")
+      .select("id,title,created_at")
       .order("created_at", {
         ascending: false,
       });
 
     if (error) {
-      setMessage(
+      showMessage(
         "❌ Events konnten nicht geladen werden: " +
           error.message
       );
@@ -122,29 +281,38 @@ export default function Home() {
     if (data) {
       setEvents(data);
 
-      if (!eventId && data.length > 0) {
+      if (
+        !eventId &&
+        data.length > 0
+      ) {
         setEventId(data[0].id);
       }
     }
   }
 
   async function createEvent() {
-    const title = window.prompt(
-      "🍻 Wie soll das Event heißen?"
-    );
+    const title =
+      window.prompt(
+        "🍻 Name des neuen Events:"
+      );
 
-    if (!title?.trim()) return;
+    if (!title?.trim()) {
+      return;
+    }
 
-    const { data, error } = await supabase
+    const {
+      data,
+      error,
+    } = await supabase
       .from("events")
       .insert({
         title: title.trim(),
       })
-      .select("id,title")
+      .select("id,title,created_at")
       .single();
 
     if (error) {
-      setMessage(
+      showMessage(
         "❌ Event konnte nicht erstellt werden: " +
           error.message
       );
@@ -152,117 +320,447 @@ export default function Home() {
     }
 
     if (data) {
-      setEvents((old) => [data, ...old]);
+      setEvents((current) => [
+        data,
+        ...current,
+      ]);
+
       setEventId(data.id);
 
-      setMessage(
+      showMessage(
         "🎉 Event erfolgreich erstellt!"
       );
     }
   }
 
   async function deleteEvent() {
-    if (!eventId) return;
+    if (!eventId) {
+      return;
+    }
 
-    const event = events.find(
-      (item) => item.id === eventId
-    );
+    const event =
+      events.find(
+        (item) =>
+          item.id === eventId
+      );
 
-    const confirmed = window.confirm(
-      `⚠️ Möchtest du "${event?.title}" wirklich löschen?`
-    );
+    if (
+      !window.confirm(
+        `⚠️ "${event?.title}" wirklich löschen?`
+      )
+    ) {
+      return;
+    }
 
-    if (!confirmed) return;
-
-    const { error } = await supabase
+    const {
+      error,
+    } = await supabase
       .from("events")
       .delete()
       .eq("id", eventId);
 
     if (error) {
-      setMessage(
+      showMessage(
         "❌ Event konnte nicht gelöscht werden: " +
           error.message
       );
       return;
     }
 
-    setEvents((old) =>
-      old.filter(
-        (item) => item.id !== eventId
+    setEvents((current) =>
+      current.filter(
+        (item) =>
+          item.id !== eventId
       )
     );
 
     setEventId("");
+
     setPeople([]);
     setDrinks([]);
     setPayments([]);
+    setChallenges([]);
     setBeerRequests([]);
 
-    setMessage("🗑️ Event gelöscht.");
+    showMessage(
+      "🗑️ Event gelöscht."
+    );
   }
 
   /*
    * =========================================================
-   * DRINKS
+   * PROFILE
+   * =========================================================
+   */
+
+  async function loadProfiles() {
+    const {
+      data,
+      error,
+    } = await supabase
+      .from("profiles")
+      .select(
+        "id,username,name,points,drinks_count,promille"
+      );
+
+    if (error) {
+      console.log(
+        "Profiles:",
+        error.message
+      );
+      return;
+    }
+
+    if (data) {
+      setProfiles(data);
+    }
+  }
+
+  /*
+   * =========================================================
+   * TEILNEHMER
+   * =========================================================
+   */
+
+  async function loadPeople() {
+    if (!eventId) {
+      setPeople([]);
+      return;
+    }
+
+    const {
+      data: members,
+      error: memberError,
+    } = await supabase
+      .from("event_members")
+      .select("profile_id")
+      .eq(
+        "event_id",
+        eventId
+      );
+
+    if (memberError) {
+      showMessage(
+        "❌ Teilnehmer konnten nicht geladen werden: " +
+          memberError.message
+      );
+      return;
+    }
+
+    if (
+      !members ||
+      members.length === 0
+    ) {
+      setPeople([]);
+      return;
+    }
+
+    const ids =
+      members
+        .map(
+          (item) =>
+            item.profile_id
+        )
+        .filter(Boolean);
+
+    if (ids.length === 0) {
+      setPeople([]);
+      return;
+    }
+
+    const {
+      data,
+      error,
+    } = await supabase
+      .from("profiles")
+      .select(
+        "id,username,name,points,drinks_count,promille"
+      )
+      .in(
+        "id",
+        ids
+      );
+
+    if (error) {
+      showMessage(
+        "❌ Teilnehmerprofile konnten nicht geladen werden: " +
+          error.message
+      );
+      return;
+    }
+
+    if (!data) {
+      setPeople([]);
+      return;
+    }
+
+    const paymentByPerson: Record<
+      string,
+      number
+    > = {};
+
+    payments.forEach(
+      (payment) => {
+        const id =
+          payment.bezahlt_von ||
+          payment.profile_id;
+
+        if (!id) {
+          return;
+        }
+
+        paymentByPerson[id] =
+          (paymentByPerson[id] || 0) +
+          Number(
+            payment.betrag || 0
+          );
+      }
+    );
+
+    const result: Person[] =
+      data.map(
+        (profile: any) => ({
+          id: profile.id,
+
+          name:
+            profile.username ||
+            profile.name ||
+            "Teilnehmer",
+
+          points: Number(
+            profile.points || 0
+          ),
+
+          drinks: Number(
+            profile.drinks_count ||
+              0
+          ),
+
+          liters: 0,
+
+          cost: 0,
+
+          promille: Number(
+            profile.promille ||
+              0
+          ),
+        })
+      );
+
+    setPeople(result);
+  }
+
+  async function addPerson() {
+    if (!eventId) {
+      showMessage(
+        "❌ Bitte zuerst ein Event auswählen."
+      );
+      return;
+    }
+
+    const name =
+      personName.trim();
+
+    if (!name) {
+      showMessage(
+        "❌ Bitte einen Namen eingeben."
+      );
+      return;
+    }
+
+    /*
+     * Zuerst prüfen wir, ob es bereits
+     * ein Profil mit diesem Namen gibt.
+     *
+     * Dadurch vermeiden wir möglichst
+     * doppelte Teilnehmer wie:
+     *
+     * Philipp
+     * Philipp Adam
+     */
+
+    const {
+      data: existingProfiles,
+    } = await supabase
+      .from("profiles")
+      .select(
+        "id,username,name,points,drinks_count,promille"
+      )
+      .or(
+        `username.ilike.${name},name.ilike.${name}`
+      )
+      .limit(1);
+
+    let profileId =
+      existingProfiles?.[0]?.id;
+
+    if (!profileId) {
+      const {
+        data,
+        error,
+      } = await supabase
+        .from("profiles")
+        .insert({
+          username: name,
+          name,
+          points: 0,
+          drinks_count: 0,
+        })
+        .select("id")
+        .single();
+
+      if (error || !data) {
+        showMessage(
+          "❌ Teilnehmer konnte nicht erstellt werden: " +
+            (error?.message ||
+              "Unbekannter Fehler")
+        );
+        return;
+      }
+
+      profileId =
+        data.id;
+    }
+
+    /*
+     * Prüfen, ob der Teilnehmer
+     * bereits im Event ist.
+     */
+
+    const {
+      data: existingMember,
+    } = await supabase
+      .from("event_members")
+      .select("profile_id")
+      .eq(
+        "event_id",
+        eventId
+      )
+      .eq(
+        "profile_id",
+        profileId
+      )
+      .maybeSingle();
+
+    if (existingMember) {
+      showMessage(
+        "❌ Teilnehmer ist bereits in diesem Event."
+      );
+      return;
+    }
+
+    const {
+      error: memberError,
+    } = await supabase
+      .from("event_members")
+      .insert({
+        event_id: eventId,
+        profile_id: profileId,
+      });
+
+    if (memberError) {
+      showMessage(
+        "❌ Teilnehmer konnte nicht hinzugefügt werden: " +
+          memberError.message
+      );
+      return;
+    }
+
+    setPersonName("");
+
+    await loadProfiles();
+    await loadPeople();
+
+    showMessage(
+      "✅ Teilnehmer hinzugefügt!"
+    );
+  }
+
+  /*
+   * =========================================================
+   * GETRÄNKE
    * =========================================================
    */
 
   async function loadDrinks() {
-    if (!eventId) return;
+    if (!eventId) {
+      setDrinks([]);
+      return;
+    }
 
-    const { data, error } = await supabase
+    const {
+      data,
+      error,
+    } = await supabase
       .from("drinks")
       .select("*")
-      .eq("event_id", eventId)
+      .eq(
+        "event_id",
+        eventId
+      )
       .order("created_at", {
         ascending: false,
       });
 
     if (error) {
-      setMessage(
+      showMessage(
         "❌ Getränke konnten nicht geladen werden: " +
           error.message
       );
       return;
     }
 
-    if (data) {
-      setDrinks(data);
-    }
+    setDrinks(data || []);
   }
 
   async function saveDrink() {
     if (!eventId) {
-      setMessage(
+      showMessage(
         "❌ Bitte zuerst ein Event auswählen."
       );
       return;
     }
 
     if (!drinkName.trim()) {
-      setMessage(
+      showMessage(
         "❌ Bitte ein Getränk eingeben."
       );
       return;
     }
 
-    const { error } = await supabase
+    const {
+      error,
+    } = await supabase
       .from("drinks")
       .insert({
         event_id: eventId,
-        getraenk: drinkName.trim(),
-        drink_name: drinkName.trim(),
-        menge: Number(liters),
-        liters: Number(liters),
-        alkohol: Number(alcohol),
-        alcohol_percent: Number(alcohol),
-        preis: Number(price),
+
+        getraenk:
+          drinkName.trim(),
+
+        drink_name:
+          drinkName.trim(),
+
+        menge:
+          Number(liters),
+
+        liters:
+          Number(liters),
+
+        alkohol:
+          Number(alcohol),
+
+        alcohol_percent:
+          Number(alcohol),
+
+        preis:
+          Number(price),
+
         quantity: 1,
       });
 
     if (error) {
-      setMessage(
+      showMessage(
         "❌ Getränk konnte nicht gespeichert werden: " +
           error.message
       );
@@ -276,175 +774,8 @@ export default function Home() {
 
     await loadDrinks();
 
-    setMessage(
+    showMessage(
       "🍺 Getränk gespeichert!"
-    );
-  }
-
-  /*
-   * =========================================================
-   * PEOPLE
-   * =========================================================
-   */
-
-  async function loadPeople() {
-    if (!eventId) return;
-
-    const {
-      data: members,
-      error,
-    } = await supabase
-      .from("event_members")
-      .select("profile_id")
-      .eq("event_id", eventId);
-
-    if (error) {
-      setMessage(
-        "❌ Teilnehmer konnten nicht geladen werden: " +
-          error.message
-      );
-      return;
-    }
-
-    if (!members || members.length === 0) {
-      setPeople([]);
-      return;
-    }
-
-    const ids = members.map(
-      (member) => member.profile_id
-    );
-
-    const {
-      data: profiles,
-      error: profileError,
-    } = await supabase
-      .from("profiles")
-      .select("*")
-      .in("id", ids);
-
-    if (profileError) {
-      setMessage(
-        "❌ Profile konnten nicht geladen werden: " +
-          profileError.message
-      );
-      return;
-    }
-
-    if (!profiles) {
-      setPeople([]);
-      return;
-    }
-
-    const result: Person[] =
-      profiles.map((profile: any) => ({
-        id: profile.id,
-        name:
-          profile.username ||
-          profile.name ||
-          "Teilnehmer",
-        points: Number(
-          profile.points || 0
-        ),
-        drinks: Number(
-          profile.drinks_count || 0
-        ),
-        liters: Number(
-          profile.liters || 0
-        ),
-        cost: 0,
-        promille: Number(
-          profile.promille || 0
-        ),
-      }));
-
-    /*
-     * Kosten werden bewusst NICHT
-     * aus profiles.cost gelesen,
-     * weil diese Spalte nicht existiert.
-     *
-     * Stattdessen werden die Kosten
-     * aus den zugeordneten Getränken
-     * in der Anzeige berechnet.
-     */
-
-    setPeople(result);
-  }
-
-  async function addPerson() {
-    if (!eventId) {
-      setMessage(
-        "❌ Bitte zuerst ein Event auswählen."
-      );
-      return;
-    }
-
-    if (!personName.trim()) {
-      setMessage(
-        "❌ Bitte einen Namen eingeben."
-      );
-      return;
-    }
-
-    const name = personName.trim();
-
-    if (
-      people.some(
-        (person) =>
-          person.name.toLowerCase() ===
-          name.toLowerCase()
-      )
-    ) {
-      setMessage(
-        "❌ Teilnehmer bereits vorhanden."
-      );
-      return;
-    }
-
-    const { data: profile, error } =
-      await supabase
-        .from("profiles")
-        .insert({
-          username: name,
-          name,
-          points: 0,
-          drinks_count: 0,
-        })
-        .select("id")
-        .single();
-
-    if (error || !profile) {
-      setMessage(
-        "❌ Teilnehmer konnte nicht hinzugefügt werden: " +
-          (error?.message ||
-            "Unbekannter Fehler")
-      );
-      return;
-    }
-
-    const {
-      error: memberError,
-    } = await supabase
-      .from("event_members")
-      .insert({
-        event_id: eventId,
-        profile_id: profile.id,
-      });
-
-    if (memberError) {
-      setMessage(
-        "❌ Teilnehmer konnte nicht dem Event hinzugefügt werden: " +
-          memberError.message
-      );
-      return;
-    }
-
-    setPersonName("");
-
-    await loadPeople();
-
-    setMessage(
-      "✅ Teilnehmer hinzugefügt!"
     );
   }
 
@@ -452,39 +783,48 @@ export default function Home() {
    * =========================================================
    * GETRÄNK ZUORDNEN
    * =========================================================
-   *
-   * WICHTIG:
-   * Hier wird KEIN "cost" in profiles geschrieben.
-   * Dadurch kommt der Fehler
-   * "Could not find the 'cost' column of 'profiles'"
-   * nicht mehr.
    */
 
   async function assignDrink(
     person: Person,
     drink: Drink
   ) {
-    const drinkLiters = Number(
-      drink.liters ??
-        drink.menge ??
-        0
-    );
+    const drinkNameValue =
+      getDrinkName(drink);
 
-    const points = 10;
+    const drinkLiters =
+      getDrinkLiters(drink);
 
-    const { error } = await supabase
+    const drinkPrice =
+      getDrinkPrice(drink);
+
+    const newPoints =
+      person.points + 10;
+
+    /*
+     * Punkte + Getränkezahl.
+     *
+     * KEIN profiles.cost!
+     */
+
+    const {
+      error,
+    } = await supabase
       .from("profiles")
       .update({
         points:
-          person.points + points,
+          newPoints,
 
         drinks_count:
           person.drinks + 1,
       })
-      .eq("id", person.id);
+      .eq(
+        "id",
+        person.id
+      );
 
     if (error) {
-      setMessage(
+      showMessage(
         "❌ Getränk konnte nicht zugeordnet werden: " +
           error.message
       );
@@ -492,87 +832,187 @@ export default function Home() {
     }
 
     /*
-     * Punkte-Historie speichern.
+     * Punkte-Historie.
+     *
+     * Diese Einträge verwenden wir gleichzeitig
+     * als Getränkeverlauf.
      */
+
     const {
-      error: historyError,
+      error:
+        historyError,
     } = await supabase
       .from("point_history")
       .insert({
-        profile_id: person.id,
-        points,
-        reason: "Getränk",
+        profile_id:
+          person.id,
+
+        points: 10,
+
+        reason:
+          "Getränk",
+
         description:
-          `Getrunken: ${
-            drink.getraenk ||
-            drink.drink_name ||
-            "Getränk"
-          }`,
+          `🍺 ${drinkNameValue} · ${drinkLiters.toFixed(
+            2
+          )} L · ${getDrinkAlcohol(
+            drink
+          ).toFixed(
+            1
+          )}% · ${drinkPrice.toFixed(
+            2
+          )} €`,
       });
 
     if (historyError) {
       console.log(
-        "Punkte-Historie:",
+        "point_history:",
         historyError.message
       );
     }
 
     /*
-     * Lokale Anzeige aktualisieren.
+     * Promille neu berechnen.
      *
-     * Kosten werden nur lokal ergänzt.
-     * Sie werden NICHT in profiles gespeichert.
+     * Deine vorhandene Funktion:
+     *
+     * calculate_promille(uuid, uuid)
      */
-    setPeople((currentPeople) =>
-      currentPeople.map((item) => {
-        if (item.id !== person.id) {
-          return item;
-        }
 
-        return {
-          ...item,
-
-          points:
-            item.points + points,
-
-          drinks:
-            item.drinks + 1,
-
-          liters:
-            item.liters + drinkLiters,
-
-          cost:
-            item.cost +
-            Number(
-              drink.preis || 0
-            ),
-        };
-      })
-    );
-
-    setAnimation("prost");
-
-    window.setTimeout(() => {
-      setAnimation(null);
-    }, 2200);
-
-    await loadPointHistory(
+    await calculatePersonPromille(
       person.id
     );
 
-    setMessage(
-      `🍺 ${person.name}: +${points} Punkte`
+    await loadProfiles();
+    await loadPeople();
+
+    showAnimation(
+      "prost"
+    );
+
+    showMessage(
+      `🍺 ${person.name} hat ${drinkNameValue} getrunken · +10 Punkte`
     );
   }
 
   /*
    * =========================================================
-   * PAYMENTS
+   * PROMILLE
+   * =========================================================
+   */
+
+  async function calculatePersonPromille(
+    profileId: string
+  ) {
+    if (!eventId) {
+      return;
+    }
+
+    /*
+     * Erst versuchen wir die vorhandene
+     * Datenbankfunktion.
+     */
+
+    const {
+      data,
+      error,
+    } = await supabase.rpc(
+      "calculate_promille",
+      {
+        input_event_id:
+          eventId,
+
+        input_profile_id:
+          profileId,
+      }
+    );
+
+    if (error) {
+      console.log(
+        "Promille RPC:",
+        error.message
+      );
+      return;
+    }
+
+    /*
+     * Je nach Rückgabetyp kann Supabase
+     * einen einzelnen Wert oder ein
+     * Objekt zurückgeben.
+     */
+
+    let value = 0;
+
+    if (
+      typeof data ===
+      "number"
+    ) {
+      value = data;
+    } else if (
+      typeof data ===
+        "string" &&
+      !Number.isNaN(
+        Number(data)
+      )
+    ) {
+      value =
+        Number(data);
+    } else if (
+      data &&
+      typeof data ===
+        "object"
+    ) {
+      value = Number(
+        data.promille ??
+          data.calculate_promille ??
+          data.value ??
+          0
+      );
+    }
+
+    if (
+      Number.isFinite(value)
+    ) {
+      await supabase
+        .from("profiles")
+        .update({
+          promille: value,
+        })
+        .eq(
+          "id",
+          profileId
+        );
+    }
+  }
+
+  async function recalculateAllPromille() {
+    for (
+      const person of people
+    ) {
+      await calculatePersonPromille(
+        person.id
+      );
+    }
+
+    await loadProfiles();
+    await loadPeople();
+
+    showMessage(
+      "🍺 Promillewerte aktualisiert."
+    );
+  }
+
+  /*
+   * =========================================================
+   * ZAHLUNGEN
    * =========================================================
    */
 
   async function loadPayments() {
-    if (!eventId) return;
+    if (!eventId) {
+      setPayments([]);
+      return;
+    }
 
     const {
       data,
@@ -580,13 +1020,16 @@ export default function Home() {
     } = await supabase
       .from("payments")
       .select("*")
-      .eq("event_id", eventId)
+      .eq(
+        "event_id",
+        eventId
+      )
       .order("created_at", {
         ascending: false,
       });
 
     if (error) {
-      setMessage(
+      showMessage(
         "❌ Zahlungen konnten nicht geladen werden: " +
           error.message
       );
@@ -598,22 +1041,23 @@ export default function Home() {
       return;
     }
 
-    const profileIds = data
-      .map(
-        (payment: any) =>
-          payment.bezahlt_von ||
-          payment.profile_id
-      )
-      .filter(Boolean);
+    const ids =
+      data
+        .map(
+          (payment: any) =>
+            payment.bezahlt_von ||
+            payment.profile_id
+        )
+        .filter(Boolean);
 
-    let names: Record<
+    const names: Record<
       string,
       string
     > = {};
 
-    if (profileIds.length > 0) {
+    if (ids.length > 0) {
       const {
-        data: profiles,
+        data: payerProfiles,
       } = await supabase
         .from("profiles")
         .select(
@@ -621,39 +1065,40 @@ export default function Home() {
         )
         .in(
           "id",
-          profileIds
+          ids
         );
 
-      profiles?.forEach(
+      payerProfiles?.forEach(
         (profile: any) => {
           names[profile.id] =
-            profile.username ||
-            profile.name ||
-            "Teilnehmer";
+            getPersonName(
+              profile
+            );
         }
       );
     }
 
-    const mapped: Payment[] =
-      data.map((payment: any) => {
-        const payerId =
-          payment.bezahlt_von ||
-          payment.profile_id;
+    setPayments(
+      data.map(
+        (payment: any) => {
+          const payerId =
+            payment.bezahlt_von ||
+            payment.profile_id;
 
-        return {
-          ...payment,
-          person_name:
-            names[payerId] ||
-            "Unbekannt",
-        };
-      });
-
-    setPayments(mapped);
+          return {
+            ...payment,
+            person_name:
+              names[payerId] ||
+              "Unbekannt",
+          };
+        }
+      )
+    );
   }
 
   async function savePayment() {
     if (!eventId) {
-      setMessage(
+      showMessage(
         "❌ Bitte zuerst ein Event auswählen."
       );
       return;
@@ -662,73 +1107,94 @@ export default function Home() {
     const amount =
       Number(paymentAmount);
 
-    if (!amount || amount <= 0) {
-      setMessage(
+    if (
+      !Number.isFinite(
+        amount
+      ) ||
+      amount <= 0
+    ) {
+      showMessage(
         "❌ Bitte einen gültigen Betrag eingeben."
       );
       return;
     }
 
-    if (people.length === 0) {
-      setMessage(
-        "❌ Bitte zuerst einen Teilnehmer hinzufügen."
+    if (
+      people.length === 0
+    ) {
+      showMessage(
+        "❌ Keine Teilnehmer vorhanden."
       );
       return;
     }
 
-    const choices = people
-      .map(
-        (person, index) =>
-          `${index + 1}. ${person.name}`
-      )
-      .join("\n");
+    const choices =
+      people
+        .map(
+          (
+            person,
+            index
+          ) =>
+            `${index + 1}. ${person.name}`
+        )
+        .join("\n");
 
     const answer =
       window.prompt(
         `💶 Wer hat bezahlt?\n\n${choices}\n\nNummer eingeben:`
       );
 
-    if (answer === null) {
+    if (
+      answer === null
+    ) {
       return;
     }
 
     const index =
       Number(answer) - 1;
 
-    const payer = people[index];
+    const payer =
+      people[index];
 
     if (!payer) {
-      setMessage(
+      showMessage(
         "❌ Ungültiger Teilnehmer."
       );
       return;
     }
 
     /*
-     * Deine payments-Tabelle besitzt:
+     * Deine Tabelle besitzt:
      *
-     * id
-     * event_id
      * betrag
-     * created_at
      * bezahlt_von
      * profile_id
      * status
-     *
-     * Deshalb wird NICHT "amount" verwendet.
      */
-    const { error } = await supabase
+
+    const {
+      error,
+    } = await supabase
       .from("payments")
       .insert({
-        event_id: eventId,
-        betrag: amount,
-        bezahlt_von: payer.id,
-        profile_id: payer.id,
-        status: "paid",
+        event_id:
+          eventId,
+
+        betrag:
+          amount,
+
+        bezahlt_von:
+          payer.id,
+
+        profile_id:
+          payer.id,
+
+        status:
+          "paid",
       });
 
     if (error) {
-      setMessage(
+      showMessage(
         "❌ Zahlung konnte nicht gespeichert werden: " +
           error.message
       );
@@ -737,18 +1203,16 @@ export default function Home() {
 
     setPaymentAmount("");
 
-    setAnimation("money");
-
-    window.setTimeout(() => {
-      setAnimation(null);
-    }, 2500);
-
     await loadPayments();
 
-    setMessage(
+    showAnimation(
+      "money"
+    );
+
+    showMessage(
       `💶 ${payer.name} hat ${amount.toFixed(
         2
-      )} € bezahlt!`
+      )} € bezahlt.`
     );
   }
 
@@ -759,21 +1223,18 @@ export default function Home() {
    */
 
   async function loadPointHistory(
-    profileId?: string
+    profileId: string
   ) {
-    const id =
-      profileId ||
-      selectedPerson?.id;
-
-    if (!id) return;
-
     const {
       data,
       error,
     } = await supabase
       .from("point_history")
       .select("*")
-      .eq("profile_id", id)
+      .eq(
+        "profile_id",
+        profileId
+      )
       .order("created_at", {
         ascending: false,
       });
@@ -783,253 +1244,12 @@ export default function Home() {
         "Punkte-Historie:",
         error.message
       );
+      setPointHistory([]);
       return;
     }
 
-    if (data) {
-      setPointHistory(data);
-    }
-  }
-
-  /*
-   * =========================================================
-   * BIER-SYSTEM
-   * =========================================================
-   */
-
-  async function loadBeerRequests() {
-    if (!eventId) return;
-
-    const {
-      data,
-      error,
-    } = await supabase
-      .from("beer_requests")
-      .select("*")
-      .eq("event_id", eventId)
-      .order("created_at", {
-        ascending: false,
-      });
-
-    if (error) {
-      console.log(
-        "Beer requests:",
-        error.message
-      );
-      return;
-    }
-
-    if (!data) {
-      setBeerRequests([]);
-      return;
-    }
-
-    const ids = data.map(
-      (request: any) =>
-        request.requester_profile_id
-    );
-
-    let names: Record<
-      string,
-      string
-    > = {};
-
-    if (ids.length > 0) {
-      const {
-        data: profiles,
-      } = await supabase
-        .from("profiles")
-        .select(
-          "id,username,name"
-        )
-        .in("id", ids);
-
-      profiles?.forEach(
-        (profile: any) => {
-          names[profile.id] =
-            profile.username ||
-            profile.name ||
-            "Teilnehmer";
-        }
-      );
-    }
-
-    setBeerRequests(
-      data.map((request: any) => ({
-        ...request,
-        requester_name:
-          names[
-            request.requester_profile_id
-          ] ||
-          "Teilnehmer",
-      }))
-    );
-
-    const requestIds =
-      data.map(
-        (request: any) =>
-          request.id
-      );
-
-    if (requestIds.length > 0) {
-      const {
-        data: responses,
-      } = await supabase
-        .from(
-          "beer_request_responses"
-        )
-        .select("*")
-        .in(
-          "request_id",
-          requestIds
-        );
-
-      if (responses) {
-        setBeerResponses(
-          responses
-        );
-      }
-    }
-  }
-
-  async function requestBeer() {
-    if (!eventId) {
-      setMessage(
-        "❌ Bitte zuerst ein Event auswählen."
-      );
-      return;
-    }
-
-    if (people.length < 2) {
-      setMessage(
-        "🍺 Es müssen mindestens zwei Teilnehmer im Event sein."
-      );
-      return;
-    }
-
-    const requester =
-      people[0];
-
-    const { error } =
-      await supabase.rpc(
-        "create_beer_request",
-        {
-          input_event_id:
-            eventId,
-
-          input_requester_profile_id:
-            requester.id,
-
-          input_message:
-            `${requester.name} möchte ein Bier mit dir trinken 🍻`,
-        }
-      );
-
-    if (error) {
-      setMessage(
-        "❌ Bier-Anfrage konnte nicht erstellt werden: " +
-          error.message
-      );
-      return;
-    }
-
-    setAnimation("beer");
-
-    window.setTimeout(() => {
-      setAnimation(null);
-    }, 2200);
-
-    await loadBeerRequests();
-
-    setMessage(
-      `🍻 ${requester.name} möchte ein Bier mit dir trinken!`
-    );
-  }
-
-  async function respondBeer(
-    requestId: string,
-    response:
-      | "accepted"
-      | "declined",
-    personId: string
-  ) {
-    const { error } =
-      await supabase.rpc(
-        "respond_to_beer_request",
-        {
-          input_request_id:
-            requestId,
-
-          input_profile_id:
-            personId,
-
-          input_response:
-            response,
-        }
-      );
-
-    if (error) {
-      setMessage(
-        "❌ Antwort konnte nicht gespeichert werden: " +
-          error.message
-      );
-      return;
-    }
-
-    if (
-      response ===
-      "accepted"
-    ) {
-      const person =
-        people.find(
-          (item) =>
-            item.id ===
-            personId
-        );
-
-      if (person) {
-        await supabase
-          .from("profiles")
-          .update({
-            points:
-              person.points + 10,
-          })
-          .eq(
-            "id",
-            person.id
-          );
-
-        await supabase
-          .from("point_history")
-          .insert({
-            profile_id:
-              person.id,
-
-            points: 10,
-
-            reason:
-              "Bier-Runde",
-
-            description:
-              "Bier-Anfrage angenommen 🍻",
-          });
-      }
-
-      setAnimation("prost");
-
-      window.setTimeout(() => {
-        setAnimation(null);
-      }, 2200);
-    }
-
-    await loadBeerRequests();
-    await loadPeople();
-
-    setMessage(
-      response ===
-        "accepted"
-        ? "🍻 Bier angenommen! +10 Punkte"
-        : "❌ Bier abgelehnt."
+    setPointHistory(
+      data || []
     );
   }
 
@@ -1042,15 +1262,19 @@ export default function Home() {
   async function sponsorCrate(
     person: Person
   ) {
-    if (!eventId) return;
+    if (!eventId) {
+      return;
+    }
 
     const input =
       window.prompt(
-        "🍺 Wie viele Kisten möchtest du spendieren?",
+        `🍺 ${person.name}\n\nWie viele Kisten Bier möchtest du spendieren?`,
         "1"
       );
 
-    if (input === null) {
+    if (
+      input === null
+    ) {
       return;
     }
 
@@ -1063,8 +1287,8 @@ export default function Home() {
       ) ||
       crates < 1
     ) {
-      setMessage(
-        "❌ Bitte eine gültige Anzahl eingeben."
+      showMessage(
+        "❌ Ungültige Anzahl."
       );
       return;
     }
@@ -1072,36 +1296,6 @@ export default function Home() {
     const points =
       crates * 50;
 
-    /*
-     * Falls dein RPC vorhanden ist,
-     * wird er aufgerufen.
-     */
-    const {
-      error: rpcError,
-    } = await supabase.rpc(
-      "sponsor_beer_crate",
-      {
-        input_event_id:
-          eventId,
-
-        input_profile_id:
-          person.id,
-
-        input_crates:
-          crates,
-      }
-    );
-
-    if (rpcError) {
-      console.log(
-        "sponsor_beer_crate:",
-        rpcError.message
-      );
-    }
-
-    /*
-     * Punkte direkt in profiles.
-     */
     const {
       error,
     } = await supabase
@@ -1117,7 +1311,7 @@ export default function Home() {
       );
 
     if (error) {
-      setMessage(
+      showMessage(
         "❌ Kiste konnte nicht gespeichert werden: " +
           error.message
       );
@@ -1136,22 +1330,706 @@ export default function Home() {
           "Kiste Bier",
 
         description:
-          `${crates} Kiste${
+          `🍺 ${crates} Kiste${
             crates === 1
               ? ""
               : "n"
-          } Bier spendiert 🍺`,
+          } Bier spendiert`,
       });
 
+    await loadProfiles();
     await loadPeople();
 
-    setMessage(
+    showAnimation(
+      "crate"
+    );
+
+    showMessage(
       `🍺 ${person.name} spendiert ${crates} Kiste${
         crates === 1
           ? ""
           : "n"
-      }! +${points} Punkte`
+      } Bier · +${points} Punkte`
     );
+  }
+
+  /*
+   * =========================================================
+   * CHALLENGES
+   * =========================================================
+   */
+
+  async function loadChallengeData() {
+    const {
+      data: categories,
+    } = await supabase
+      .from(
+        "challenge_categories"
+      )
+      .select(
+        "id,name,emoji,description"
+      )
+      .order(
+        "name",
+        {
+          ascending: true,
+        }
+      );
+
+    setChallengeCategories(
+      categories || []
+    );
+
+    const {
+      data: templates,
+    } = await supabase
+      .from(
+        "challenge_templates"
+      )
+      .select(
+        "id,title,description,category,default_points,requires_vote,minimum_votes,is_active"
+      )
+      .eq(
+        "is_active",
+        true
+      )
+      .order(
+        "created_at",
+        {
+          ascending: false,
+        }
+      );
+
+    setChallengeTemplates(
+      templates || []
+    );
+
+    await loadChallenges();
+  }
+
+  async function loadChallenges() {
+    if (!eventId) {
+      setChallenges([]);
+      return;
+    }
+
+    const {
+      data,
+      error,
+    } = await supabase
+      .from("challenges")
+      .select("*")
+      .eq(
+        "event_id",
+        eventId
+      )
+      .order(
+        "created_at",
+        {
+          ascending: false,
+        }
+      );
+
+    if (error) {
+      console.log(
+        "Challenges:",
+        error.message
+      );
+      return;
+    }
+
+    setChallenges(
+      data || []
+    );
+  }
+
+  async function createChallenge(
+    template?: ChallengeTemplate
+  ) {
+    if (!eventId) {
+      showMessage(
+        "❌ Bitte zuerst ein Event auswählen."
+      );
+      return;
+    }
+
+    let title =
+      template?.title ||
+      window.prompt(
+        "🎯 Name der Challenge:"
+      );
+
+    if (!title?.trim()) {
+      return;
+    }
+
+    let description =
+      template?.description ||
+      window.prompt(
+        "Beschreibung:"
+      ) ||
+      "";
+
+    let points =
+      Number(
+        template?.default_points ||
+          10
+      );
+
+    if (!template) {
+      const pointInput =
+        window.prompt(
+          "🏆 Punkte:",
+          "10"
+        );
+
+      if (
+        pointInput !==
+        null
+      ) {
+        points =
+          Number(
+            pointInput
+          ) || 10;
+      }
+    }
+
+    let category =
+      template?.category ||
+      "Quatsch";
+
+    if (
+      challengeCategories.length >
+      0
+    ) {
+      const categoryText =
+        challengeCategories
+          .map(
+            (
+              item,
+              index
+            ) =>
+              `${index + 1}. ${
+                item.emoji || ""
+              } ${
+                item.name
+              }`
+          )
+          .join("\n");
+
+      const selected =
+        window.prompt(
+          `Kategorie auswählen:\n\n${categoryText}`,
+          "1"
+        );
+
+      if (
+        selected !==
+        null
+      ) {
+        const categoryIndex =
+          Number(
+            selected
+          ) - 1;
+
+        if (
+          challengeCategories[
+            categoryIndex
+          ]
+        ) {
+          category =
+            challengeCategories[
+              categoryIndex
+            ].name;
+        }
+      }
+    }
+
+    const {
+      data,
+      error,
+    } = await supabase
+      .from("challenges")
+      .insert({
+        event_id:
+          eventId,
+
+        title:
+          title.trim(),
+
+        description:
+          description.trim(),
+
+        points,
+
+        category,
+
+        status:
+          "open",
+
+        required_votes:
+          template?.minimum_votes ||
+          1,
+
+        is_active:
+          true,
+      })
+      .select("*")
+      .single();
+
+    if (error) {
+      showMessage(
+        "❌ Challenge konnte nicht erstellt werden: " +
+          error.message
+      );
+      return;
+    }
+
+    if (data) {
+      setChallenges(
+        (current) => [
+          data,
+          ...current,
+        ]
+      );
+
+      showAnimation(
+        "challenge"
+      );
+
+      showMessage(
+        "🎯 Challenge erstellt!"
+      );
+    }
+  }
+
+  async function assignChallenge(
+    challenge: Challenge,
+    person: Person
+  ) {
+    const {
+      error,
+    } = await supabase
+      .from("challenges")
+      .update({
+        assigned_profile_id:
+          person.id,
+
+        status:
+          "open",
+      })
+      .eq(
+        "id",
+        challenge.id
+      );
+
+    if (error) {
+      showMessage(
+        "❌ Challenge konnte nicht zugeordnet werden: " +
+          error.message
+      );
+      return;
+    }
+
+    await loadChallenges();
+
+    showMessage(
+      `🎯 Challenge an ${person.name} zugewiesen.`
+    );
+  }
+
+  async function completeChallenge(
+    challenge: Challenge,
+    person: Person
+  ) {
+    const points =
+      Number(
+        challenge.points ||
+          0
+      );
+
+    /*
+     * Challenge abschließen.
+     */
+
+    const {
+      error,
+    } = await supabase
+      .from("challenges")
+      .update({
+        status:
+          "completed",
+
+        winner_profile_id:
+          person.id,
+
+        completed_at:
+          new Date().toISOString(),
+
+        is_active:
+          false,
+      })
+      .eq(
+        "id",
+        challenge.id
+      );
+
+    if (error) {
+      showMessage(
+        "❌ Challenge konnte nicht abgeschlossen werden: " +
+          error.message
+      );
+      return;
+    }
+
+    /*
+     * Punkte vergeben.
+     */
+
+    const currentPerson =
+      people.find(
+        (item) =>
+          item.id ===
+          person.id
+      );
+
+    const oldPoints =
+      currentPerson?.points ||
+      person.points ||
+      0;
+
+    await supabase
+      .from("profiles")
+      .update({
+        points:
+          oldPoints +
+          points,
+      })
+      .eq(
+        "id",
+        person.id
+      );
+
+    /*
+     * Ergebnis speichern.
+     */
+
+    await supabase
+      .from(
+        "challenge_results"
+      )
+      .insert({
+        challenge_id:
+          challenge.id,
+
+        profile_id:
+          person.id,
+
+        place: 1,
+
+        points,
+
+        result_type:
+          "winner",
+      });
+
+    /*
+     * Punkte-Historie.
+     */
+
+    await supabase
+      .from("point_history")
+      .insert({
+        profile_id:
+          person.id,
+
+        points,
+
+        reason:
+          "Challenge",
+
+        description:
+          `🎯 ${challenge.title}`,
+      });
+
+    await loadProfiles();
+    await loadPeople();
+    await loadChallenges();
+
+    showAnimation(
+      "challenge"
+    );
+
+    showMessage(
+      `🏆 ${person.name} gewinnt "${challenge.title}" · +${points} Punkte`
+    );
+  }
+
+  /*
+   * =========================================================
+   * BIER-ANFRAGEN
+   * =========================================================
+   */
+
+  async function loadBeerRequests() {
+    if (!eventId) {
+      setBeerRequests([]);
+      return;
+    }
+
+    const {
+      data,
+      error,
+    } = await supabase
+      .from("beer_requests")
+      .select("*")
+      .eq(
+        "event_id",
+        eventId
+      )
+      .order(
+        "created_at",
+        {
+          ascending: false,
+        }
+      );
+
+    if (error) {
+      console.log(
+        "Beer Requests:",
+        error.message
+      );
+      return;
+    }
+
+    if (!data) {
+      setBeerRequests([]);
+      return;
+    }
+
+    const ids =
+      data.map(
+        (item: any) =>
+          item.requester_profile_id
+      );
+
+    const names: Record<
+      string,
+      string
+    > = {};
+
+    if (ids.length) {
+      const {
+        data: requesterProfiles,
+      } = await supabase
+        .from("profiles")
+        .select(
+          "id,username,name"
+        )
+        .in(
+          "id",
+          ids
+        );
+
+      requesterProfiles?.forEach(
+        (profile: any) => {
+          names[profile.id] =
+            getPersonName(
+              profile
+            );
+        }
+      );
+    }
+
+    setBeerRequests(
+      data.map(
+        (item: any) => ({
+          ...item,
+
+          requester_name:
+            names[
+              item.requester_profile_id
+            ] ||
+            "Teilnehmer",
+        })
+      )
+    );
+
+    const requestIds =
+      data.map(
+        (item: any) =>
+          item.id
+      );
+
+    if (
+      requestIds.length
+    ) {
+      const {
+        data: responses,
+      } = await supabase
+        .from(
+          "beer_request_responses"
+        )
+        .select("*")
+        .in(
+          "request_id",
+          requestIds
+        );
+
+      setBeerResponses(
+        responses || []
+      );
+    }
+  }
+
+  async function requestBeer() {
+    if (!eventId) {
+      showMessage(
+        "❌ Bitte zuerst ein Event auswählen."
+      );
+      return;
+    }
+
+    if (
+      people.length <
+      2
+    ) {
+      showMessage(
+        "🍺 Mindestens zwei Teilnehmer werden benötigt."
+      );
+      return;
+    }
+
+    /*
+     * Der aktuelle Benutzer wird
+     * soweit möglich über das Profil
+     * bestimmt.
+     *
+     * Wenn nur ein Profil vorhanden ist,
+     * verwenden wir dieses.
+     */
+
+    const requester =
+      people[0];
+
+    const {
+      error,
+    } = await supabase.rpc(
+      "create_beer_request",
+      {
+        input_event_id:
+          eventId,
+
+        input_requester_profile_id:
+          requester.id,
+
+        input_message:
+          `${requester.name} möchte ein Bier mit dir trinken 🍻`,
+      }
+    );
+
+    if (error) {
+      showMessage(
+        "❌ Bier-Anfrage konnte nicht erstellt werden: " +
+          error.message
+      );
+      return;
+    }
+
+    await loadBeerRequests();
+
+    showAnimation(
+      "beer"
+    );
+
+    showMessage(
+      `🍻 ${requester.name} möchte ein Bier mit dir trinken!`
+    );
+  }
+
+  async function respondBeer(
+    request: BeerRequest,
+    person: Person,
+    response:
+      | "accepted"
+      | "declined"
+  ) {
+    const {
+      error,
+    } = await supabase.rpc(
+      "respond_to_beer_request",
+      {
+        input_request_id:
+          request.id,
+
+        input_profile_id:
+          person.id,
+
+        input_response:
+          response,
+      }
+    );
+
+    if (error) {
+      showMessage(
+        "❌ Antwort konnte nicht gespeichert werden: " +
+          error.message
+      );
+      return;
+    }
+
+    if (
+      response ===
+      "accepted"
+    ) {
+      const points = 10;
+
+      const newPoints =
+        person.points +
+        points;
+
+      await supabase
+        .from("profiles")
+        .update({
+          points:
+            newPoints,
+        })
+        .eq(
+          "id",
+          person.id
+        );
+
+      await supabase
+        .from("point_history")
+        .insert({
+          profile_id:
+            person.id,
+
+          points,
+
+          reason:
+            "Bier-Runde",
+
+          description:
+            "🍻 Bier-Anfrage angenommen",
+        });
+
+      showAnimation(
+        "prost"
+      );
+
+      showMessage(
+        `🍻 ${person.name} hat zugesagt · +10 Punkte`
+      );
+    } else {
+      showMessage(
+        `❌ ${person.name} hat abgelehnt.`
+      );
+    }
+
+    await loadBeerRequests();
+    await loadProfiles();
+    await loadPeople();
   }
 
   /*
@@ -1162,49 +2040,44 @@ export default function Home() {
 
   useEffect(() => {
     loadEvents();
+    loadProfiles();
+    loadChallengeData();
   }, []);
 
   useEffect(() => {
-    if (!eventId) return;
+    if (!eventId) {
+      return;
+    }
 
     loadDrinks();
-    loadPeople();
     loadPayments();
+    loadPeople();
+    loadChallenges();
     loadBeerRequests();
   }, [eventId]);
 
-  useEffect(() => {
-    if (selectedPerson) {
-      loadPointHistory(
-        selectedPerson.id
-      );
-    }
-  }, [selectedPerson]);
-
   /*
    * =========================================================
-   * STATISTIK
+   * BERECHNUNGEN
    * =========================================================
    */
-
-  const totalLiters =
-    drinks.reduce(
-      (sum, drink) =>
-        sum +
-        Number(
-          drink.liters ??
-            drink.menge ??
-            0
-        ),
-      0
-    );
 
   const totalDrinkCost =
     drinks.reduce(
       (sum, drink) =>
         sum +
-        Number(
-          drink.preis || 0
+        getDrinkPrice(
+          drink
+        ),
+      0
+    );
+
+  const totalLiters =
+    drinks.reduce(
+      (sum, drink) =>
+        sum +
+        getDrinkLiters(
+          drink
         ),
       0
     );
@@ -1214,15 +2087,66 @@ export default function Home() {
       (sum, payment) =>
         sum +
         Number(
-          payment.betrag || 0
+          payment.betrag ||
+            0
         ),
       0
     );
 
+  /*
+   * Gesamtkosten des Events.
+   *
+   * Wenn bereits Zahlungen höher sind,
+   * verwenden wir den höheren Wert,
+   * damit die offene Summe nicht negativ
+   * wird.
+   */
+
+  const eventTotal =
+    Math.max(
+      totalDrinkCost,
+      totalPayments
+    );
+
+  const amountPerPerson =
+    people.length > 0
+      ? eventTotal /
+        people.length
+      : 0;
+
+  const paidByPerson: Record<
+    string,
+    number
+  > = {};
+
+  payments.forEach(
+    (payment) => {
+      const profileId =
+        payment.bezahlt_von ||
+        payment.profile_id;
+
+      if (!profileId) {
+        return;
+      }
+
+      paidByPerson[
+        profileId
+      ] =
+        (paidByPerson[
+          profileId
+        ] || 0) +
+        Number(
+          payment.betrag ||
+            0
+        );
+    }
+  );
+
   const totalPoints =
     people.reduce(
       (sum, person) =>
-        sum + person.points,
+        sum +
+        person.points,
       0
     );
 
@@ -1238,6 +2162,21 @@ export default function Home() {
     );
 
   /*
+   * Getränkeverlauf:
+   *
+   * Wir verwenden point_history,
+   * weil dort jeder getrunkene Drink
+   * mit Zeitstempel gespeichert wird.
+   */
+
+  const drinkHistory =
+    pointHistory.filter(
+      (entry) =>
+        entry.reason ===
+        "Getränk"
+    );
+
+  /*
    * =========================================================
    * RENDER
    * =========================================================
@@ -1246,44 +2185,53 @@ export default function Home() {
   return (
     <main className="page">
 
+      {/* ===================================================
+          ANIMATION: PROST
+      =================================================== */}
+
       {animation ===
         "prost" && (
         <div className="animationOverlay">
+
           <div className="clinkingGlasses">
-            <span>🍺</span>
-            <span>🍺</span>
+            <span>
+              🍺
+            </span>
+
+            <span>
+              🍺
+            </span>
           </div>
 
-          <div className="prost">
+          <div className="prostText">
             PROST! 🍻
           </div>
+
         </div>
       )}
 
-      {animation ===
-        "beer" && (
-        <div className="animationOverlay">
-          <div className="giantBeer">
-            🍺
-          </div>
-
-          <div className="prost">
-            BIER? 🍻
-          </div>
-        </div>
-      )}
+      {/* ===================================================
+          ANIMATION: GELD
+      =================================================== */}
 
       {animation ===
         "money" && (
         <div className="moneyOverlay">
+
           {Array.from(
-            { length: 20 },
+            {
+              length: 28,
+            },
             (_, index) => (
               <span
-                key={index}
+                key={
+                  index
+                }
                 style={{
+                  left:
+                    `${Math.random() * 100}%`,
                   animationDelay:
-                    `${index * 0.08}s`,
+                    `${index * 0.06}s`,
                 }}
               >
                 {index % 2 ===
@@ -1293,12 +2241,91 @@ export default function Home() {
               </span>
             )
           )}
+
+          <div className="moneyText">
+            BEZAHLT! 💶
+          </div>
+
+        </div>
+      )}
+
+      {/* ===================================================
+          ANIMATION: KISTE
+      =================================================== */}
+
+      {animation ===
+        "crate" && (
+        <div className="animationOverlay">
+
+          <div className="crateAnimation">
+            🍺🍺🍺
+          </div>
+
+          <div className="crateText">
+            KISTE BIER!
+          </div>
+
+          <div className="crateSub">
+            SPENDIERT 🍻
+          </div>
+
+        </div>
+      )}
+
+      {/* ===================================================
+          ANIMATION: CHALLENGE
+      =================================================== */}
+
+      {animation ===
+        "challenge" && (
+        <div className="animationOverlay">
+
+          <div className="challengeAnimation">
+            🎯
+          </div>
+
+          <div className="challengeText">
+            CHALLENGE!
+          </div>
+
+          <div className="challengeSub">
+            🏆 PUNKTE!
+          </div>
+
+        </div>
+      )}
+
+      {/* ===================================================
+          ANIMATION: BIER
+      =================================================== */}
+
+      {animation ===
+        "beer" && (
+        <div className="animationOverlay">
+
+          <div className="beerAnimation">
+            🍺
+          </div>
+
+          <div className="beerText">
+            BIER?
+          </div>
+
+          <div className="beerSub">
+            Wer ist dabei? 🍻
+          </div>
+
         </div>
       )}
 
       <div className="container">
 
+        {/* =================================================
+            HEADER
+        ================================================= */}
+
         <header>
+
           <div className="logo">
             🍻
           </div>
@@ -1309,15 +2336,20 @@ export default function Home() {
             </h1>
 
             <p>
-              Events · Getränke ·
-              Punkte · Challenges
+              Events · Getränke · Punkte · Challenges
             </p>
           </div>
+
         </header>
+
+        {/* =================================================
+            EVENT
+        ================================================= */}
 
         <section className="card">
 
           <div className="sectionHeader">
+
             <h2>
               📅 Aktuelles Event
             </h2>
@@ -1330,6 +2362,7 @@ export default function Home() {
             >
               ➕ Neues Event
             </button>
+
           </div>
 
           <select
@@ -1340,6 +2373,7 @@ export default function Home() {
               )
             }
           >
+
             <option value="">
               Event auswählen
             </option>
@@ -1347,13 +2381,20 @@ export default function Home() {
             {events.map(
               (event) => (
                 <option
-                  key={event.id}
-                  value={event.id}
+                  key={
+                    event.id
+                  }
+                  value={
+                    event.id
+                  }
                 >
-                  {event.title}
+                  {
+                    event.title
+                  }
                 </option>
               )
             )}
+
           </select>
 
           {eventId && (
@@ -1369,15 +2410,23 @@ export default function Home() {
 
         </section>
 
+        {/* =================================================
+            STATISTIK
+        ================================================= */}
+
         <div className="stats">
 
           <div className="stat">
             <span>
               🍺
             </span>
+
             <b>
-              {drinks.length}
+              {
+                drinks.length
+              }
             </b>
+
             <small>
               Getränke
             </small>
@@ -1387,11 +2436,15 @@ export default function Home() {
             <span>
               💧
             </span>
+
             <b>
-              {totalLiters.toFixed(
-                1
-              )}
+              {
+                totalLiters.toFixed(
+                  1
+                )
+              }
             </b>
+
             <small>
               Liter
             </small>
@@ -1401,13 +2454,17 @@ export default function Home() {
             <span>
               💶
             </span>
+
             <b>
-              {totalDrinkCost.toFixed(
-                2
-              )} €
+              {
+                eventTotal.toFixed(
+                  2
+                )
+              } €
             </b>
+
             <small>
-              Getränke
+              Eventwert
             </small>
           </div>
 
@@ -1415,9 +2472,13 @@ export default function Home() {
             <span>
               👥
             </span>
+
             <b>
-              {people.length}
+              {
+                people.length
+              }
             </b>
+
             <small>
               Teilnehmer
             </small>
@@ -1425,15 +2486,20 @@ export default function Home() {
 
         </div>
 
+        {/* =================================================
+            BIER BUTTON
+        ================================================= */}
+
         <section className="beerHero">
 
           <button
-            className="beerButton"
+            className="bigBeerButton"
             onClick={
               requestBeer
             }
           >
-            <span className="beerEmoji">
+
+            <span className="bigBeerEmoji">
               🍺
             </span>
 
@@ -1442,230 +2508,406 @@ export default function Home() {
             </strong>
 
             <small>
-              Wer trinkt ein Bier
-              mit mir?
+              Wer trinkt ein Bier mit mir?
             </small>
+
           </button>
 
         </section>
+
+        {/* =================================================
+            BIER ANFRAGEN
+        ================================================= */}
 
         {beerRequests.length >
           0 && (
           <section className="card">
 
-            <h2>
-              🔔 Bier-Anfragen
-            </h2>
-
-            {beerRequests.map(
-              (request) => {
-
-                const responses =
-                  beerResponses.filter(
-                    (response) =>
-                      response.request_id ===
-                      request.id
-                  );
-
-                return (
-                  <div
-                    className="beerRequest"
-                    key={
-                      request.id
-                    }
-                  >
-
-                    <strong>
-                      🍻{" "}
-                      {
-                        request.requester_name
-                      }
-                    </strong>
-
-                    <p>
-                      möchte ein Bier
-                      mit dir trinken.
-                    </p>
-
-                    {people
-                      .filter(
-                        (person) =>
-                          person.id !==
-                          request.requester_profile_id
-                      )
-                      .map(
-                        (person) => {
-
-                          const answer =
-                            responses.find(
-                              (item) =>
-                                item.profile_id ===
-                                person.id
-                            );
-
-                          return (
-                            <div
-                              className="response"
-                              key={
-                                person.id
-                              }
-                            >
-
-                              <span>
-                                {
-                                  person.name
-                                }
-                              </span>
-
-                              {answer ? (
-                                <b>
-                                  {answer.response ===
-                                  "accepted"
-                                    ? "✅ Zugesagt"
-                                    : "❌ Abgelehnt"}
-                                </b>
-                              ) : (
-                                <div className="responseButtons">
-
-                                  <button
-                                    className="accept"
-                                    onClick={() =>
-                                      respondBeer(
-                                        request.id,
-                                        "accepted",
-                                        person.id
-                                      )
-                                    }
-                                  >
-                                    ✅
-                                  </button>
-
-                                  <button
-                                    className="decline"
-                                    onClick={() =>
-                                      respondBeer(
-                                        request.id,
-                                        "declined",
-                                        person.id
-                                      )
-                                    }
-                                  >
-                                    ❌
-                                  </button>
-
-                                </div>
-                              )}
-
-                            </div>
-                          );
-                        }
-                      )}
-
-                  </div>
-                );
+            <button
+              className="collapseButton"
+              onClick={() =>
+                setShowBeerRequests(
+                  !showBeerRequests
+                )
               }
-            )}
+            >
+              <span>
+                🔔 Bier-Anfragen
+              </span>
+
+              <span>
+                {
+                  showBeerRequests
+                    ? "▲"
+                    : "▼"
+                }
+              </span>
+            </button>
+
+            {showBeerRequests &&
+              beerRequests.map(
+                (
+                  request
+                ) => {
+
+                  const responses =
+                    beerResponses.filter(
+                      (
+                        response
+                      ) =>
+                        response.request_id ===
+                        request.id
+                    );
+
+                  return (
+                    <div
+                      className="beerRequest"
+                      key={
+                        request.id
+                      }
+                    >
+
+                      <strong>
+                        🍻{" "}
+                        {
+                          request.requester_name
+                        }
+                      </strong>
+
+                      <p>
+                        möchte ein Bier mit dir trinken.
+                      </p>
+
+                      {people
+                        .filter(
+                          (
+                            person
+                          ) =>
+                            person.id !==
+                            request.requester_profile_id
+                        )
+                        .map(
+                          (
+                            person
+                          ) => {
+
+                            const answer =
+                              responses.find(
+                                (
+                                  item
+                                ) =>
+                                  item.profile_id ===
+                                  person.id
+                              );
+
+                            return (
+                              <div
+                                className="responseRow"
+                                key={
+                                  person.id
+                                }
+                              >
+
+                                <span>
+                                  {
+                                    person.name
+                                  }
+                                </span>
+
+                                {answer ? (
+                                  <b>
+                                    {answer.response ===
+                                    "accepted"
+                                      ? "✅ Zugesagt"
+                                      : "❌ Abgelehnt"}
+                                  </b>
+                                ) : (
+                                  <div className="responseButtons">
+
+                                    <button
+                                      className="accept"
+                                      onClick={() =>
+                                        respondBeer(
+                                          request,
+                                          person,
+                                          "accepted"
+                                        )
+                                      }
+                                    >
+                                      ✅
+                                    </button>
+
+                                    <button
+                                      className="decline"
+                                      onClick={() =>
+                                        respondBeer(
+                                          request,
+                                          person,
+                                          "declined"
+                                        )
+                                      }
+                                    >
+                                      ❌
+                                    </button>
+
+                                  </div>
+                                )}
+
+                              </div>
+                            );
+                          }
+                        )}
+
+                    </div>
+                  );
+                }
+              )}
 
           </section>
         )}
 
+        {/* =================================================
+            TEILNEHMER
+        ================================================= */}
+
         <section className="card">
 
-          <h2>
-            👥 Teilnehmer
-          </h2>
+          <button
+            className="collapseButton"
+            onClick={() =>
+              setShowPeople(
+                !showPeople
+              )
+            }
+          >
 
-          <div className="row">
+            <span>
+              👥 Teilnehmer
+            </span>
 
-            <input
-              placeholder="Name"
-              value={
-                personName
+            <span>
+              {
+                showPeople
+                  ? "▲"
+                  : "▼"
               }
-              onChange={(event) =>
-                setPersonName(
-                  event.target.value
-                )
-              }
-            />
+            </span>
 
-            <button
-              className="goldButton"
-              onClick={
-                addPerson
-              }
-            >
-              ➕ Hinzufügen
-            </button>
+          </button>
 
-          </div>
+          {showPeople && (
+            <>
+              <div className="row">
 
-          {people.map(
-            (person) => (
-              <div
-                className="person"
-                key={person.id}
-              >
+                <input
+                  placeholder="Name"
+                  value={
+                    personName
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    setPersonName(
+                      event.target.value
+                    )
+                  }
+                />
 
-                <div>
-                  <strong>
-                    👤{" "}
-                    {person.name}
-                  </strong>
-
-                  <small>
-                    🍺{" "}
-                    {person.drinks}
-                    {" · "}
-                    💧{" "}
-                    {person.liters.toFixed(
-                      1
-                    )} L
-                    {" · "}
-                    🏆{" "}
-                    {person.points}
-                    {" · "}
-                    🍺{" "}
-                    {person.promille.toFixed(
-                      2
-                    )} ‰
-                  </small>
-                </div>
-
-                <div className="personButtons">
-
-                  <button
-                    className="crate"
-                    onClick={() =>
-                      sponsorCrate(
-                        person
-                      )
-                    }
-                  >
-                    🍺 Kiste
-                  </button>
-
-                  <button
-                    className="darkButton"
-                    onClick={() => {
-                      setSelectedPerson(
-                        person
-                      );
-                      loadPointHistory(
-                        person.id
-                      );
-                    }}
-                  >
-                    🏆
-                  </button>
-
-                </div>
+                <button
+                  className="goldButton"
+                  onClick={
+                    addPerson
+                  }
+                >
+                  ➕ Hinzufügen
+                </button>
 
               </div>
-            )
+
+              {people.map(
+                (
+                  person
+                ) => {
+
+                  const paid =
+                    paidByPerson[
+                      person.id
+                    ] || 0;
+
+                  const open =
+                    Math.max(
+                      0,
+                      amountPerPerson -
+                        paid
+                    );
+
+                  return (
+                    <div
+                      className="personCard"
+                      key={
+                        person.id
+                      }
+                    >
+
+                      <div className="personTop">
+
+                        <div>
+
+                          <strong>
+                            👤{" "}
+                            {
+                              person.name
+                            }
+                          </strong>
+
+                          <small>
+                            🍺{" "}
+                            {
+                              person.drinks
+                            }
+                            {" · "}
+                            💧{" "}
+                            {
+                              person.liters.toFixed(
+                                1
+                              )
+                            } L
+                            {" · "}
+                            🏆{" "}
+                            {
+                              person.points
+                            }
+                          </small>
+
+                        </div>
+
+                        <button
+                          className="rankMiniButton"
+                          onClick={() => {
+                            setSelectedPerson(
+                              person
+                            );
+
+                            loadPointHistory(
+                              person.id
+                            );
+                          }}
+                        >
+                          🏆
+                        </button>
+
+                      </div>
+
+                      <div className="personStats">
+
+                        <div>
+                          <span>
+                            💶 Anteil
+                          </span>
+
+                          <b>
+                            {
+                              amountPerPerson.toFixed(
+                                2
+                              )
+                            } €
+                          </b>
+                        </div>
+
+                        <div>
+                          <span>
+                            💳 Bezahlt
+                          </span>
+
+                          <b className="green">
+                            {
+                              paid.toFixed(
+                                2
+                              )
+                            } €
+                          </b>
+                        </div>
+
+                        <div>
+                          <span>
+                            ⚠️ Offen
+                          </span>
+
+                          <b
+                            className={
+                              open >
+                              0
+                                ? "red"
+                                : "green"
+                            }
+                          >
+                            {
+                              open.toFixed(
+                                2
+                              )
+                            } €
+                          </b>
+                        </div>
+
+                        <div>
+                          <span>
+                            🍺 Promille
+                          </span>
+
+                          <b>
+                            {
+                              Number(
+                                person.promille ||
+                                  0
+                              ).toFixed(
+                                2
+                              )
+                            } ‰
+                          </b>
+                        </div>
+
+                      </div>
+
+                      <div className="personActions">
+
+                        <button
+                          className="crateButton"
+                          onClick={() =>
+                            sponsorCrate(
+                              person
+                            )
+                          }
+                        >
+                          🍺 Kiste Bier spendieren
+                        </button>
+
+                      </div>
+
+                    </div>
+                  );
+                }
+              )}
+
+              {people.length >
+                0 && (
+                <button
+                  className="outlineButton"
+                  onClick={
+                    recalculateAllPromille
+                  }
+                >
+                  🍺 Promille neu berechnen
+                </button>
+              )}
+
+            </>
           )}
 
         </section>
+
+        {/* =================================================
+            GETRÄNK HINZUFÜGEN
+        ================================================= */}
 
         <section className="card">
 
@@ -1678,7 +2920,9 @@ export default function Home() {
             value={
               drinkName
             }
-            onChange={(event) =>
+            onChange={(
+              event
+            ) =>
               setDrinkName(
                 event.target.value
               )
@@ -1689,8 +2933,12 @@ export default function Home() {
 
             <input
               type="number"
-              value={liters}
-              onChange={(event) =>
+              value={
+                liters
+              }
+              onChange={(
+                event
+              ) =>
                 setLiters(
                   event.target.value
                 )
@@ -1700,8 +2948,12 @@ export default function Home() {
 
             <input
               type="number"
-              value={alcohol}
-              onChange={(event) =>
+              value={
+                alcohol
+              }
+              onChange={(
+                event
+              ) =>
                 setAlcohol(
                   event.target.value
                 )
@@ -1711,8 +2963,12 @@ export default function Home() {
 
             <input
               type="number"
-              value={price}
-              onChange={(event) =>
+              value={
+                price
+              }
+              onChange={(
+                event
+              ) =>
                 setPrice(
                   event.target.value
                 )
@@ -1733,6 +2989,10 @@ export default function Home() {
 
         </section>
 
+        {/* =================================================
+            GETRÄNKE ZUORDNEN
+        ================================================= */}
+
         <section className="card">
 
           <h2>
@@ -1742,12 +3002,13 @@ export default function Home() {
           {people.length ===
           0 ? (
             <p>
-              👥 Zuerst Teilnehmer
-              hinzufügen.
+              👥 Zuerst Teilnehmer hinzufügen.
             </p>
           ) : (
             people.map(
-              (person) => (
+              (
+                person
+              ) => (
                 <div
                   className="assignment"
                   key={
@@ -1763,16 +3024,22 @@ export default function Home() {
 
                   <select
                     defaultValue=""
-                    onChange={(event) => {
+                    onChange={(
+                      event
+                    ) => {
 
                       const drink =
                         drinks.find(
-                          (item) =>
+                          (
+                            item
+                          ) =>
                             item.id ===
                             event.target.value
                         );
 
-                      if (drink) {
+                      if (
+                        drink
+                      ) {
                         assignDrink(
                           person,
                           drink
@@ -1789,7 +3056,9 @@ export default function Home() {
                     </option>
 
                     {drinks.map(
-                      (drink) => (
+                      (
+                        drink
+                      ) => (
                         <option
                           key={
                             drink.id
@@ -1799,18 +3068,25 @@ export default function Home() {
                           }
                         >
                           {
-                            drink.getraenk ||
-                            drink.drink_name ||
-                            "Getränk"
+                            getDrinkName(
+                              drink
+                            )
                           }
                           {" · "}
-                          {Number(
-                            drink.preis ||
-                              0
-                          ).toFixed(
-                            2
-                          )}
-                          €
+                          {
+                            getDrinkLiters(
+                              drink
+                            ).toFixed(
+                              1
+                            )
+                          } L ·{" "}
+                          {
+                            getDrinkPrice(
+                              drink
+                            ).toFixed(
+                              2
+                            )
+                          } €
                         </option>
                       )
                     )}
@@ -1824,162 +3100,799 @@ export default function Home() {
 
         </section>
 
-        <section className="card">
-
-          <h2>
-            🍺 Getränke
-          </h2>
-
-          {drinks.map(
-            (drink) => (
-              <div
-                className="item"
-                key={
-                  drink.id
-                }
-              >
-
-                <div>
-                  <strong>
-                    🍺{" "}
-                    {
-                      drink.getraenk ||
-                      drink.drink_name ||
-                      "Getränk"
-                    }
-                  </strong>
-
-                  <small>
-                    {Number(
-                      drink.liters ??
-                        drink.menge ??
-                        0
-                    ).toFixed(
-                      1
-                    )}{" "}
-                    Liter ·{" "}
-                    {Number(
-                      drink.alcohol_percent ??
-                        drink.alkohol ??
-                        0
-                    ).toFixed(
-                      1
-                    )} %
-                  </small>
-                </div>
-
-                <b>
-                  {Number(
-                    drink.preis ||
-                      0
-                  ).toFixed(
-                    2
-                  )} €
-                </b>
-
-              </div>
-            )
-          )}
-
-        </section>
+        {/* =================================================
+            GETRÄNKE
+        ================================================= */}
 
         <section className="card">
-
-          <h2>
-            💶 Zahlungen
-          </h2>
-
-          <input
-            type="number"
-            step="0.01"
-            placeholder="Betrag €"
-            value={
-              paymentAmount
-            }
-            onChange={(event) =>
-              setPaymentAmount(
-                event.target.value
-              )
-            }
-          />
-
-          <input
-            placeholder="Wofür?"
-            value={
-              paymentDescription
-            }
-            onChange={(event) =>
-              setPaymentDescription(
-                event.target.value
-              )
-            }
-          />
 
           <button
-            className="saveButton"
-            onClick={
-              savePayment
+            className="collapseButton"
+            onClick={() =>
+              setShowDrinks(
+                !showDrinks
+              )
             }
           >
-            💶 Zahlung speichern
-          </button>
-
-          <div className="paymentTotal">
 
             <span>
-              💰 Gesamt bezahlt
+              🍺 Getränke
             </span>
 
-            <strong>
-              {totalPayments.toFixed(
-                2
-              )} €
-            </strong>
+            <span>
+              {
+                showDrinks
+                  ? "▲"
+                  : "▼"
+              }
+            </span>
 
-          </div>
+          </button>
 
-          {payments.map(
-            (payment) => (
-              <div
-                className="item"
-                key={
-                  payment.id
-                }
-              >
+          {showDrinks &&
+            drinks.map(
+              (
+                drink
+              ) => (
+                <div
+                  className="item"
+                  key={
+                    drink.id
+                  }
+                >
 
-                <div>
+                  <div>
 
-                  <strong>
-                    💶{" "}
+                    <strong>
+                      🍺{" "}
+                      {
+                        getDrinkName(
+                          drink
+                        )
+                      }
+                    </strong>
+
+                    <small>
+                      {
+                        getDrinkLiters(
+                          drink
+                        ).toFixed(
+                          1
+                        )
+                      } Liter ·{" "}
+                      {
+                        getDrinkAlcohol(
+                          drink
+                        ).toFixed(
+                          1
+                        )
+                      } %
+                    </small>
+
+                  </div>
+
+                  <b>
                     {
-                      payment.person_name
-                    }
-                  </strong>
-
-                  <small>
-                    {payment.status ===
-                    "paid"
-                      ? "Bezahlt"
-                      : payment.status ||
-                        "Zahlung"}
-                  </small>
+                      getDrinkPrice(
+                        drink
+                      ).toFixed(
+                        2
+                      )
+                    } €
+                  </b>
 
                 </div>
+              )
+            )}
 
-                <b>
-                  {Number(
-                    payment.betrag ||
-                      0
-                  ).toFixed(
-                    2
-                  )} €
-                </b>
+        </section>
 
-              </div>
-            )
+        {/* =================================================
+            GETRÄNKEVERLAUF
+        ================================================= */}
+
+        <section className="card">
+
+          <button
+            className="collapseButton"
+            onClick={() =>
+              setShowDrinkHistory(
+                !showDrinkHistory
+              )
+            }
+          >
+
+            <span>
+              🕒 Getränkeverlauf
+            </span>
+
+            <span>
+              {
+                showDrinkHistory
+                  ? "▲"
+                  : "▼"
+              }
+            </span>
+
+          </button>
+
+          {showDrinkHistory && (
+            <>
+
+              {drinkHistory.length ===
+              0 ? (
+                <p>
+                  Noch kein Getränk getrunken.
+                </p>
+              ) : (
+                drinkHistory.map(
+                  (
+                    entry,
+                    index
+                  ) => {
+
+                    const person =
+                      people.find(
+                        (
+                          item
+                        ) =>
+                          item.id ===
+                          entry.profile_id
+                      );
+
+                    return (
+                      <div
+                        className="historyItem"
+                        key={
+                          entry.id ||
+                          index
+                        }
+                      >
+
+                        <div>
+
+                          <strong>
+                            🍺{" "}
+                            {
+                              person?.name ||
+                              "Teilnehmer"
+                            }
+                          </strong>
+
+                          <small>
+                            {
+                              entry.description
+                            }
+                          </small>
+
+                        </div>
+
+                        <div className="historyTime">
+                          {entry.created_at
+                            ? new Date(
+                                entry.created_at
+                              ).toLocaleTimeString(
+                                "de-DE",
+                                {
+                                  hour:
+                                    "2-digit",
+                                  minute:
+                                    "2-digit",
+                                }
+                              )
+                            : ""}
+                        </div>
+
+                      </div>
+                    );
+                  }
+                )
+              )}
+
+            </>
           )}
 
         </section>
+
+        {/* =================================================
+            ZAHLUNGEN
+        ================================================= */}
+
+        <section className="card">
+
+          <button
+            className="collapseButton"
+            onClick={() =>
+              setShowPayments(
+                !showPayments
+              )
+            }
+          >
+
+            <span>
+              💶 Zahlungen & Kosten
+            </span>
+
+            <span>
+              {
+                showPayments
+                  ? "▲"
+                  : "▼"
+              }
+            </span>
+
+          </button>
+
+          {showPayments && (
+            <>
+
+              <div className="paymentOverview">
+
+                <div>
+                  <span>
+                    💰 Gesamtkosten
+                  </span>
+
+                  <strong>
+                    {
+                      eventTotal.toFixed(
+                        2
+                      )
+                    } €
+                  </strong>
+                </div>
+
+                <div>
+                  <span>
+                    💳 Bezahlt
+                  </span>
+
+                  <strong className="green">
+                    {
+                      totalPayments.toFixed(
+                        2
+                      )
+                    } €
+                  </strong>
+                </div>
+
+                <div>
+                  <span>
+                    ⚠️ Noch offen
+                  </span>
+
+                  <strong className="red">
+                    {
+                      Math.max(
+                        0,
+                        eventTotal -
+                          totalPayments
+                      ).toFixed(
+                        2
+                      )
+                    } €
+                  </strong>
+                </div>
+
+                <div>
+                  <span>
+                    👥 Pro Person
+                  </span>
+
+                  <strong>
+                    {
+                      amountPerPerson.toFixed(
+                        2
+                      )
+                    } €
+                  </strong>
+                </div>
+
+              </div>
+
+              <input
+                type="number"
+                step="0.01"
+                placeholder="Betrag €"
+                value={
+                  paymentAmount
+                }
+                onChange={(
+                  event
+                ) =>
+                  setPaymentAmount(
+                    event.target.value
+                  )
+                }
+              />
+
+              <input
+                placeholder="Wofür?"
+                value={
+                  paymentDescription
+                }
+                onChange={(
+                  event
+                ) =>
+                  setPaymentDescription(
+                    event.target.value
+                  )
+                }
+              />
+
+              <button
+                className="saveButton"
+                onClick={
+                  savePayment
+                }
+              >
+                💶 Zahlung speichern
+              </button>
+
+              <h3>
+                👥 Wer hat bezahlt?
+              </h3>
+
+              {payments.length ===
+              0 ? (
+                <p>
+                  Noch keine Zahlungen.
+                </p>
+              ) : (
+                payments.map(
+                  (
+                    payment
+                  ) => (
+                    <div
+                      className="paymentRow"
+                      key={
+                        payment.id
+                      }
+                    >
+
+                      <div>
+
+                        <strong>
+                          💶{" "}
+                          {
+                            payment.person_name
+                          }
+                        </strong>
+
+                        <small>
+                          {
+                            payment.created_at
+                              ? new Date(
+                                  payment.created_at
+                                ).toLocaleString(
+                                  "de-DE"
+                                )
+                              : "Datum unbekannt"
+                          }
+                        </small>
+
+                      </div>
+
+                      <b className="green">
+                        +
+                        {
+                          Number(
+                            payment.betrag ||
+                              0
+                          ).toFixed(
+                            2
+                          )
+                        } €
+                      </b>
+
+                    </div>
+                  )
+                )
+              )}
+
+              <h3>
+                ⚠️ Wer muss noch bezahlen?
+              </h3>
+
+              {people.map(
+                (
+                  person
+                ) => {
+
+                  const paid =
+                    paidByPerson[
+                      person.id
+                    ] || 0;
+
+                  const open =
+                    Math.max(
+                      0,
+                      amountPerPerson -
+                        paid
+                    );
+
+                  return (
+                    <div
+                      className="paymentPerson"
+                      key={
+                        person.id
+                      }
+                    >
+
+                      <div>
+
+                        <strong>
+                          {
+                            person.name
+                          }
+                        </strong>
+
+                        <small>
+                          Anteil:{" "}
+                          {
+                            amountPerPerson.toFixed(
+                              2
+                            )
+                          } € · Bezahlt:{" "}
+                          {
+                            paid.toFixed(
+                              2
+                            )
+                          } €
+                        </small>
+
+                      </div>
+
+                      <b
+                        className={
+                          open >
+                          0
+                            ? "red"
+                            : "green"
+                        }
+                      >
+                        {open >
+                        0
+                          ? `${open.toFixed(
+                              2
+                            )} € offen`
+                          : "✅ Bezahlt"}
+                      </b>
+
+                    </div>
+                  );
+                }
+              )}
+
+            </>
+          )}
+
+        </section>
+
+        {/* =================================================
+            CHALLENGES
+        ================================================= */}
+
+        <section className="card">
+
+          <button
+            className="collapseButton"
+            onClick={() =>
+              setShowChallenges(
+                !showChallenges
+              )
+            }
+          >
+
+            <span>
+              🎯 Challenges
+            </span>
+
+            <span>
+              {
+                showChallenges
+                  ? "▲"
+                  : "▼"
+              }
+            </span>
+
+          </button>
+
+          {showChallenges && (
+            <>
+
+              <div className="challengeCreate">
+
+                <button
+                  className="challengeMainButton"
+                  onClick={() =>
+                    createChallenge()
+                  }
+                >
+                  🎯 Eigene Challenge erstellen
+                </button>
+
+              </div>
+
+              <h3>
+                ⚡ Vorlagen
+              </h3>
+
+              <div className="templateGrid">
+
+                {challengeTemplates
+                  .filter(
+                    (
+                      template
+                    ) =>
+                      !selectedCategory ||
+                      template.category ===
+                        selectedCategory
+                  )
+                  .slice(
+                    0,
+                    12
+                  )
+                  .map(
+                    (
+                      template
+                    ) => (
+                      <button
+                        className="templateCard"
+                        key={
+                          template.id
+                        }
+                        onClick={() =>
+                          createChallenge(
+                            template
+                          )
+                        }
+                      >
+
+                        <strong>
+                          🎯{" "}
+                          {
+                            template.title
+                          }
+                        </strong>
+
+                        <small>
+                          {
+                            template.description
+                          }
+                        </small>
+
+                        <b>
+                          +{
+                            template.default_points ||
+                            10
+                          } Punkte
+                        </b>
+
+                      </button>
+                    )
+                  )}
+
+              </div>
+
+              <h3>
+                🏷️ Kategorien
+              </h3>
+
+              <div className="categoryScroll">
+
+                <button
+                  className={
+                    selectedCategory ===
+                    ""
+                      ? "category active"
+                      : "category"
+                  }
+                  onClick={() =>
+                    setSelectedCategory(
+                      ""
+                    )
+                  }
+                >
+                  🎯 Alle
+                </button>
+
+                {challengeCategories.map(
+                  (
+                    category
+                  ) => (
+                    <button
+                      className={
+                        selectedCategory ===
+                        category.name
+                          ? "category active"
+                          : "category"
+                      }
+                      key={
+                        category.id
+                      }
+                      onClick={() =>
+                        setSelectedCategory(
+                          category.name
+                        )
+                      }
+                    >
+                      {
+                        category.emoji
+                      }{" "}
+                      {
+                        category.name
+                      }
+                    </button>
+                  )
+                )}
+
+              </div>
+
+              <h3>
+                🔥 Aktive Challenges
+              </h3>
+
+              {challenges.length ===
+              0 ? (
+                <p>
+                  Noch keine Challenges in diesem Event.
+                </p>
+              ) : (
+                challenges.map(
+                  (
+                    challenge
+                  ) => {
+
+                    const assigned =
+                      people.find(
+                        (
+                          person
+                        ) =>
+                          person.id ===
+                          challenge.assigned_profile_id
+                      );
+
+                    return (
+                      <div
+                        className="challengeItem"
+                        key={
+                          challenge.id
+                        }
+                      >
+
+                        <div>
+
+                          <strong>
+                            🎯{" "}
+                            {
+                              challenge.title
+                            }
+                          </strong>
+
+                          <small>
+                            {
+                              challenge.description
+                            }
+                          </small>
+
+                          <small>
+                            Kategorie:{" "}
+                            {
+                              challenge.category
+                            }
+                            {" · "}
+                            +{
+                              challenge.points ||
+                              0
+                            } Punkte
+                          </small>
+
+                          {assigned && (
+                            <small>
+                              👤 Für:{" "}
+                              {
+                                assigned.name
+                              }
+                            </small>
+                          )}
+
+                        </div>
+
+                        <div className="challengeActions">
+
+                          <select
+                            value={
+                              challenge.assigned_profile_id ||
+                              ""
+                            }
+                            onChange={(
+                              event
+                            ) => {
+
+                              const person =
+                                people.find(
+                                  (
+                                    item
+                                  ) =>
+                                    item.id ===
+                                    event.target.value
+                                );
+
+                              if (
+                                person
+                              ) {
+                                assignChallenge(
+                                  challenge,
+                                  person
+                                );
+                              }
+                            }}
+                          >
+
+                            <option value="">
+                              Teilnehmer
+                            </option>
+
+                            {people.map(
+                              (
+                                person
+                              ) => (
+                                <option
+                                  key={
+                                    person.id
+                                  }
+                                  value={
+                                    person.id
+                                  }
+                                >
+                                  {
+                                    person.name
+                                  }
+                                </option>
+                              )
+                            )}
+
+                          </select>
+
+                          <button
+                            className="completeChallenge"
+                            onClick={() => {
+
+                              const person =
+                                assigned ||
+                                people[0];
+
+                              if (
+                                person
+                              ) {
+                                completeChallenge(
+                                  challenge,
+                                  person
+                                );
+                              }
+
+                            }}
+                          >
+                            🏆 Fertig
+                          </button>
+
+                        </div>
+
+                      </div>
+                    );
+                  }
+                )
+              )}
+
+            </>
+          )}
+
+        </section>
+
+        {/* =================================================
+            RANGLISTE
+        ================================================= */}
 
         <section className="card">
 
@@ -1988,47 +3901,55 @@ export default function Home() {
           </h2>
 
           <p>
-            Tippe auf eine Person,
-            um zu sehen, wofür sie
-            Punkte bekommen hat.
+            Tippe auf eine Person, um zu sehen, wofür sie Punkte bekommen hat.
           </p>
 
           {ranking.map(
-            (person, index) => (
+            (
+              person,
+              index
+            ) => (
               <button
                 className="rank"
                 key={
                   person.id
                 }
                 onClick={() => {
+
                   setSelectedPerson(
                     person
                   );
+
                   loadPointHistory(
                     person.id
                   );
+
                 }}
               >
 
                 <strong>
-                  {index === 0
+                  {index ===
+                  0
                     ? "🥇"
-                    : index === 1
+                    : index ===
+                      1
                     ? "🥈"
-                    : index === 2
+                    : index ===
+                      2
                     ? "🥉"
                     : `${index + 1}.`}
                 </strong>
 
                 <span>
-                  {person.name}
+                  {
+                    person.name
+                  }
                 </span>
 
                 <b>
                   {
                     person.points
-                  }{" "}
-                  Punkte
+                  } Punkte
                 </b>
 
               </button>
@@ -2039,12 +3960,18 @@ export default function Home() {
             🏆 Gesamt:
             <strong>
               {" "}
-              {totalPoints}
+              {
+                totalPoints
+              }
             </strong>{" "}
             Punkte
           </div>
 
         </section>
+
+        {/* =================================================
+            PERSON DETAIL / PUNKTE HISTORIE
+        ================================================= */}
 
         {selectedPerson && (
           <div className="modal">
@@ -2079,6 +4006,44 @@ export default function Home() {
                 </small>
               </div>
 
+              <div className="detailStats">
+
+                <div>
+                  🍺
+                  <strong>
+                    {
+                      selectedPerson.drinks
+                    }
+                  </strong>
+                  Getränke
+                </div>
+
+                <div>
+                  💧
+                  <strong>
+                    {
+                      selectedPerson.liters.toFixed(
+                        1
+                      )
+                    }
+                  </strong>
+                  Liter
+                </div>
+
+                <div>
+                  🍺
+                  <strong>
+                    {
+                      selectedPerson.promille.toFixed(
+                        2
+                      )
+                    }
+                  </strong>
+                  ‰
+                </div>
+
+              </div>
+
               <h3>
                 📜 Punkte-Historie
               </h3>
@@ -2086,8 +4051,7 @@ export default function Home() {
               {pointHistory.length ===
               0 ? (
                 <p>
-                  Noch keine
-                  Punkte-Historie.
+                  Noch keine Punkte-Historie.
                 </p>
               ) : (
                 pointHistory.map(
@@ -2119,6 +4083,18 @@ export default function Home() {
                           }
                         </small>
 
+                        <small>
+                          {
+                            entry.created_at
+                              ? new Date(
+                                  entry.created_at
+                                ).toLocaleString(
+                                  "de-DE"
+                                )
+                              : ""
+                          }
+                        </small>
+
                       </div>
 
                       <b>
@@ -2139,23 +4115,37 @@ export default function Home() {
           </div>
         )}
 
+        {/* =================================================
+            MESSAGE
+        ================================================= */}
+
         {message && (
           <div className="message">
-            {message}
+            {
+              message
+            }
           </div>
         )}
 
+        {/* =================================================
+            FOOTER
+        ================================================= */}
+
         <footer>
-          🍻 Güstener Zapfhahn
-          Zentrale
+
+          🍻 Güstener Zapfhahn Zentrale
 
           <small>
-            Dein Event. Deine Getränke.
-            Deine Runde.
+            Dein Event. Deine Getränke. Deine Runde.
           </small>
+
         </footer>
 
       </div>
+
+      {/* ===================================================
+          DESIGN
+      =================================================== */}
 
       <style jsx global>{`
 
@@ -2165,7 +4155,7 @@ export default function Home() {
           padding: 0;
           width: 100%;
           min-height: 100%;
-          background: #07090d;
+          background: #05070a;
         }
 
         body {
@@ -2179,8 +4169,7 @@ export default function Home() {
         .page {
           width: 100%;
           min-height: 100vh;
-          margin: 0;
-          padding: 12px;
+          padding: 10px;
 
           color: white;
 
@@ -2192,25 +4181,27 @@ export default function Home() {
           background:
             radial-gradient(
               circle at 10% 0%,
-              rgba(245,158,11,.15),
-              transparent 30%
+              rgba(245,158,11,.18),
+              transparent 28%
             ),
+
             radial-gradient(
-              circle at 100% 20%,
-              rgba(30,90,130,.18),
+              circle at 100% 15%,
+              rgba(40,90,140,.18),
               transparent 35%
             ),
+
             linear-gradient(
               145deg,
-              #06080c,
-              #111923 55%,
-              #06080c
+              #05070a,
+              #101821 55%,
+              #05070a
             );
         }
 
         .container {
           width: 100%;
-          max-width: 900px;
+          max-width: 920px;
           margin: 0 auto;
         }
 
@@ -2218,24 +4209,34 @@ export default function Home() {
           display: flex;
           align-items: center;
           gap: 15px;
+
           padding:
-            10px 3px 24px;
+            12px
+            4px
+            25px;
         }
 
         .logo {
-          font-size: 40px;
-          padding: 12px;
+          width: 65px;
+          height: 65px;
+
+          display: flex;
+          justify-content: center;
+          align-items: center;
+
+          font-size: 38px;
+
           border-radius: 20px;
 
           background:
             linear-gradient(
               145deg,
-              #f59e0b,
+              #fbbf24,
               #d97706
             );
 
           box-shadow:
-            0 12px 35px
+            0 15px 40px
             rgba(245,158,11,.25);
         }
 
@@ -2249,13 +4250,24 @@ export default function Home() {
             0 0 15px;
         }
 
+        h3 {
+          margin-top: 20px;
+        }
+
         p {
-          color: #9ca8b5;
+          color:
+            #9ca8b5;
+        }
+
+        small {
+          color:
+            #8995a3;
         }
 
         .card {
           margin-bottom: 15px;
           padding: 18px;
+
           border-radius: 22px;
 
           background:
@@ -2266,27 +4278,31 @@ export default function Home() {
             rgba(255,255,255,.08);
 
           box-shadow:
-            0 15px 40px
-            rgba(0,0,0,.2);
+            0 15px 45px
+            rgba(0,0,0,.18);
 
           backdrop-filter:
-            blur(10px);
+            blur(12px);
         }
 
         .sectionHeader {
           display: flex;
-          justify-content: space-between;
           align-items: center;
+          justify-content: space-between;
+
           gap: 10px;
         }
 
         input,
         select {
           width: 100%;
+
           padding: 14px;
+
           margin-bottom: 10px;
 
           border-radius: 13px;
+
           border:
             1px solid
             #303b47;
@@ -2295,6 +4311,7 @@ export default function Home() {
             #111820;
 
           color: white;
+
           outline: none;
         }
 
@@ -2307,13 +4324,18 @@ export default function Home() {
         button {
           border: 0;
           cursor: pointer;
+
           border-radius: 13px;
+
           font-weight: 800;
         }
 
         .goldButton {
           padding:
-            12px 15px;
+            12px 16px;
+
+          color:
+            #111;
 
           background:
             linear-gradient(
@@ -2321,33 +4343,35 @@ export default function Home() {
               #fbbf24,
               #f59e0b
             );
-
-          color: #111;
         }
 
         .deleteButton {
           width: 100%;
+
           padding: 12px;
 
-          background:
-            #401919;
-
           color:
-            #ff9999;
+            #ffaaaa;
+
+          background:
+            #411719;
         }
 
         .stats {
           display: grid;
+
           grid-template-columns:
-            repeat(4, 1fr);
+            repeat(4,1fr);
 
           gap: 10px;
+
           margin-bottom: 15px;
         }
 
         .stat {
-          text-align: center;
           padding: 15px 8px;
+
+          text-align: center;
 
           border-radius: 18px;
 
@@ -2361,11 +4385,12 @@ export default function Home() {
 
         .stat span {
           display: block;
-          font-size: 23px;
+          font-size: 24px;
         }
 
         .stat b {
           display: block;
+
           margin:
             5px 0;
 
@@ -2373,20 +4398,21 @@ export default function Home() {
         }
 
         .stat small {
-          color:
-            #8995a3;
+          font-size: 11px;
         }
 
         .beerHero {
           margin-bottom: 15px;
         }
 
-        .beerButton {
+        .bigBeerButton {
           width: 100%;
-          min-height: 190px;
+          min-height: 205px;
 
           display: flex;
+
           flex-direction: column;
+
           justify-content: center;
           align-items: center;
 
@@ -2395,9 +4421,9 @@ export default function Home() {
           background:
             radial-gradient(
               circle at 50% 15%,
-              #ff5a5a,
-              #b81717 55%,
-              #700b0b
+              #ff5555,
+              #bd1515 55%,
+              #690808
             );
 
           border:
@@ -2405,90 +4431,191 @@ export default function Home() {
             rgba(255,255,255,.15);
 
           box-shadow:
-            0 18px 50px
-            rgba(190,20,20,.35);
+            0 20px 60px
+            rgba(180,15,15,.4);
 
           transition:
-            transform .15s ease;
+            transform .15s ease,
+            box-shadow .15s ease;
         }
 
-        .beerButton:hover {
+        .bigBeerButton:hover {
           transform:
-            translateY(-3px)
-            scale(1.01);
+            translateY(-3px);
+
+          box-shadow:
+            0 25px 70px
+            rgba(220,20,20,.5);
         }
 
-        .beerButton:active {
+        .bigBeerButton:active {
           transform:
-            scale(.97);
+            scale(.96);
         }
 
-        .beerEmoji {
-          font-size: 55px;
+        .bigBeerEmoji {
+          font-size: 60px;
         }
 
-        .beerButton strong {
-          font-size: 42px;
-          letter-spacing: 5px;
+        .bigBeerButton strong {
+          font-size: 44px;
+          letter-spacing: 6px;
         }
 
-        .beerButton small {
-          font-size: 13px;
-          opacity: .85;
+        .bigBeerButton small {
+          color:
+            rgba(255,255,255,.8);
         }
 
-        .beerRequest {
-          padding: 15px;
-          margin-top: 10px;
+        .collapseButton {
+          width: 100%;
 
-          border-radius: 16px;
-
-          background:
-            rgba(255,255,255,.05);
-        }
-
-        .response {
           display: flex;
+
           align-items: center;
           justify-content: space-between;
 
-          gap: 10px;
+          padding: 2px 0;
 
-          padding:
-            9px 0;
+          color: white;
 
-          border-top:
+          background: transparent;
+
+          font-size: 19px;
+
+          text-align: left;
+        }
+
+        .personCard {
+          margin-top: 10px;
+          padding: 15px;
+
+          border-radius: 17px;
+
+          background:
+            rgba(255,255,255,.045);
+
+          border:
             1px solid
             rgba(255,255,255,.05);
         }
 
-        .responseButtons {
+        .personTop {
           display: flex;
-          gap: 6px;
+
+          justify-content: space-between;
+          align-items: center;
         }
 
-        .accept {
-          padding:
-            10px 14px;
-
-          background:
-            #15803d;
-
-          color: white;
+        .personTop strong {
+          display: block;
+          font-size: 17px;
         }
 
-        .decline {
-          padding:
-            10px 14px;
+        .personTop small {
+          display: block;
 
-          background:
-            #991b1b;
+          margin-top: 5px;
+        }
+
+        .rankMiniButton {
+          padding:
+            10px 13px;
 
           color: white;
+
+          background:
+            #303944;
+        }
+
+        .personStats {
+          display: grid;
+
+          grid-template-columns:
+            repeat(4,1fr);
+
+          gap: 7px;
+
+          margin-top: 13px;
+        }
+
+        .personStats div {
+          padding: 10px;
+
+          text-align: center;
+
+          border-radius: 12px;
+
+          background:
+            rgba(255,255,255,.04);
+        }
+
+        .personStats span {
+          display: block;
+
+          font-size: 11px;
+
+          color:
+            #8995a3;
+        }
+
+        .personStats b {
+          display: block;
+
+          margin-top: 4px;
+        }
+
+        .personActions {
+          margin-top: 10px;
+        }
+
+        .crateButton {
+          width: 100%;
+
+          padding: 13px;
+
+          color:
+            #111;
+
+          background:
+            linear-gradient(
+              135deg,
+              #fbbf24,
+              #d97706
+            );
+        }
+
+        .outlineButton {
+          width: 100%;
+
+          margin-top: 12px;
+
+          padding: 13px;
+
+          color:
+            #fbbf24;
+
+          background:
+            transparent;
+
+          border:
+            1px solid
+            #9a6b08;
+        }
+
+        .green {
+          color:
+            #4ade80 !important;
+        }
+
+        .red {
+          color:
+            #ff6b6b !important;
         }
 
         .row {
           display: grid;
+
           grid-template-columns:
             1fr auto;
 
@@ -2497,15 +4624,20 @@ export default function Home() {
 
         .three {
           display: grid;
+
           grid-template-columns:
-            repeat(3, 1fr);
+            repeat(3,1fr);
 
           gap: 8px;
         }
 
         .saveButton {
           width: 100%;
+
           padding: 14px;
+
+          color:
+            #111;
 
           background:
             linear-gradient(
@@ -2513,69 +4645,17 @@ export default function Home() {
               #fbbf24,
               #f59e0b
             );
-
-          color: #111;
-        }
-
-        .person,
-        .item,
-        .history {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-
-          gap: 10px;
-
-          padding: 13px;
-          margin-top: 8px;
-
-          border-radius: 15px;
-
-          background:
-            rgba(255,255,255,.045);
-        }
-
-        .person small,
-        .item small,
-        .history small {
-          display: block;
-          margin-top: 4px;
-          color:
-            #8995a3;
-        }
-
-        .personButtons {
-          display: flex;
-          gap: 6px;
-        }
-
-        .crate {
-          padding:
-            10px 12px;
-
-          background:
-            #f59e0b;
-
-          color: #111;
-        }
-
-        .darkButton {
-          padding:
-            10px 12px;
-
-          background:
-            #303944;
-
-          color: white;
         }
 
         .assignment {
           display: grid;
+
           grid-template-columns:
-            1fr 1.5fr;
+            1fr 1.6fr;
+
+          align-items: center;
 
           gap: 10px;
-          align-items: center;
 
           margin-bottom: 8px;
         }
@@ -2584,20 +4664,320 @@ export default function Home() {
           margin: 0;
         }
 
-        .paymentTotal {
+        .item {
           display: flex;
+
           justify-content: space-between;
+          align-items: center;
 
-          padding: 15px;
-          margin-top: 10px;
+          gap: 10px;
 
-          border-radius: 14px;
+          margin-top: 8px;
+
+          padding: 13px;
+
+          border-radius: 15px;
 
           background:
-            rgba(245,158,11,.1);
+            rgba(255,255,255,.045);
+        }
+
+        .item small {
+          display: block;
+
+          margin-top: 4px;
+        }
+
+        .historyItem {
+          display: flex;
+
+          justify-content: space-between;
+          align-items: center;
+
+          gap: 10px;
+
+          margin-top: 8px;
+
+          padding: 13px;
+
+          border-radius: 15px;
+
+          background:
+            rgba(255,255,255,.045);
+        }
+
+        .historyItem small {
+          display: block;
+
+          margin-top: 5px;
+        }
+
+        .historyTime {
+          color:
+            #fbbf24;
+        }
+
+        .paymentOverview {
+          display: grid;
+
+          grid-template-columns:
+            repeat(4,1fr);
+
+          gap: 8px;
+
+          margin-bottom: 15px;
+        }
+
+        .paymentOverview div {
+          padding: 12px;
+
+          border-radius: 13px;
+
+          text-align: center;
+
+          background:
+            rgba(255,255,255,.045);
+        }
+
+        .paymentOverview span {
+          display: block;
+
+          font-size: 11px;
+
+          color:
+            #8995a3;
+        }
+
+        .paymentOverview strong {
+          display: block;
+
+          margin-top: 5px;
+        }
+
+        .paymentRow,
+        .paymentPerson {
+          display: flex;
+
+          justify-content: space-between;
+          align-items: center;
+
+          gap: 10px;
+
+          margin-top: 8px;
+
+          padding: 13px;
+
+          border-radius: 15px;
+
+          background:
+            rgba(255,255,255,.045);
+        }
+
+        .paymentRow small,
+        .paymentPerson small {
+          display: block;
+
+          margin-top: 4px;
+        }
+
+        .beerRequest {
+          margin-top: 12px;
+
+          padding: 15px;
+
+          border-radius: 16px;
+
+          background:
+            rgba(255,255,255,.045);
+
+          border:
+            1px solid
+            rgba(255,255,255,.06);
+        }
+
+        .responseRow {
+          display: flex;
+
+          justify-content: space-between;
+          align-items: center;
+
+          padding:
+            10px 0;
+
+          border-top:
+            1px solid
+            rgba(255,255,255,.06);
+        }
+
+        .responseButtons {
+          display: flex;
+
+          gap: 6px;
+        }
+
+        .accept {
+          padding:
+            9px 13px;
+
+          color: white;
+
+          background:
+            #15803d;
+        }
+
+        .decline {
+          padding:
+            9px 13px;
+
+          color: white;
+
+          background:
+            #991b1b;
+        }
+
+        .challengeMainButton {
+          width: 100%;
+
+          padding: 14px;
+
+          color:
+            #111;
+
+          background:
+            linear-gradient(
+              135deg,
+              #fbbf24,
+              #f59e0b
+            );
+        }
+
+        .templateGrid {
+          display: grid;
+
+          grid-template-columns:
+            repeat(2,1fr);
+
+          gap: 8px;
+        }
+
+        .templateCard {
+          padding: 13px;
+
+          color: white;
+
+          text-align: left;
+
+          background:
+            rgba(255,255,255,.045);
+
+          border:
+            1px solid
+            rgba(255,255,255,.07);
+        }
+
+        .templateCard strong {
+          display: block;
+        }
+
+        .templateCard small {
+          display: block;
+
+          margin-top: 6px;
+        }
+
+        .templateCard b {
+          display: block;
+
+          margin-top: 8px;
 
           color:
             #fbbf24;
+        }
+
+        .categoryScroll {
+          display: flex;
+
+          gap: 7px;
+
+          overflow-x: auto;
+
+          padding-bottom: 5px;
+        }
+
+        .category {
+          flex:
+            0 0 auto;
+
+          padding:
+            10px 13px;
+
+          color:
+            #d4d9df;
+
+          background:
+            #1a232d;
+        }
+
+        .category.active {
+          color:
+            #111;
+
+          background:
+            #fbbf24;
+        }
+
+        .challengeItem {
+          display: grid;
+
+          grid-template-columns:
+            1fr auto;
+
+          gap: 12px;
+
+          margin-top: 10px;
+
+          padding: 15px;
+
+          border-radius: 17px;
+
+          background:
+            rgba(255,255,255,.045);
+        }
+
+        .challengeItem strong {
+          display: block;
+
+          font-size: 17px;
+        }
+
+        .challengeItem small {
+          display: block;
+
+          margin-top: 5px;
+        }
+
+        .challengeActions {
+          display: flex;
+
+          flex-direction: column;
+
+          gap: 6px;
+
+          min-width: 140px;
+        }
+
+        .challengeActions select {
+          margin: 0;
+        }
+
+        .completeChallenge {
+          padding: 11px;
+
+          color:
+            #111;
+
+          background:
+            #4ade80;
         }
 
         .rank {
@@ -2612,20 +4992,21 @@ export default function Home() {
 
           gap: 10px;
 
-          padding: 14px;
           margin-top: 8px;
 
-          text-align: left;
+          padding: 14px;
 
           color: white;
 
+          text-align: left;
+
           background:
-            rgba(255,255,255,.05);
+            rgba(255,255,255,.045);
         }
 
         .rank:hover {
           background:
-            rgba(245,158,11,.12);
+            rgba(245,158,11,.1);
         }
 
         .totalPoints {
@@ -2637,129 +5018,6 @@ export default function Home() {
             #fbbf24;
         }
 
-        .message {
-          position: fixed;
-
-          left: 50%;
-          bottom: 20px;
-
-          z-index: 1000;
-
-          width:
-            min(90%, 600px);
-
-          transform:
-            translateX(-50%);
-
-          padding: 15px;
-
-          border-radius: 15px;
-
-          background:
-            #172230;
-
-          border:
-            1px solid
-            #405366;
-
-          color:
-            #fbbf24;
-
-          text-align: center;
-
-          box-shadow:
-            0 15px 40px
-            rgba(0,0,0,.4);
-        }
-
-        .animationOverlay {
-          position: fixed;
-
-          inset: 0;
-
-          z-index: 2000;
-
-          display: flex;
-          flex-direction: column;
-
-          justify-content: center;
-          align-items: center;
-
-          background:
-            rgba(0,0,0,.8);
-
-          backdrop-filter:
-            blur(6px);
-
-          pointer-events: none;
-        }
-
-        .clinkingGlasses {
-          display: flex;
-          gap: 30px;
-
-          font-size: 90px;
-
-          animation:
-            clink .9s
-            ease-in-out
-            infinite alternate;
-        }
-
-        .giantBeer {
-          font-size: 130px;
-
-          animation:
-            beerBounce .7s
-            ease-in-out
-            infinite alternate;
-        }
-
-        .prost {
-          margin-top: 20px;
-
-          font-size: 60px;
-          font-weight: 900;
-
-          color:
-            #fbbf24;
-
-          text-shadow:
-            0 5px 35px
-            rgba(245,158,11,.7);
-        }
-
-        .moneyOverlay {
-          position: fixed;
-
-          inset: 0;
-
-          z-index: 2000;
-
-          display: flex;
-          flex-wrap: wrap;
-
-          justify-content:
-            space-around;
-
-          align-content:
-            flex-start;
-
-          overflow: hidden;
-
-          pointer-events: none;
-        }
-
-        .moneyOverlay span {
-          display: block;
-
-          font-size: 50px;
-
-          animation:
-            moneyFall 2.4s
-            linear forwards;
-        }
-
         .modal {
           position: fixed;
 
@@ -2769,13 +5027,13 @@ export default function Home() {
 
           display: flex;
 
-          justify-content: center;
           align-items: center;
+          justify-content: center;
 
           padding: 20px;
 
           background:
-            rgba(0,0,0,.78);
+            rgba(0,0,0,.8);
 
           backdrop-filter:
             blur(8px);
@@ -2785,9 +5043,10 @@ export default function Home() {
           position: relative;
 
           width:
-            min(100%, 600px);
+            min(100%,620px);
 
-          max-height: 85vh;
+          max-height:
+            88vh;
 
           overflow-y: auto;
 
@@ -2814,10 +5073,10 @@ export default function Home() {
 
           border-radius: 50%;
 
+          color: white;
+
           background:
             #303944;
-
-          color: white;
 
           font-size: 25px;
         }
@@ -2827,20 +5086,66 @@ export default function Home() {
 
           padding: 20px;
 
-          font-size: 55px;
-          font-weight: 900;
-
           color:
             #fbbf24;
+
+          font-size: 55px;
+          font-weight: 900;
         }
 
         .bigPoints small {
           display: block;
 
           font-size: 13px;
+        }
 
-          color:
-            #8995a3;
+        .detailStats {
+          display: grid;
+
+          grid-template-columns:
+            repeat(3,1fr);
+
+          gap: 8px;
+        }
+
+        .detailStats div {
+          padding: 13px;
+
+          text-align: center;
+
+          border-radius: 14px;
+
+          background:
+            rgba(255,255,255,.045);
+        }
+
+        .detailStats strong {
+          display: block;
+
+          margin: 5px 0;
+        }
+
+        .history {
+          display: flex;
+
+          justify-content: space-between;
+
+          gap: 10px;
+
+          margin-top: 8px;
+
+          padding: 13px;
+
+          border-radius: 14px;
+
+          background:
+            rgba(255,255,255,.045);
+        }
+
+        .history small {
+          display: block;
+
+          margin-top: 4px;
         }
 
         .history b {
@@ -2848,6 +5153,211 @@ export default function Home() {
             #4ade80;
 
           font-size: 20px;
+        }
+
+        .message {
+          position: fixed;
+
+          left: 50%;
+          bottom: 20px;
+
+          z-index: 3000;
+
+          width:
+            min(92%,650px);
+
+          transform:
+            translateX(-50%);
+
+          padding: 15px;
+
+          border-radius: 15px;
+
+          text-align: center;
+
+          color:
+            #fbbf24;
+
+          background:
+            #172230;
+
+          border:
+            1px solid
+            #405366;
+
+          box-shadow:
+            0 20px 50px
+            rgba(0,0,0,.5);
+        }
+
+        .animationOverlay {
+          position: fixed;
+
+          inset: 0;
+
+          z-index: 2500;
+
+          display: flex;
+
+          flex-direction: column;
+
+          justify-content: center;
+          align-items: center;
+
+          pointer-events: none;
+
+          background:
+            rgba(0,0,0,.82);
+
+          backdrop-filter:
+            blur(7px);
+        }
+
+        .clinkingGlasses {
+          display: flex;
+
+          gap: 35px;
+
+          font-size: 100px;
+
+          animation:
+            clink .8s
+            ease-in-out
+            infinite alternate;
+        }
+
+        .prostText {
+          margin-top: 20px;
+
+          color:
+            #fbbf24;
+
+          font-size: 65px;
+          font-weight: 900;
+
+          text-shadow:
+            0 5px 40px
+            rgba(245,158,11,.7);
+        }
+
+        .beerAnimation {
+          font-size: 150px;
+
+          animation:
+            beerBounce .7s
+            ease-in-out
+            infinite alternate;
+        }
+
+        .beerText {
+          margin-top: 10px;
+
+          font-size: 70px;
+          font-weight: 900;
+
+          color:
+            #ff4b4b;
+        }
+
+        .beerSub {
+          font-size: 20px;
+
+          color:
+            white;
+        }
+
+        .crateAnimation {
+          font-size: 90px;
+
+          animation:
+            cratePop .7s
+            ease-out
+            infinite alternate;
+        }
+
+        .crateText {
+          margin-top: 15px;
+
+          color:
+            #fbbf24;
+
+          font-size: 55px;
+          font-weight: 900;
+        }
+
+        .crateSub {
+          margin-top: 8px;
+
+          font-size: 24px;
+        }
+
+        .challengeAnimation {
+          font-size: 140px;
+
+          animation:
+            challengeSpin 1s
+            ease-in-out
+            infinite alternate;
+        }
+
+        .challengeText {
+          font-size: 55px;
+
+          color:
+            #fbbf24;
+
+          font-weight: 900;
+        }
+
+        .challengeSub {
+          margin-top: 10px;
+
+          font-size: 25px;
+        }
+
+        .moneyOverlay {
+          position: fixed;
+
+          inset: 0;
+
+          z-index: 2500;
+
+          overflow: hidden;
+
+          pointer-events: none;
+        }
+
+        .moneyOverlay span {
+          position: absolute;
+
+          top: -80px;
+
+          font-size: 48px;
+
+          animation:
+            moneyFall 2.4s
+            linear forwards;
+        }
+
+        .moneyText {
+          position: absolute;
+
+          inset: 0;
+
+          display: flex;
+
+          align-items: center;
+          justify-content: center;
+
+          font-size: 65px;
+          font-weight: 900;
+
+          color:
+            #4ade80;
+
+          text-shadow:
+            0 5px 40px
+            rgba(74,222,128,.6);
         }
 
         footer {
@@ -2862,24 +5372,28 @@ export default function Home() {
 
         footer small {
           display: block;
+
           margin-top: 5px;
         }
 
         @keyframes clink {
+
           from {
             transform:
-              translateX(-25px)
+              translateX(-30px)
               rotate(-10deg);
           }
 
           to {
             transform:
-              translateX(25px)
+              translateX(30px)
               rotate(10deg);
           }
+
         }
 
         @keyframes beerBounce {
+
           from {
             transform:
               scale(.85)
@@ -2891,9 +5405,43 @@ export default function Home() {
               scale(1.15)
               rotate(8deg);
           }
+
+        }
+
+        @keyframes cratePop {
+
+          from {
+            transform:
+              scale(.8)
+              translateY(20px);
+          }
+
+          to {
+            transform:
+              scale(1.15)
+              translateY(-10px);
+          }
+
+        }
+
+        @keyframes challengeSpin {
+
+          from {
+            transform:
+              rotate(-12deg)
+              scale(.9);
+          }
+
+          to {
+            transform:
+              rotate(12deg)
+              scale(1.15);
+          }
+
         }
 
         @keyframes moneyFall {
+
           0% {
             transform:
               translateY(-120px)
@@ -2913,25 +5461,22 @@ export default function Home() {
 
             opacity: 0;
           }
+
         }
 
-        @media(max-width:650px) {
+        @media(max-width:700px) {
 
           .page {
-            padding: 8px;
-          }
-
-          header {
-            padding-top: 8px;
+            padding: 7px;
           }
 
           h1 {
-            font-size: 21px;
+            font-size: 20px;
           }
 
           .stats {
             grid-template-columns:
-              repeat(2, 1fr);
+              repeat(2,1fr);
           }
 
           .row,
@@ -2942,44 +5487,74 @@ export default function Home() {
           }
 
           .sectionHeader {
+            flex-direction:
+              column;
+
             align-items:
               stretch;
-
-            flex-direction:
-              column;
           }
 
-          .beerButton {
-            min-height: 175px;
+          .personStats {
+            grid-template-columns:
+              repeat(2,1fr);
           }
 
-          .beerButton strong {
-            font-size: 35px;
+          .paymentOverview {
+            grid-template-columns:
+              repeat(2,1fr);
           }
 
-          .person {
-            align-items:
-              flex-start;
-
-            flex-direction:
-              column;
+          .challengeItem {
+            grid-template-columns:
+              1fr;
           }
 
-          .personButtons {
-            width: 100%;
+          .challengeActions {
+            min-width: 0;
           }
 
-          .personButtons button {
-            flex: 1;
+          .templateGrid {
+            grid-template-columns:
+              1fr;
           }
 
-          .prost {
-            font-size: 43px;
+          .bigBeerButton {
+            min-height: 180px;
+          }
+
+          .bigBeerButton strong {
+            font-size: 36px;
+          }
+
+          .prostText {
+            font-size: 45px;
           }
 
           .clinkingGlasses {
-            font-size: 65px;
+            font-size: 70px;
           }
+
+          .beerText {
+            font-size: 55px;
+          }
+
+          .crateText {
+            font-size: 40px;
+          }
+
+          .challengeText {
+            font-size: 42px;
+          }
+
+          .moneyText {
+            font-size: 45px;
+          }
+
+          .detailStats {
+            grid-template-columns:
+              repeat(3,1fr);
+          }
+
         }
 
       `}</style>
