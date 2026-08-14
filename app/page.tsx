@@ -72,35 +72,27 @@ export default function Home() {
   const [people, setPeople] = useState<Person[]>([]);
   const [drinks, setDrinks] = useState<Drink[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [pointHistory, setPointHistory] =
-    useState<PointHistory[]>([]);
+  const [pointHistory, setPointHistory] = useState<PointHistory[]>([]);
 
-  const [beerRequests, setBeerRequests] =
-    useState<BeerRequest[]>([]);
-  const [beerResponses, setBeerResponses] =
-    useState<BeerResponse[]>([]);
+  const [beerRequests, setBeerRequests] = useState<BeerRequest[]>([]);
+  const [beerResponses, setBeerResponses] = useState<BeerResponse[]>([]);
 
   const [drinkName, setDrinkName] = useState("");
   const [liters, setLiters] = useState("0.5");
   const [alcohol, setAlcohol] = useState("5");
   const [price, setPrice] = useState("0");
 
-  const [personName, setPersonName] =
-    useState("");
+  const [personName, setPersonName] = useState("");
 
-  const [paymentAmount, setPaymentAmount] =
-    useState("");
-
+  const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentDescription, setPaymentDescription] =
     useState("Getränkeeinkauf");
 
-  const [message, setMessage] =
-    useState("");
+  const [message, setMessage] = useState("");
 
-  const [animation, setAnimation] =
-    useState<"prost" | "money" | "beer" | null>(
-      null
-    );
+  const [animation, setAnimation] = useState<
+    "prost" | "money" | "beer" | null
+  >(null);
 
   const [selectedPerson, setSelectedPerson] =
     useState<Person | null>(null);
@@ -162,6 +154,7 @@ export default function Home() {
     if (data) {
       setEvents((old) => [data, ...old]);
       setEventId(data.id);
+
       setMessage(
         "🎉 Event erfolgreich erstellt!"
       );
@@ -226,7 +219,15 @@ export default function Home() {
         ascending: false,
       });
 
-    if (!error && data) {
+    if (error) {
+      setMessage(
+        "❌ Getränke konnten nicht geladen werden: " +
+          error.message
+      );
+      return;
+    }
+
+    if (data) {
       setDrinks(data);
     }
   }
@@ -289,11 +290,13 @@ export default function Home() {
   async function loadPeople() {
     if (!eventId) return;
 
-    const { data: members, error } =
-      await supabase
-        .from("event_members")
-        .select("profile_id")
-        .eq("event_id", eventId);
+    const {
+      data: members,
+      error,
+    } = await supabase
+      .from("event_members")
+      .select("profile_id")
+      .eq("event_id", eventId);
 
     if (error) {
       setMessage(
@@ -312,11 +315,21 @@ export default function Home() {
       (member) => member.profile_id
     );
 
-    const { data: profiles } =
-      await supabase
-        .from("profiles")
-        .select("*")
-        .in("id", ids);
+    const {
+      data: profiles,
+      error: profileError,
+    } = await supabase
+      .from("profiles")
+      .select("*")
+      .in("id", ids);
+
+    if (profileError) {
+      setMessage(
+        "❌ Profile konnten nicht geladen werden: " +
+          profileError.message
+      );
+      return;
+    }
 
     if (!profiles) {
       setPeople([]);
@@ -339,13 +352,21 @@ export default function Home() {
         liters: Number(
           profile.liters || 0
         ),
-        cost: Number(
-          profile.cost || 0
-        ),
+        cost: 0,
         promille: Number(
           profile.promille || 0
         ),
       }));
+
+    /*
+     * Kosten werden bewusst NICHT
+     * aus profiles.cost gelesen,
+     * weil diese Spalte nicht existiert.
+     *
+     * Stattdessen werden die Kosten
+     * aus den zugeordneten Getränken
+     * in der Anzeige berechnet.
+     */
 
     setPeople(result);
   }
@@ -401,13 +422,14 @@ export default function Home() {
       return;
     }
 
-    const { error: memberError } =
-      await supabase
-        .from("event_members")
-        .insert({
-          event_id: eventId,
-          profile_id: profile.id,
-        });
+    const {
+      error: memberError,
+    } = await supabase
+      .from("event_members")
+      .insert({
+        event_id: eventId,
+        profile_id: profile.id,
+      });
 
     if (memberError) {
       setMessage(
@@ -428,8 +450,14 @@ export default function Home() {
 
   /*
    * =========================================================
-   * DRINK ZUORDNEN
+   * GETRÄNK ZUORDNEN
    * =========================================================
+   *
+   * WICHTIG:
+   * Hier wird KEIN "cost" in profiles geschrieben.
+   * Dadurch kommt der Fehler
+   * "Could not find the 'cost' column of 'profiles'"
+   * nicht mehr.
    */
 
   async function assignDrink(
@@ -442,10 +470,6 @@ export default function Home() {
         0
     );
 
-    const drinkPrice = Number(
-      drink.preis || 0
-    );
-
     const points = 10;
 
     const { error } = await supabase
@@ -453,12 +477,9 @@ export default function Home() {
       .update({
         points:
           person.points + points,
+
         drinks_count:
           person.drinks + 1,
-        liters:
-          person.liters + drinkLiters,
-        cost:
-          person.cost + drinkPrice,
       })
       .eq("id", person.id);
 
@@ -470,7 +491,12 @@ export default function Home() {
       return;
     }
 
-    await supabase
+    /*
+     * Punkte-Historie speichern.
+     */
+    const {
+      error: historyError,
+    } = await supabase
       .from("point_history")
       .insert({
         profile_id: person.id,
@@ -484,13 +510,52 @@ export default function Home() {
           }`,
       });
 
+    if (historyError) {
+      console.log(
+        "Punkte-Historie:",
+        historyError.message
+      );
+    }
+
+    /*
+     * Lokale Anzeige aktualisieren.
+     *
+     * Kosten werden nur lokal ergänzt.
+     * Sie werden NICHT in profiles gespeichert.
+     */
+    setPeople((currentPeople) =>
+      currentPeople.map((item) => {
+        if (item.id !== person.id) {
+          return item;
+        }
+
+        return {
+          ...item,
+
+          points:
+            item.points + points,
+
+          drinks:
+            item.drinks + 1,
+
+          liters:
+            item.liters + drinkLiters,
+
+          cost:
+            item.cost +
+            Number(
+              drink.preis || 0
+            ),
+        };
+      })
+    );
+
     setAnimation("prost");
 
     window.setTimeout(() => {
       setAnimation(null);
     }, 2200);
 
-    await loadPeople();
     await loadPointHistory(
       person.id
     );
@@ -509,7 +574,10 @@ export default function Home() {
   async function loadPayments() {
     if (!eventId) return;
 
-    const { data, error } = await supabase
+    const {
+      data,
+      error,
+    } = await supabase
       .from("payments")
       .select("*")
       .eq("event_id", eventId)
@@ -544,13 +612,17 @@ export default function Home() {
     > = {};
 
     if (profileIds.length > 0) {
-      const { data: profiles } =
-        await supabase
-          .from("profiles")
-          .select(
-            "id,username,name"
-          )
-          .in("id", profileIds);
+      const {
+        data: profiles,
+      } = await supabase
+        .from("profiles")
+        .select(
+          "id,username,name"
+        )
+        .in(
+          "id",
+          profileIds
+        );
 
       profiles?.forEach(
         (profile: any) => {
@@ -611,11 +683,14 @@ export default function Home() {
       )
       .join("\n");
 
-    const answer = window.prompt(
-      `💶 Wer hat bezahlt?\n\n${choices}\n\nNummer eingeben:`
-    );
+    const answer =
+      window.prompt(
+        `💶 Wer hat bezahlt?\n\n${choices}\n\nNummer eingeben:`
+      );
 
-    if (answer === null) return;
+    if (answer === null) {
+      return;
+    }
 
     const index =
       Number(answer) - 1;
@@ -629,6 +704,19 @@ export default function Home() {
       return;
     }
 
+    /*
+     * Deine payments-Tabelle besitzt:
+     *
+     * id
+     * event_id
+     * betrag
+     * created_at
+     * bezahlt_von
+     * profile_id
+     * status
+     *
+     * Deshalb wird NICHT "amount" verwendet.
+     */
     const { error } = await supabase
       .from("payments")
       .insert({
@@ -679,13 +767,24 @@ export default function Home() {
 
     if (!id) return;
 
-    const { data } = await supabase
+    const {
+      data,
+      error,
+    } = await supabase
       .from("point_history")
       .select("*")
       .eq("profile_id", id)
       .order("created_at", {
         ascending: false,
       });
+
+    if (error) {
+      console.log(
+        "Punkte-Historie:",
+        error.message
+      );
+      return;
+    }
 
     if (data) {
       setPointHistory(data);
@@ -701,21 +800,18 @@ export default function Home() {
   async function loadBeerRequests() {
     if (!eventId) return;
 
-    const { data, error } =
-      await supabase
-        .from("beer_requests")
-        .select("*")
-        .eq("event_id", eventId)
-        .order("created_at", {
-          ascending: false,
-        });
+    const {
+      data,
+      error,
+    } = await supabase
+      .from("beer_requests")
+      .select("*")
+      .eq("event_id", eventId)
+      .order("created_at", {
+        ascending: false,
+      });
 
     if (error) {
-      /*
-       * Falls die Tabelle noch nicht in
-       * der aktuellen Schema-Version existiert,
-       * bleibt die restliche App trotzdem nutzbar.
-       */
       console.log(
         "Beer requests:",
         error.message
@@ -739,13 +835,14 @@ export default function Home() {
     > = {};
 
     if (ids.length > 0) {
-      const { data: profiles } =
-        await supabase
-          .from("profiles")
-          .select(
-            "id,username,name"
-          )
-          .in("id", ids);
+      const {
+        data: profiles,
+      } = await supabase
+        .from("profiles")
+        .select(
+          "id,username,name"
+        )
+        .in("id", ids);
 
       profiles?.forEach(
         (profile: any) => {
@@ -775,16 +872,17 @@ export default function Home() {
       );
 
     if (requestIds.length > 0) {
-      const { data: responses } =
-        await supabase
-          .from(
-            "beer_request_responses"
-          )
-          .select("*")
-          .in(
-            "request_id",
-            requestIds
-          );
+      const {
+        data: responses,
+      } = await supabase
+        .from(
+          "beer_request_responses"
+        )
+        .select("*")
+        .in(
+          "request_id",
+          requestIds
+        );
 
       if (responses) {
         setBeerResponses(
@@ -818,8 +916,10 @@ export default function Home() {
         {
           input_event_id:
             eventId,
+
           input_requester_profile_id:
             requester.id,
+
           input_message:
             `${requester.name} möchte ein Bier mit dir trinken 🍻`,
         }
@@ -859,8 +959,10 @@ export default function Home() {
         {
           input_request_id:
             requestId,
+
           input_profile_id:
             personId,
+
           input_response:
             response,
         }
@@ -874,11 +976,15 @@ export default function Home() {
       return;
     }
 
-    if (response === "accepted") {
+    if (
+      response ===
+      "accepted"
+    ) {
       const person =
         people.find(
           (item) =>
-            item.id === personId
+            item.id ===
+            personId
         );
 
       if (person) {
@@ -898,9 +1004,12 @@ export default function Home() {
           .insert({
             profile_id:
               person.id,
+
             points: 10,
+
             reason:
               "Bier-Runde",
+
             description:
               "Bier-Anfrage angenommen 🍻",
           });
@@ -917,7 +1026,8 @@ export default function Home() {
     await loadPeople();
 
     setMessage(
-      response === "accepted"
+      response ===
+        "accepted"
         ? "🍻 Bier angenommen! +10 Punkte"
         : "❌ Bier abgelehnt."
     );
@@ -940,7 +1050,9 @@ export default function Home() {
         "1"
       );
 
-    if (input === null) return;
+    if (input === null) {
+      return;
+    }
 
     const crates =
       Number(input);
@@ -961,33 +1073,25 @@ export default function Home() {
       crates * 50;
 
     /*
-     * Der RPC wird versucht, falls
-     * dein zuvor eingerichtetes
-     * Bier-System ihn besitzt.
+     * Falls dein RPC vorhanden ist,
+     * wird er aufgerufen.
      */
-    const { error: rpcError } =
-      await supabase.rpc(
-        "sponsor_beer_crate",
-        {
-          input_event_id:
-            eventId,
-          input_profile_id:
-            person.id,
-          input_crates:
-            crates,
-        }
-      );
+    const {
+      error: rpcError,
+    } = await supabase.rpc(
+      "sponsor_beer_crate",
+      {
+        input_event_id:
+          eventId,
 
-    /*
-     * Wenn der RPC bereits Punkte
-     * selbst vergeben hat, verhindern
-     * wir eine doppelte Punktevergabe
-     * nicht durch eine weitere RPC-
-     * Operation.
-     *
-     * Die lokale Punktehistorie wird
-     * trotzdem versucht.
-     */
+        input_profile_id:
+          person.id,
+
+        input_crates:
+          crates,
+      }
+    );
+
     if (rpcError) {
       console.log(
         "sponsor_beer_crate:",
@@ -995,21 +1099,22 @@ export default function Home() {
       );
     }
 
-    const currentPoints =
-      person.points;
-
-    const { error } =
-      await supabase
-        .from("profiles")
-        .update({
-          points:
-            currentPoints +
-            points,
-        })
-        .eq(
-          "id",
-          person.id
-        );
+    /*
+     * Punkte direkt in profiles.
+     */
+    const {
+      error,
+    } = await supabase
+      .from("profiles")
+      .update({
+        points:
+          person.points +
+          points,
+      })
+      .eq(
+        "id",
+        person.id
+      );
 
     if (error) {
       setMessage(
@@ -1024,9 +1129,12 @@ export default function Home() {
       .insert({
         profile_id:
           person.id,
+
         points,
+
         reason:
           "Kiste Bier",
+
         description:
           `${crates} Kiste${
             crates === 1
@@ -1138,8 +1246,6 @@ export default function Home() {
   return (
     <main className="page">
 
-      {/* PROST */}
-
       {animation ===
         "prost" && (
         <div className="animationOverlay">
@@ -1154,8 +1260,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* BIER */}
-
       {animation ===
         "beer" && (
         <div className="animationOverlay">
@@ -1169,32 +1273,30 @@ export default function Home() {
         </div>
       )}
 
-      {/* GELD */}
-
       {animation ===
         "money" && (
         <div className="moneyOverlay">
-          <span>💶</span>
-          <span>💵</span>
-          <span>💶</span>
-          <span>💵</span>
-          <span>💶</span>
-          <span>💵</span>
-          <span>💶</span>
-          <span>💵</span>
-          <span>💶</span>
-          <span>💵</span>
-          <span>💶</span>
-          <span>💵</span>
-          <span>💶</span>
-          <span>💵</span>
-          <span>💶</span>
+          {Array.from(
+            { length: 20 },
+            (_, index) => (
+              <span
+                key={index}
+                style={{
+                  animationDelay:
+                    `${index * 0.08}s`,
+                }}
+              >
+                {index % 2 ===
+                0
+                  ? "💶"
+                  : "💵"}
+              </span>
+            )
+          )}
         </div>
       )}
 
       <div className="container">
-
-        {/* HEADER */}
 
         <header>
           <div className="logo">
@@ -1212,8 +1314,6 @@ export default function Home() {
             </p>
           </div>
         </header>
-
-        {/* EVENT */}
 
         <section className="card">
 
@@ -1268,8 +1368,6 @@ export default function Home() {
           )}
 
         </section>
-
-        {/* STATS */}
 
         <div className="stats">
 
@@ -1327,8 +1425,6 @@ export default function Home() {
 
         </div>
 
-        {/* BIER BUTTON */}
-
         <section className="beerHero">
 
           <button
@@ -1352,8 +1448,6 @@ export default function Home() {
           </button>
 
         </section>
-
-        {/* BIER REQUESTS */}
 
         {beerRequests.length >
           0 && (
@@ -1475,8 +1569,6 @@ export default function Home() {
           </section>
         )}
 
-        {/* TEILNEHMER */}
-
         <section className="card">
 
           <h2>
@@ -1575,8 +1667,6 @@ export default function Home() {
 
         </section>
 
-        {/* GETRÄNK */}
-
         <section className="card">
 
           <h2>
@@ -1642,8 +1732,6 @@ export default function Home() {
           </button>
 
         </section>
-
-        {/* ZUORDNUNG */}
 
         <section className="card">
 
@@ -1736,8 +1824,6 @@ export default function Home() {
 
         </section>
 
-        {/* GETRÄNKE */}
-
         <section className="card">
 
           <h2>
@@ -1797,12 +1883,10 @@ export default function Home() {
 
         </section>
 
-        {/* ZAHLUNG */}
-
         <section className="card">
 
           <h2>
-            💶 Zahlung
+            💶 Zahlungen
           </h2>
 
           <input
@@ -1897,8 +1981,6 @@ export default function Home() {
 
         </section>
 
-        {/* RANGLISTE */}
-
         <section className="card">
 
           <h2>
@@ -1964,8 +2046,6 @@ export default function Home() {
 
         </section>
 
-        {/* PERSON MODAL */}
-
         {selectedPerson && (
           <div className="modal">
 
@@ -2024,6 +2104,7 @@ export default function Home() {
                     >
 
                       <div>
+
                         <strong>
                           {
                             entry.reason ||
@@ -2037,6 +2118,7 @@ export default function Home() {
                             ""
                           }
                         </small>
+
                       </div>
 
                       <b>
@@ -2057,8 +2139,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* MESSAGE */}
-
         {message && (
           <div className="message">
             {message}
@@ -2068,6 +2148,7 @@ export default function Home() {
         <footer>
           🍻 Güstener Zapfhahn
           Zentrale
+
           <small>
             Dein Event. Deine Getränke.
             Deine Runde.
@@ -2082,8 +2163,8 @@ export default function Home() {
         body {
           margin: 0;
           padding: 0;
-          min-height: 100%;
           width: 100%;
+          min-height: 100%;
           background: #07090d;
         }
 
@@ -2096,10 +2177,11 @@ export default function Home() {
         }
 
         .page {
-          min-height: 100vh;
           width: 100%;
+          min-height: 100vh;
           margin: 0;
           padding: 12px;
+
           color: white;
 
           font-family:
@@ -2232,20 +2314,24 @@ export default function Home() {
         .goldButton {
           padding:
             12px 15px;
+
           background:
             linear-gradient(
               135deg,
               #fbbf24,
               #f59e0b
             );
+
           color: #111;
         }
 
         .deleteButton {
           width: 100%;
           padding: 12px;
+
           background:
             #401919;
+
           color:
             #ff9999;
         }
@@ -2254,6 +2340,7 @@ export default function Home() {
           display: grid;
           grid-template-columns:
             repeat(4, 1fr);
+
           gap: 10px;
           margin-bottom: 15px;
         }
@@ -2261,6 +2348,7 @@ export default function Home() {
         .stat {
           text-align: center;
           padding: 15px 8px;
+
           border-radius: 18px;
 
           background:
@@ -2280,6 +2368,7 @@ export default function Home() {
           display: block;
           margin:
             5px 0;
+
           font-size: 20px;
         }
 
@@ -2351,6 +2440,7 @@ export default function Home() {
         .beerRequest {
           padding: 15px;
           margin-top: 10px;
+
           border-radius: 16px;
 
           background:
@@ -2361,6 +2451,7 @@ export default function Home() {
           display: flex;
           align-items: center;
           justify-content: space-between;
+
           gap: 10px;
 
           padding:
@@ -2379,16 +2470,20 @@ export default function Home() {
         .accept {
           padding:
             10px 14px;
+
           background:
             #15803d;
+
           color: white;
         }
 
         .decline {
           padding:
             10px 14px;
+
           background:
             #991b1b;
+
           color: white;
         }
 
@@ -2396,6 +2491,7 @@ export default function Home() {
           display: grid;
           grid-template-columns:
             1fr auto;
+
           gap: 8px;
         }
 
@@ -2403,6 +2499,7 @@ export default function Home() {
           display: grid;
           grid-template-columns:
             repeat(3, 1fr);
+
           gap: 8px;
         }
 
@@ -2426,10 +2523,12 @@ export default function Home() {
           display: flex;
           align-items: center;
           justify-content: space-between;
+
           gap: 10px;
 
           padding: 13px;
           margin-top: 8px;
+
           border-radius: 15px;
 
           background:
@@ -2453,16 +2552,20 @@ export default function Home() {
         .crate {
           padding:
             10px 12px;
+
           background:
             #f59e0b;
+
           color: #111;
         }
 
         .darkButton {
           padding:
             10px 12px;
+
           background:
             #303944;
+
           color: white;
         }
 
@@ -2470,8 +2573,10 @@ export default function Home() {
           display: grid;
           grid-template-columns:
             1fr 1.5fr;
+
           gap: 10px;
           align-items: center;
+
           margin-bottom: 8px;
         }
 
@@ -2499,15 +2604,19 @@ export default function Home() {
           width: 100%;
 
           display: grid;
+
           grid-template-columns:
             45px 1fr auto;
+
           align-items: center;
+
           gap: 10px;
 
           padding: 14px;
           margin-top: 8px;
 
           text-align: left;
+
           color: white;
 
           background:
@@ -2521,15 +2630,19 @@ export default function Home() {
 
         .totalPoints {
           margin-top: 15px;
+
           text-align: center;
+
           color:
             #fbbf24;
         }
 
         .message {
           position: fixed;
+
           left: 50%;
           bottom: 20px;
+
           z-index: 1000;
 
           width:
@@ -2561,11 +2674,14 @@ export default function Home() {
 
         .animationOverlay {
           position: fixed;
+
           inset: 0;
+
           z-index: 2000;
 
           display: flex;
           flex-direction: column;
+
           justify-content: center;
           align-items: center;
 
@@ -2581,6 +2697,7 @@ export default function Home() {
         .clinkingGlasses {
           display: flex;
           gap: 30px;
+
           font-size: 90px;
 
           animation:
@@ -2614,47 +2731,44 @@ export default function Home() {
 
         .moneyOverlay {
           position: fixed;
+
           inset: 0;
+
           z-index: 2000;
 
           display: flex;
           flex-wrap: wrap;
+
           justify-content:
             space-around;
+
           align-content:
             flex-start;
 
           overflow: hidden;
-
-          padding-top: 0;
-
-          background:
-            rgba(0,0,0,.18);
 
           pointer-events: none;
         }
 
         .moneyOverlay span {
           display: block;
+
           font-size: 50px;
 
           animation:
             moneyFall 2.4s
             linear forwards;
-
-          animation-delay:
-            calc(
-              var(--delay, 0)
-              * 0.05s
-            );
         }
 
         .modal {
           position: fixed;
+
           inset: 0;
+
           z-index: 1500;
 
           display: flex;
+
           justify-content: center;
           align-items: center;
 
@@ -2674,9 +2788,11 @@ export default function Home() {
             min(100%, 600px);
 
           max-height: 85vh;
+
           overflow-y: auto;
 
           padding: 25px;
+
           border-radius: 25px;
 
           background:
@@ -2689,6 +2805,7 @@ export default function Home() {
 
         .close {
           position: absolute;
+
           top: 12px;
           right: 12px;
 
@@ -2701,11 +2818,13 @@ export default function Home() {
             #303944;
 
           color: white;
+
           font-size: 25px;
         }
 
         .bigPoints {
           text-align: center;
+
           padding: 20px;
 
           font-size: 55px;
@@ -2719,6 +2838,7 @@ export default function Home() {
           display: block;
 
           font-size: 13px;
+
           color:
             #8995a3;
         }
@@ -2726,6 +2846,7 @@ export default function Home() {
         .history b {
           color:
             #4ade80;
+
           font-size: 20px;
         }
 
@@ -2734,6 +2855,7 @@ export default function Home() {
             35px 10px;
 
           text-align: center;
+
           color:
             #687686;
         }
@@ -2776,6 +2898,7 @@ export default function Home() {
             transform:
               translateY(-120px)
               rotate(0deg);
+
             opacity: 0;
           }
 
@@ -2787,6 +2910,7 @@ export default function Home() {
             transform:
               translateY(110vh)
               rotate(720deg);
+
             opacity: 0;
           }
         }
@@ -2820,6 +2944,7 @@ export default function Home() {
           .sectionHeader {
             align-items:
               stretch;
+
             flex-direction:
               column;
           }
@@ -2835,6 +2960,7 @@ export default function Home() {
           .person {
             align-items:
               flex-start;
+
             flex-direction:
               column;
           }
