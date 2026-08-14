@@ -1,9 +1,23 @@
+html,
 body {
-  font-family: Arial, sans-serif;
-  padding: 20px;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
+  background: #070a0d;
 }
 
-button {
-  padding: 10px 20px;
-  font-size: 16px;
+* {
+  box-sizing: border-box;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
 }
