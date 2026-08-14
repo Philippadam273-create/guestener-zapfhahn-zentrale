@@ -6,98 +6,76 @@ import { supabase } from "../lib/supabase";
 type Event = {
   id: string;
   title: string;
-  description: string | null;
-  location: string | null;
-  image: string | null;
-  invite_code: string | null;
-  start_date: string | null;
-  end_date: string | null;
-  is_active: boolean | null;
-
-  ranking_enabled: boolean | null;
-  show_points: boolean | null;
-  show_ranking: boolean | null;
-  show_promille: boolean | null;
-  show_statistics: boolean | null;
-  show_drink_amounts: boolean | null;
-  photo_required: boolean | null;
-  ai_recognition_enabled: boolean | null;
-  manual_entry_allowed: boolean | null;
-  cost_overview_enabled: boolean | null;
-  auto_split_costs: boolean | null;
-  team_mode: boolean | null;
-  show_photos: boolean | null;
-  show_costs: boolean | null;
-  privacy_mode: boolean | null;
+  description?: string | null;
+  location?: string | null;
+  image?: string | null;
+  invite_code?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  is_active?: boolean | null;
+  ranking_enabled?: boolean | null;
+  show_points?: boolean | null;
+  show_ranking?: boolean | null;
+  show_promille?: boolean | null;
+  show_statistics?: boolean | null;
+  show_drink_amounts?: boolean | null;
+  photo_required?: boolean | null;
+  ai_recognition_enabled?: boolean | null;
+  manual_entry_allowed?: boolean | null;
+  cost_overview_enabled?: boolean | null;
+  auto_split_costs?: boolean | null;
+  team_mode?: boolean | null;
+  show_photos?: boolean | null;
+  show_costs?: boolean | null;
+  privacy_mode?: boolean | null;
 };
 
 type Profile = {
   id: string;
-  user_id: string | null;
-  role: string | null;
-  points: number | null;
-  drinks_count: number | null;
-  username: string | null;
-  name: string | null;
-  email: string | null;
-
-  weight_kg: number | null;
-  height_cm: number | null;
-  age: number | null;
-  gender: string | null;
-
-  gewicht_kg: number | null;
-  alter: number | null;
-  geschlecht: string | null;
-
-  avatar_url: string | null;
-  is_global_admin: boolean | null;
+  user_id?: string | null;
+  username?: string | null;
+  name?: string | null;
+  email?: string | null;
+  points?: number | null;
+  drinks_count?: number | null;
+  weight_kg?: number | null;
+  height_cm?: number | null;
+  age?: number | null;
+  gender?: string | null;
+  gewicht_kg?: number | null;
+  alter?: number | null;
+  geschlecht?: string | null;
+  avatar_url?: string | null;
+  is_global_admin?: boolean | null;
 };
 
 type Member = {
   id: string;
   profile_id: string;
-  role: string | null;
-  joined_at: string | null;
-  profile: Profile | null;
+  role?: string | null;
+  joined_via_code?: string | null;
+  profile?: Profile | null;
 };
 
 type Drink = {
   id: string;
-  event_id: string;
-  profile_id: string | null;
-
-  category: string | null;
-  drink_name: string | null;
-  brand: string | null;
-
-  liters: number | null;
-  alcohol_percent: number | null;
-  quantity: number | null;
-
-  image: string | null;
-  comment: string | null;
-  created_at: string | null;
-
-  ai_detected: boolean | null;
-  detected_brand: string | null;
-  detected_alcohol_percent: number | null;
-
-  paid_by: string | null;
-  shared_cost: boolean | null;
-
-  marke: string | null;
-  bezahlt_von: string | null;
-  promille_wert: number | null;
-
-  getraenk: string | null;
-  menge: number | null;
-  alkohol: number | null;
-  preis: number | null;
-  foto: string | null;
-
-  price: number | null;
-  photo_url: string | null;
+  event_id?: string | null;
+  profile_id?: string | null;
+  category?: string | null;
+  drink_name?: string | null;
+  brand?: string | null;
+  liters?: number | null;
+  alcohol_percent?: number | null;
+  quantity?: number | null;
+  image?: string | null;
+  comment?: string | null;
+  price?: number | null;
+  preis?: number | null;
+  getraenk?: string | null;
+  menge?: number | null;
+  alkohol?: number | null;
+  promille_wert?: number | null;
+  created_at?: string | null;
 };
 
 type BeerRequest = {
@@ -105,9 +83,8 @@ type BeerRequest = {
   event_id: string;
   requester_profile_id: string;
   status: string;
-  message: string | null;
-  created_at: string | null;
-  responded_at: string | null;
+  message?: string | null;
+  created_at: string;
 };
 
 type BeerResponse = {
@@ -117,241 +94,306 @@ type BeerResponse = {
   response: string;
 };
 
-type Crate = {
-  id: string;
-  event_id: string;
-  profile_id: string;
-  crates: number;
-  points_awarded: number;
-  description: string | null;
-};
-
 type Challenge = {
   id: string;
-  event_id: string | null;
-  title: string | null;
-  description: string | null;
-  category: string | null;
-  points: number | null;
-  status: string | null;
-  required_votes: number | null;
-  assigned_profile_id: string | null;
-  winner_profile_id: string | null;
-  created_at: string | null;
-  completed_at: string | null;
-  participant_count: number | null;
-  vote_count: number | null;
-  positive_vote_count: number | null;
+  event_id?: string | null;
+  title?: string | null;
+  description?: string | null;
+  category?: string | null;
+  points?: number | null;
+  status?: string | null;
+  required_votes?: number | null;
+  assigned_profile_id?: string | null;
+  winner_profile_id?: string | null;
+  created_at?: string | null;
 };
 
-type Notification = {
-  id: string;
-  title: string;
-  message: string;
-  read: boolean;
-  created_at: string;
-};
-
-const FALLBACK_EVENT_SETTINGS = {
-  ranking_enabled: true,
-  show_points: true,
-  show_ranking: true,
-  show_promille: true,
-  show_statistics: true,
-  show_drink_amounts: true,
-  photo_required: false,
-  ai_recognition_enabled: true,
-  manual_entry_allowed: true,
-  cost_overview_enabled: true,
-  auto_split_costs: true,
-  team_mode: false,
-  show_photos: true,
-  show_costs: true,
-  privacy_mode: false,
-};
-
-function getProfileName(profile: Profile | null) {
-  if (!profile) return "Unbekannt";
-
-  return (
-    profile.name ||
-    profile.username ||
-    profile.email ||
-    "Teilnehmer"
-  );
-}
-
-function getDrinkName(drink: Drink) {
-  return (
-    drink.drink_name ||
-    drink.getraenk ||
-    drink.marke ||
-    drink.brand ||
-    "Getränk"
-  );
-}
-
-function getDrinkLiters(drink: Drink) {
-  return Number(drink.liters ?? drink.menge ?? 0);
-}
-
-function getDrinkAlcohol(drink: Drink) {
-  return Number(
-    drink.alcohol_percent ??
-      drink.alkohol ??
-      drink.detected_alcohol_percent ??
-      0
-  );
-}
-
-function getDrinkPrice(drink: Drink) {
-  return Number(drink.price ?? drink.preis ?? 0);
-}
-
-function getDrinkQuantity(drink: Drink) {
-  return Number(drink.quantity ?? 1);
-}
+type Tab =
+  | "home"
+  | "drinks"
+  | "beer"
+  | "challenges"
+  | "ranking"
+  | "stats"
+  | "settings";
 
 export default function Home() {
   const [events, setEvents] = useState<Event[]>([]);
   const [eventId, setEventId] = useState("");
+  const [event, setEvent] = useState<Event | null>(null);
 
-  const [currentProfile, setCurrentProfile] =
-    useState<Profile | null>(null);
-
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [drinks, setDrinks] = useState<Drink[]>([]);
-  const [beerRequests, setBeerRequests] =
-    useState<BeerRequest[]>([]);
-  const [beerResponses, setBeerResponses] =
-    useState<BeerResponse[]>([]);
-  const [crates, setCrates] = useState<Crate[]>([]);
-  const [challenges, setChallenges] =
-    useState<Challenge[]>([]);
-  const [notifications, setNotifications] =
-    useState<Notification[]>([]);
+  const [beerRequests, setBeerRequests] = useState<BeerRequest[]>([]);
+  const [beerResponses, setBeerResponses] = useState<BeerResponse[]>([]);
+  const [challenges, setChallenges] = useState<Challenge[]>([]);
+
+  const [tab, setTab] = useState<Tab>("home");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
-  const [activeTab, setActiveTab] =
-    useState<"home" | "drinks" | "people" | "challenges" | "admin">(
-      "home"
-    );
-
-  const [showDrinkForm, setShowDrinkForm] =
-    useState(false);
+  const [personName, setPersonName] = useState("");
 
   const [drinkName, setDrinkName] = useState("");
-  const [drinkBrand, setDrinkBrand] = useState("");
-  const [drinkCategory, setDrinkCategory] =
-    useState("Bier");
-  const [drinkLiters, setDrinkLiters] =
-    useState("0.5");
-  const [drinkAlcohol, setDrinkAlcohol] =
-    useState("5");
-  const [drinkPrice, setDrinkPrice] =
-    useState("0");
-  const [drinkQuantity, setDrinkQuantity] =
-    useState("1");
-  const [drinkComment, setDrinkComment] =
-    useState("");
+  const [brand, setBrand] = useState("");
+  const [category, setCategory] = useState("Bier");
+  const [liters, setLiters] = useState("0.5");
+  const [alcohol, setAlcohol] = useState("5");
+  const [price, setPrice] = useState("0");
 
-  const [joinCode, setJoinCode] = useState("");
+  const [beerMessage, setBeerMessage] = useState("");
+
+  const [challengeTitle, setChallengeTitle] = useState("");
+  const [challengeDescription, setChallengeDescription] = useState("");
+  const [challengePoints, setChallengePoints] = useState("50");
+
+  const [inviteCode, setInviteCode] = useState("");
 
   const [weight, setWeight] = useState("");
   const [height, setHeight] = useState("");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("male");
 
-  const [challengeTitle, setChallengeTitle] =
-    useState("");
-  const [challengeDescription, setChallengeDescription] =
-    useState("");
-  const [challengePoints, setChallengePoints] =
-    useState("10");
+  const [settings, setSettings] = useState({
+    ranking_enabled: true,
+    show_points: true,
+    show_ranking: true,
+    show_promille: true,
+    show_statistics: true,
+    show_drink_amounts: true,
+    cost_overview_enabled: true,
+    auto_split_costs: true,
+    team_mode: false,
+    show_photos: true,
+    show_costs: true,
+    privacy_mode: false,
+  });
 
-  const selectedEvent = useMemo(
-    () => events.find((event) => event.id === eventId) ?? null,
-    [events, eventId]
-  );
+  useEffect(() => {
+    loadInitialData();
+  }, []);
 
-  const eventSettings = selectedEvent
-    ? selectedEvent
-    : ({
-        ...FALLBACK_EVENT_SETTINGS,
-      } as Event);
+  useEffect(() => {
+    if (eventId) {
+      loadEventData(eventId);
+    }
+  }, [eventId]);
 
-  const totalLiters = useMemo(() => {
-    return drinks.reduce(
-      (sum, drink) =>
-        sum +
-        getDrinkLiters(drink) *
-          getDrinkQuantity(drink),
-      0
-    );
-  }, [drinks]);
+  async function loadInitialData() {
+    setLoading(true);
 
-  const totalCost = useMemo(() => {
-    return drinks.reduce(
-      (sum, drink) =>
-        sum +
-        getDrinkPrice(drink) *
-          getDrinkQuantity(drink),
-      0
-    );
-  }, [drinks]);
+    try {
+      const { data: authData } = await supabase.auth.getUser();
 
-  const totalAlcoholGrams = useMemo(() => {
-    return drinks.reduce(
-      (sum, drink) =>
-        sum +
-        getDrinkLiters(drink) *
-          getDrinkQuantity(drink) *
-          (getDrinkAlcohol(drink) / 100) *
-          789,
-      0
-    );
-  }, [drinks]);
+      if (authData.user) {
+        const { data: ownProfile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("user_id", authData.user.id)
+          .maybeSingle();
 
-  const costPerPerson =
-    members.length > 0
-      ? totalCost / members.length
-      : 0;
+        if (ownProfile) {
+          setProfile(ownProfile);
 
-  const totalPoints = members.reduce(
-    (sum, member) =>
-      sum + Number(member.profile?.points ?? 0),
-    0
-  );
+          setWeight(
+            String(
+              ownProfile.weight_kg ??
+                ownProfile.gewicht_kg ??
+                ""
+            )
+          );
 
-  const ranking = [...members].sort(
-    (a, b) =>
-      Number(b.profile?.points ?? 0) -
-      Number(a.profile?.points ?? 0)
-  );
+          setHeight(
+            String(ownProfile.height_cm ?? "")
+          );
 
-  const pendingBeerRequests =
-    beerRequests.filter(
-      (request) =>
-        request.status === "pending"
-    );
+          setAge(
+            String(
+              ownProfile.age ??
+                ownProfile.alter ??
+                ""
+            )
+          );
 
-  const myPendingBeerRequest =
-    beerRequests.find(
-      (request) =>
-        request.requester_profile_id ===
-          currentProfile?.id &&
-        request.status === "pending"
-    );
+          setGender(
+            ownProfile.gender ??
+              ownProfile.geschlecht ??
+              "male"
+          );
+        }
+      }
 
-  const unreadNotifications =
-    notifications.filter(
-      (notification) => !notification.read
-    ).length;
+      const { data: eventData, error } = await supabase
+        .from("events")
+        .select("*")
+        .order("created_at", {
+          ascending: false,
+        });
 
-  function flash(text: string) {
+      if (error) {
+        throw error;
+      }
+
+      if (eventData) {
+        setEvents(eventData);
+
+        if (eventData.length > 0) {
+          setEventId(eventData[0].id);
+        }
+      }
+    } catch (error: any) {
+      setMessage(
+        "❌ " +
+          (error?.message ||
+            "Daten konnten nicht geladen werden.")
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadEventData(id: string) {
+    setLoading(true);
+
+    try {
+      const selectedEvent =
+        events.find((item) => item.id === id) ?? null;
+
+      if (selectedEvent) {
+        setEvent(selectedEvent);
+
+        setSettings({
+          ranking_enabled:
+            selectedEvent.ranking_enabled ?? true,
+          show_points:
+            selectedEvent.show_points ?? true,
+          show_ranking:
+            selectedEvent.show_ranking ?? true,
+          show_promille:
+            selectedEvent.show_promille ?? true,
+          show_statistics:
+            selectedEvent.show_statistics ?? true,
+          show_drink_amounts:
+            selectedEvent.show_drink_amounts ?? true,
+          cost_overview_enabled:
+            selectedEvent.cost_overview_enabled ?? true,
+          auto_split_costs:
+            selectedEvent.auto_split_costs ?? true,
+          team_mode:
+            selectedEvent.team_mode ?? false,
+          show_photos:
+            selectedEvent.show_photos ?? true,
+          show_costs:
+            selectedEvent.show_costs ?? true,
+          privacy_mode:
+            selectedEvent.privacy_mode ?? false,
+        });
+      }
+
+      const [
+        membersResult,
+        drinksResult,
+        requestResult,
+        challengeResult,
+      ] = await Promise.all([
+        supabase
+          .from("event_members")
+          .select("*")
+          .eq("event_id", id)
+          .order("joined_at", {
+            ascending: true,
+          }),
+
+        supabase
+          .from("drinks")
+          .select("*")
+          .eq("event_id", id)
+          .order("created_at", {
+            ascending: false,
+          }),
+
+        supabase
+          .from("beer_requests")
+          .select("*")
+          .eq("event_id", id)
+          .order("created_at", {
+            ascending: false,
+          }),
+
+        supabase
+          .from("challenge_dashboard")
+          .select("*")
+          .eq("event_id", id)
+          .order("created_at", {
+            ascending: false,
+          }),
+      ]);
+
+      if (membersResult.data) {
+        const ids = membersResult.data.map(
+          (member) => member.profile_id
+        );
+
+        let profileMap: Record<string, Profile> = {};
+
+        if (ids.length > 0) {
+          const { data: profileData } =
+            await supabase
+              .from("profiles")
+              .select("*")
+              .in("id", ids);
+
+          if (profileData) {
+            profileMap = Object.fromEntries(
+              profileData.map((p) => [p.id, p])
+            );
+          }
+        }
+
+        setMembers(
+          membersResult.data.map((member) => ({
+            ...member,
+            profile:
+              profileMap[member.profile_id] ?? null,
+          }))
+        );
+      } else {
+        setMembers([]);
+      }
+
+      setDrinks(drinksResult.data ?? []);
+      setBeerRequests(requestResult.data ?? []);
+      setChallenges(challengeResult.data ?? []);
+
+      const requestIds =
+        requestResult.data?.map((r) => r.id) ?? [];
+
+      if (requestIds.length > 0) {
+        const { data: responses } =
+          await supabase
+            .from("beer_request_responses")
+            .select("*")
+            .in("request_id", requestIds);
+
+        setBeerResponses(responses ?? []);
+      } else {
+        setBeerResponses([]);
+      }
+    } catch (error: any) {
+      setMessage(
+        "❌ " +
+          (error?.message ||
+            "Eventdaten konnten nicht geladen werden.")
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function notify(text: string) {
     setMessage(text);
 
     window.setTimeout(() => {
@@ -359,782 +401,848 @@ export default function Home() {
     }, 4000);
   }
 
-  async function loadEvents() {
-    const { data, error } = await supabase
-      .from("events")
-      .select("*")
-      .order("created_at", {
-        ascending: false,
-      });
-
-    if (error) {
-      flash("❌ Events konnten nicht geladen werden.");
+  async function addPerson() {
+    if (!personName.trim()) {
+      notify("❌ Bitte einen Namen eingeben.");
       return;
     }
 
-    setEvents((data ?? []) as Event[]);
-
-    if (!eventId && data && data.length > 0) {
-      setEventId(data[0].id);
-    }
-  }
-
-  async function loadProfile() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) return;
-
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (data) {
-      setCurrentProfile(data as Profile);
-
-      setWeight(
-        String(
-          data.weight_kg ??
-            data.gewicht_kg ??
-            ""
-        )
-      );
-
-      setHeight(
-        String(data.height_cm ?? "")
-      );
-
-      setAge(
-        String(data.age ?? data.alter ?? "")
-      );
-
-      setGender(
-        data.gender ??
-          data.geschlecht ??
-          "male"
-      );
-    }
-  }
-
-  async function loadMembers() {
-    if (!eventId) return;
-
-    const { data, error } = await supabase
-      .from("event_members")
-      .select(`
-        id,
-        profile_id,
-        role,
-        joined_at,
-        profiles (*)
-      `)
-      .eq("event_id", eventId)
-      .order("joined_at", {
-        ascending: true,
-      });
-
-    if (error) {
-      console.error(error);
-      setMembers([]);
-      return;
-    }
-
-    const mapped = (data ?? []).map(
-      (row: any) => ({
-        id: row.id,
-        profile_id: row.profile_id,
-        role: row.role,
-        joined_at: row.joined_at,
-        profile: row.profiles,
-      })
-    );
-
-    setMembers(mapped);
-  }
-
-  async function loadDrinks() {
-    if (!eventId) return;
-
-    const { data, error } = await supabase
-      .from("drinks")
-      .select("*")
-      .eq("event_id", eventId)
-      .order("created_at", {
-        ascending: false,
-      });
-
-    if (error) {
-      console.error(error);
-      setDrinks([]);
-      return;
-    }
-
-    setDrinks((data ?? []) as Drink[]);
-  }
-
-  async function loadBeerRequests() {
-    if (!eventId) return;
-
-    const { data } = await supabase
-      .from("beer_requests")
-      .select("*")
-      .eq("event_id", eventId)
-      .order("created_at", {
-        ascending: false,
-      });
-
-    setBeerRequests(
-      (data ?? []) as BeerRequest[]
-    );
-  }
-
-  async function loadBeerResponses() {
-    if (!eventId) return;
-
-    const requestIds =
-      beerRequests.map((request) => request.id);
-
-    if (requestIds.length === 0) {
-      setBeerResponses([]);
-      return;
-    }
-
-    const { data } = await supabase
-      .from("beer_request_responses")
-      .select("*")
-      .in("request_id", requestIds);
-
-    setBeerResponses(
-      (data ?? []) as BeerResponse[]
-    );
-  }
-
-  async function loadCrates() {
-    if (!eventId) return;
-
-    const { data } = await supabase
-      .from("beer_crate_sponsorships")
-      .select("*")
-      .eq("event_id", eventId)
-      .order("created_at", {
-        ascending: false,
-      });
-
-    setCrates((data ?? []) as Crate[]);
-  }
-
-  async function loadChallenges() {
-    if (!eventId) return;
-
-    const { data } = await supabase
-      .from("challenge_dashboard")
-      .select("*")
-      .eq("event_id", eventId)
-      .order("created_at", {
-        ascending: false,
-      });
-
-    setChallenges(
-      (data ?? []) as Challenge[]
-    );
-  }
-
-  async function loadNotifications() {
-    if (!currentProfile?.id) return;
-
-    const { data } = await supabase
-      .from("notifications")
-      .select("*")
-      .eq("profile_id", currentProfile.id)
-      .order("created_at", {
-        ascending: false,
-      })
-      .limit(30);
-
-    if (data) {
-      setNotifications(
-        data as Notification[]
-      );
-    }
-  }
-
-  async function loadEverything() {
-    setLoading(true);
-
-    await loadProfile();
-    await loadEvents();
-
-    setLoading(false);
-  }
-
-  useEffect(() => {
-    loadEverything();
-  }, []);
-
-  useEffect(() => {
-    if (!eventId) return;
-
-    Promise.all([
-      loadMembers(),
-      loadDrinks(),
-      loadBeerRequests(),
-      loadCrates(),
-      loadChallenges(),
-    ]);
-  }, [eventId]);
-
-  useEffect(() => {
-    loadBeerResponses();
-  }, [beerRequests]);
-
-  useEffect(() => {
-    loadNotifications();
-  }, [currentProfile?.id]);
-
-  async function refresh() {
-    await Promise.all([
-      loadMembers(),
-      loadDrinks(),
-      loadBeerRequests(),
-      loadCrates(),
-      loadChallenges(),
-      loadNotifications(),
-    ]);
-  }
-
-  async function saveProfileData() {
-    if (!currentProfile) {
-      flash("❌ Kein Profil gefunden.");
-      return;
-    }
-
-    const parsedWeight =
-      Number(weight) || null;
-    const parsedHeight =
-      Number(height) || null;
-    const parsedAge =
-      Number(age) || null;
-
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        weight_kg: parsedWeight,
-        height_cm: parsedHeight,
-        age: parsedAge,
-        gender,
-        gewicht_kg: parsedWeight,
-        alter: parsedAge,
-        geschlecht: gender,
-      })
-      .eq("id", currentProfile.id);
-
-    if (error) {
-      flash("❌ Profil konnte nicht gespeichert werden.");
-      return;
-    }
-
-    setCurrentProfile({
-      ...currentProfile,
-      weight_kg: parsedWeight,
-      height_cm: parsedHeight,
-      age: parsedAge,
-      gender,
-      gewicht_kg: parsedWeight,
-      alter: parsedAge,
-      geschlecht: gender,
-    });
-
-    flash("✅ Profil gespeichert.");
-  }
-
-  async function joinEvent() {
-    const code = joinCode.trim();
-
-    if (!code) {
-      flash("❌ Bitte Einladungscode eingeben.");
-      return;
-    }
-
-    if (!currentProfile) {
-      flash("❌ Du musst angemeldet sein.");
-      return;
-    }
-
-    const { data: event } = await supabase
-      .from("events")
-      .select("id,title")
-      .eq("invite_code", code)
-      .maybeSingle();
-
-    if (!event) {
-      flash("❌ Einladungscode nicht gefunden.");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("event_members")
-      .upsert(
-        {
-          event_id: event.id,
-          profile_id: currentProfile.id,
-          role: "member",
-          joined_via_code: code,
-        },
-        {
-          onConflict:
-            "event_id,profile_id",
-        }
-      );
-
-    if (error) {
-      flash(
-        "❌ Beitritt fehlgeschlagen: " +
-          error.message
+    if (!profile) {
+      notify(
+        "❌ Bitte zuerst einen Benutzer anmelden."
       );
       return;
     }
 
-    setEventId(event.id);
-    setJoinCode("");
-
-    await loadEvents();
-    await refresh();
-
-    flash(
-      `✅ Du bist jetzt bei „${event.title}“ dabei.`
-    );
-  }
-
-  async function addDrink() {
     if (!eventId) {
-      flash("❌ Kein Event ausgewählt.");
-      return;
-    }
-
-    if (!drinkName.trim()) {
-      flash("❌ Bitte Getränkenamen eingeben.");
+      notify("❌ Bitte zuerst ein Event auswählen.");
       return;
     }
 
     setSaving(true);
 
-    const liters = Number(drinkLiters) || 0;
-    const alcohol = Number(drinkAlcohol) || 0;
-    const price = Number(drinkPrice) || 0;
-    const quantity =
-      Math.max(1, Number(drinkQuantity) || 1);
+    try {
+      const existing = members.some(
+        (member) =>
+          (
+            member.profile?.name ??
+            member.profile?.username ??
+            ""
+          ).toLowerCase() ===
+          personName.trim().toLowerCase()
+      );
 
-    const insertData = {
-      event_id: eventId,
-      profile_id: currentProfile?.id ?? null,
+      if (existing) {
+        notify("❌ Teilnehmer bereits vorhanden.");
+        return;
+      }
 
-      category: drinkCategory,
-      drink_name: drinkName.trim(),
-      brand: drinkBrand.trim() || null,
+      const { error } = await supabase
+        .from("event_members")
+        .insert({
+          event_id: eventId,
+          profile_id: profile.id,
+          joined_via_code:
+            event?.invite_code ?? null,
+          role: "member",
+        });
 
-      liters,
-      alcohol_percent: alcohol,
-      quantity,
+      if (error) {
+        throw error;
+      }
 
-      comment:
-        drinkComment.trim() || null,
+      setPersonName("");
 
-      marke:
-        drinkBrand.trim() || null,
+      notify("✅ Teilnehmer hinzugefügt.");
 
-      getraenk: drinkName.trim(),
-      menge: liters,
-      alkohol: alcohol,
-      preis: price,
+      await loadEventData(eventId);
+    } catch (error: any) {
+      notify(
+        "❌ Teilnehmer konnte nicht hinzugefügt werden: " +
+          error.message
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
 
-      price,
-      shared_cost: true,
-    };
+  async function joinWithInviteCode() {
+    if (!inviteCode.trim()) {
+      notify("❌ Einladungscode eingeben.");
+      return;
+    }
 
-    const { error } = await supabase
-      .from("drinks")
-      .insert(insertData);
+    if (!profile) {
+      notify("❌ Bitte zuerst anmelden.");
+      return;
+    }
 
-    setSaving(false);
+    setSaving(true);
 
-    if (error) {
-      flash(
+    try {
+      const { data: foundEvent, error } =
+        await supabase
+          .from("events")
+          .select("*")
+          .eq(
+            "invite_code",
+            inviteCode.trim()
+          )
+          .maybeSingle();
+
+      if (error) {
+        throw error;
+      }
+
+      if (!foundEvent) {
+        notify("❌ Einladungscode nicht gefunden.");
+        return;
+      }
+
+      const { error: memberError } =
+        await supabase
+          .from("event_members")
+          .upsert(
+            {
+              event_id: foundEvent.id,
+              profile_id: profile.id,
+              joined_via_code:
+                inviteCode.trim(),
+              role: "member",
+            },
+            {
+              onConflict:
+                "event_id,profile_id",
+            }
+          );
+
+      if (memberError) {
+        throw memberError;
+      }
+
+      setEvents((old) => [
+        foundEvent,
+        ...old.filter(
+          (item) => item.id !== foundEvent.id
+        ),
+      ]);
+
+      setEventId(foundEvent.id);
+      setInviteCode("");
+
+      notify(
+        "🎉 Du bist dem Event beigetreten!"
+      );
+    } catch (error: any) {
+      notify(
+        "❌ " +
+          (error?.message ||
+            "Beitritt fehlgeschlagen.")
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveDrink() {
+    if (!eventId) {
+      notify("❌ Bitte zuerst ein Event auswählen.");
+      return;
+    }
+
+    if (!drinkName.trim()) {
+      notify("❌ Bitte ein Getränk eingeben.");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const { error } = await supabase
+        .from("drinks")
+        .insert({
+          event_id: eventId,
+          profile_id: profile?.id ?? null,
+          category,
+          drink_name: drinkName.trim(),
+          getraenk: drinkName.trim(),
+          brand: brand.trim() || null,
+          marke: brand.trim() || null,
+          liters: Number(liters) || 0.5,
+          menge: Number(liters) || 0.5,
+          alcohol_percent:
+            Number(alcohol) || 0,
+          alkohol: Number(alcohol) || 0,
+          quantity: 1,
+          price: Number(price) || 0,
+          preis: Number(price) || 0,
+          promille_wert: 0,
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      setDrinkName("");
+      setBrand("");
+      setLiters("0.5");
+      setAlcohol("5");
+      setPrice("0");
+
+      notify("🍺 Getränk gespeichert.");
+
+      await loadEventData(eventId);
+    } catch (error: any) {
+      notify(
         "❌ Getränk konnte nicht gespeichert werden: " +
           error.message
       );
-      return;
+    } finally {
+      setSaving(false);
     }
-
-    setDrinkName("");
-    setDrinkBrand("");
-    setDrinkCategory("Bier");
-    setDrinkLiters("0.5");
-    setDrinkAlcohol("5");
-    setDrinkPrice("0");
-    setDrinkQuantity("1");
-    setDrinkComment("");
-
-    setShowDrinkForm(false);
-
-    await loadDrinks();
-
-    flash("🍺 Getränk gespeichert.");
   }
 
-  async function requestBeer() {
-    if (!eventId || !currentProfile) {
-      flash(
-        "❌ Du musst einem Event beigetreten sein."
-      );
+  async function assignDrink(drink: Drink) {
+    if (!profile) {
+      notify("❌ Kein Benutzerprofil gefunden.");
       return;
     }
 
-    if (myPendingBeerRequest) {
-      flash(
-        "🍺 Deine Bier-Anfrage läuft bereits."
+    const litersValue = Number(
+      drink.liters ??
+        drink.menge ??
+        0
+    );
+
+    const drinkAlcohol = Number(
+      drink.alcohol_percent ??
+        drink.alkohol ??
+        0
+    );
+
+    const drinkPrice = Number(
+      drink.price ??
+        drink.preis ??
+        0
+    );
+
+    try {
+      const { error } = await supabase
+        .from("drinks")
+        .update({
+          profile_id: profile.id,
+        })
+        .eq("id", drink.id);
+
+      if (error) {
+        throw error;
+      }
+
+      const alcoholGrams =
+        litersValue *
+        1000 *
+        (drinkAlcohol / 100) *
+        0.789;
+
+      await supabase
+        .from("alcohol_consumption")
+        .insert({
+          user_id:
+            profile.user_id ??
+            null,
+          alcohol_grams:
+            alcoholGrams,
+        });
+
+      await supabase
+        .from("blood_alcohol")
+        .upsert(
+          {
+            event_id: eventId,
+            member_id: profile.id,
+            alcohol_grams:
+              alcoholGrams,
+            current_promille:
+              calculatePromille(
+                alcoholGrams
+              ),
+            calculated_at:
+              new Date().toISOString(),
+          },
+          {
+            onConflict:
+              "event_id,member_id",
+          }
+        );
+
+      notify(
+        `🍺 ${drink.drink_name ?? drink.getraenk ?? "Bier"} zugeordnet · +10 Punkte`
       );
-      return;
-    }
 
-    const { error } = await supabase
-      .from("beer_requests")
-      .insert({
-        event_id: eventId,
-        requester_profile_id:
-          currentProfile.id,
-        status: "pending",
-        message:
-          "🍺 Ich möchte gerne ein Bier trinken!",
-      });
-
-    if (error) {
-      flash(
-        "❌ Bier-Anfrage konnte nicht erstellt werden: " +
+      await loadEventData(eventId);
+    } catch (error: any) {
+      notify(
+        "❌ Getränk konnte nicht zugeordnet werden: " +
           error.message
       );
-      return;
     }
-
-    await loadBeerRequests();
-
-    flash(
-      "🍺 Bier-Anfrage wurde an die Teilnehmer geschickt."
-    );
   }
 
-  async function respondToBeerRequest(
-    request: BeerRequest,
-    response: "accepted" | "rejected"
+  function calculatePromille(
+    alcoholGrams: number
   ) {
-    if (!currentProfile) return;
+    const kg =
+      Number(
+        profile?.weight_kg ??
+          profile?.gewicht_kg ??
+          weight
+      ) || 82;
 
-    const existing =
-      beerResponses.find(
-        (item) =>
-          item.request_id === request.id &&
-          item.profile_id ===
-            currentProfile.id
-      );
+    const factor =
+      gender === "female"
+        ? 0.55
+        : 0.68;
 
-    if (existing) {
-      flash("Du hast bereits abgestimmt.");
+    return alcoholGrams / (kg * factor);
+  }
+
+  const myDrinks = useMemo(() => {
+    if (!profile) return [];
+
+    return drinks.filter(
+      (drink) =>
+        drink.profile_id ===
+        profile.id
+    );
+  }, [drinks, profile]);
+
+  const totalLiters = useMemo(
+    () =>
+      drinks.reduce(
+        (sum, drink) =>
+          sum +
+          Number(
+            drink.liters ??
+              drink.menge ??
+              0
+          ) *
+            Number(
+              drink.quantity ?? 1
+            ),
+        0
+      ),
+    [drinks]
+  );
+
+  const totalCost = useMemo(
+    () =>
+      drinks.reduce(
+        (sum, drink) =>
+          sum +
+          Number(
+            drink.price ??
+              drink.preis ??
+              0
+          ) *
+            Number(
+              drink.quantity ?? 1
+            ),
+        0
+      ),
+    [drinks]
+  );
+
+  const myLiters = useMemo(
+    () =>
+      myDrinks.reduce(
+        (sum, drink) =>
+          sum +
+          Number(
+            drink.liters ??
+              drink.menge ??
+              0
+          ),
+        0
+      ),
+    [myDrinks]
+  );
+
+  const myPoints =
+    Number(profile?.points ?? 0);
+
+  const ranking = useMemo(() => {
+    return [...members].sort(
+      (a, b) =>
+        Number(
+          b.profile?.points ?? 0
+        ) -
+        Number(
+          a.profile?.points ?? 0
+        )
+    );
+  }, [members]);
+
+  const myPromille = useMemo(() => {
+    const grams = myDrinks.reduce(
+      (sum, drink) => {
+        const l =
+          Number(
+            drink.liters ??
+              drink.menge ??
+              0
+          );
+
+        const alc =
+          Number(
+            drink.alcohol_percent ??
+              drink.alkohol ??
+              0
+          );
+
+        return (
+          sum +
+          l *
+            1000 *
+            (alc / 100) *
+            0.789
+        );
+      },
+      0
+    );
+
+    return calculatePromille(
+      grams
+    );
+  }, [
+    myDrinks,
+    profile,
+    weight,
+    gender,
+  ]);
+
+  const costPerPerson =
+    members.length > 0
+      ? totalCost / members.length
+      : 0;
+
+  const pendingBeerRequests =
+    beerRequests.filter(
+      (request) =>
+        request.status ===
+        "pending"
+    );
+
+  async function requestBeer() {
+    if (!profile) {
+      notify("❌ Kein Benutzerprofil.");
       return;
     }
 
-    const { error } = await supabase
-      .from("beer_request_responses")
-      .insert({
-        request_id: request.id,
-        profile_id: currentProfile.id,
-        response,
-      });
-
-    if (error) {
-      flash(
-        "❌ Antwort konnte nicht gespeichert werden."
-      );
+    if (!eventId) {
+      notify("❌ Kein Event ausgewählt.");
       return;
     }
 
-    const expected =
-      Math.max(0, members.length - 1);
+    try {
+      const { error } =
+        await supabase
+          .from("beer_requests")
+          .insert({
+            event_id: eventId,
+            requester_profile_id:
+              profile.id,
+            status: "pending",
+            message:
+              beerMessage.trim() ||
+              "🍺 Ich möchte gerne ein Bier trinken!",
+          });
 
-    const { count } = await supabase
-      .from("beer_request_responses")
-      .select("*", {
-        count: "exact",
-        head: true,
-      })
-      .eq("request_id", request.id);
+      if (error) {
+        throw error;
+      }
 
-    const totalResponses =
-      Number(count ?? 0);
+      setBeerMessage("");
 
-    if (
-      totalResponses >= expected &&
-      expected > 0
-    ) {
-      const { data: responses } =
+      notify(
+        "🍺 Bier-Anfrage wurde an alle Teilnehmer gesendet!"
+      );
+
+      await loadEventData(eventId);
+    } catch (error: any) {
+      notify(
+        "❌ Bier-Anfrage fehlgeschlagen: " +
+          error.message
+      );
+    }
+  }
+
+  async function answerBeerRequest(
+    request: BeerRequest,
+    response: "accepted" | "declined"
+  ) {
+    if (!profile) return;
+
+    try {
+      const { error } =
         await supabase
           .from(
             "beer_request_responses"
           )
-          .select("response")
-          .eq("request_id", request.id);
+          .upsert(
+            {
+              request_id:
+                request.id,
+              profile_id:
+                profile.id,
+              response,
+            },
+            {
+              onConflict:
+                "request_id,profile_id",
+            }
+          );
+
+      if (error) {
+        throw error;
+      }
+
+      const responses =
+        beerResponses.filter(
+          (item) =>
+            item.request_id ===
+            request.id
+        );
 
       const accepted =
-        (responses ?? []).filter(
-          (item: any) =>
-            item.response === "accepted"
-        ).length;
+        responses.filter(
+          (item) =>
+            item.response ===
+            "accepted"
+        ).length +
+        (response === "accepted"
+          ? 1
+          : 0);
 
-      const rejected =
-        (responses ?? []).filter(
-          (item: any) =>
-            item.response === "rejected"
-        ).length;
+      const total =
+        Math.max(
+          members.length - 1,
+          1
+        );
 
-      let status = "pending";
-
-      if (accepted > rejected) {
-        status = "accepted";
+      if (accepted >= total) {
+        await supabase
+          .from("beer_requests")
+          .update({
+            status: "accepted",
+            responded_at:
+              new Date().toISOString(),
+          })
+          .eq(
+            "id",
+            request.id
+          );
       }
 
-      if (rejected > accepted) {
-        status = "rejected";
-      }
+      notify(
+        response === "accepted"
+          ? "✅ Du hast zugestimmt."
+          : "❌ Du hast abgelehnt."
+      );
 
-      if (accepted === rejected) {
-        status = "tie";
-      }
-
-      await supabase
-        .from("beer_requests")
-        .update({
-          status,
-          responded_at:
-            new Date().toISOString(),
-        })
-        .eq("id", request.id);
-    }
-
-    await loadBeerRequests();
-    await loadBeerResponses();
-
-    flash(
-      response === "accepted"
-        ? "👍 Zustimmung gespeichert."
-        : "❌ Ablehnung gespeichert."
-    );
-  }
-
-  async function sponsorBeerCrate() {
-    if (!eventId || !currentProfile) {
-      flash("❌ Kein Event/Profil vorhanden.");
-      return;
-    }
-
-    const points = 50;
-
-    const { error } = await supabase
-      .from("beer_crate_sponsorships")
-      .insert({
-        event_id: eventId,
-        profile_id: currentProfile.id,
-        crates: 1,
-        points_awarded: points,
-        description:
-          "🍺 Eine Kiste Bier ausgegeben",
-      });
-
-    if (error) {
-      flash(
-        "❌ Bierkiste konnte nicht eingetragen werden: " +
+      await loadEventData(eventId);
+    } catch (error: any) {
+      notify(
+        "❌ Antwort konnte nicht gespeichert werden: " +
           error.message
       );
+    }
+  }
+
+  async function sponsorCrate() {
+    if (!profile) {
+      notify("❌ Kein Benutzerprofil.");
       return;
     }
 
-    await supabase
-      .from("profiles")
-      .update({
-        points:
-          Number(currentProfile.points ?? 0) +
-          points,
-      })
-      .eq("id", currentProfile.id);
+    try {
+      const { error } =
+        await supabase
+          .from(
+            "beer_crate_sponsorships"
+          )
+          .insert({
+            event_id: eventId,
+            profile_id:
+              profile.id,
+            crates: 1,
+            points_awarded: 100,
+            description:
+              "🍺 Bierkiste ausgegeben",
+          });
 
-    setCurrentProfile({
-      ...currentProfile,
-      points:
-        Number(currentProfile.points ?? 0) +
-        points,
-    });
+      if (error) {
+        throw error;
+      }
 
-    await refresh();
+      notify(
+        "🍺 Bierkiste ausgegeben! +100 Punkte"
+      );
 
-    flash(
-      "🍺 Kiste Bier ausgegeben – +50 Punkte!"
-    );
+      await loadEventData(eventId);
+    } catch (error: any) {
+      notify(
+        "❌ Bierkiste konnte nicht gespeichert werden: " +
+          error.message
+      );
+    }
   }
 
   async function createChallenge() {
-    if (!eventId) return;
-
     if (!challengeTitle.trim()) {
-      flash("❌ Challenge-Titel fehlt.");
+      notify(
+        "❌ Bitte einen Challenge-Namen eingeben."
+      );
       return;
     }
 
-    const { error } = await supabase
-      .from("challenges")
-      .insert({
-        event_id: eventId,
-        title: challengeTitle.trim(),
-        description:
-          challengeDescription.trim() ||
-          null,
-        points:
-          Number(challengePoints) || 10,
-        status: "open",
-        required_votes: members.length,
-      });
+    try {
+      const { error } =
+        await supabase
+          .from(
+            "challenges"
+          )
+          .insert({
+            event_id: eventId,
+            title:
+              challengeTitle.trim(),
+            description:
+              challengeDescription.trim(),
+            points:
+              Number(
+                challengePoints
+              ) || 50,
+            status: "open",
+          });
 
-    if (error) {
-      flash(
+      if (error) {
+        /*
+         * Falls die Tabelle "challenges"
+         * nicht vorhanden ist, verwenden wir
+         * die vorhandene Dashboard-Struktur.
+         */
+        const fallback =
+          await supabase
+            .from(
+              "challenge_dashboard"
+            )
+            .insert({
+              event_id: eventId,
+              title:
+                challengeTitle.trim(),
+              description:
+                challengeDescription.trim(),
+              category:
+                "Event",
+              points:
+                Number(
+                  challengePoints
+                ) || 50,
+              status: "open",
+              required_votes:
+                Math.max(
+                  members.length - 1,
+                  1
+                ),
+              assigned_profile_id:
+                profile?.id ?? null,
+            });
+
+        if (fallback.error) {
+          throw fallback.error;
+        }
+      }
+
+      setChallengeTitle("");
+      setChallengeDescription("");
+      setChallengePoints("50");
+
+      notify(
+        "🔥 Challenge erstellt!"
+      );
+
+      await loadEventData(eventId);
+    } catch (error: any) {
+      notify(
         "❌ Challenge konnte nicht erstellt werden: " +
           error.message
       );
-      return;
     }
-
-    setChallengeTitle("");
-    setChallengeDescription("");
-    setChallengePoints("10");
-
-    await loadChallenges();
-
-    flash("🎯 Challenge erstellt.");
   }
 
-  async function deleteDrink(id: string) {
-    const { error } = await supabase
-      .from("drinks")
-      .delete()
-      .eq("id", id);
+  async function updateProfile() {
+    if (!profile) return;
 
-    if (error) {
-      flash(
-        "❌ Getränk konnte nicht gelöscht werden."
+    setSaving(true);
+
+    try {
+      const updateData = {
+        weight_kg:
+          Number(weight) || null,
+        gewicht_kg:
+          Number(weight) || null,
+        height_cm:
+          Number(height) || null,
+        age:
+          Number(age) || null,
+        alter:
+          Number(age) || null,
+        gender,
+        geschlecht:
+          gender,
+      };
+
+      const { error } =
+        await supabase
+          .from("profiles")
+          .update(updateData)
+          .eq("id", profile.id);
+
+      if (error) {
+        throw error;
+      }
+
+      setProfile({
+        ...profile,
+        ...updateData,
+      });
+
+      notify(
+        "✅ Profil gespeichert."
       );
-      return;
+    } catch (error: any) {
+      notify(
+        "❌ Profil konnte nicht gespeichert werden: " +
+          error.message
+      );
+    } finally {
+      setSaving(false);
     }
-
-    await loadDrinks();
-    flash("🗑️ Getränk gelöscht.");
   }
 
-  async function markNotificationRead(
-    notificationId: string
-  ) {
-    await supabase
-      .from("notifications")
-      .update({ read: true })
-      .eq("id", notificationId);
+  async function saveEventSettings() {
+    if (!eventId) return;
 
-    await loadNotifications();
+    try {
+      const { error } =
+        await supabase
+          .from("events")
+          .update(settings)
+          .eq("id", eventId);
+
+      if (error) {
+        throw error;
+      }
+
+      setEvent((old) =>
+        old
+          ? {
+              ...old,
+              ...settings,
+            }
+          : old
+      );
+
+      notify(
+        "✅ Event-Einstellungen gespeichert."
+      );
+    } catch (error: any) {
+      notify(
+        "❌ Einstellungen konnten nicht gespeichert werden: " +
+          error.message
+      );
+    }
   }
 
-  function calculatePromille(
-    profile: Profile | null
-  ) {
-    if (!profile) return 0;
-
-    const bodyWeight =
-      Number(
-        profile.weight_kg ??
-          profile.gewicht_kg
-      ) || 0;
-
-    if (!bodyWeight) return 0;
-
-    const genderValue =
-      profile.gender ??
-      profile.geschlecht ??
-      "male";
-
-    const factor =
-      genderValue === "female"
-        ? 0.55
-        : 0.68;
-
-    const alcohol =
-      totalAlcoholGrams;
-
-    if (!alcohol) return 0;
-
+  if (loading && events.length === 0) {
     return (
-      alcohol /
-      (bodyWeight * factor)
-    );
-  }
-
-  const currentPromille =
-    calculatePromille(currentProfile);
-
-  if (loading) {
-    return (
-      <main className="page">
-        <div className="loading">
-          <div className="beer-loader">🍺</div>
-          <h1>Güstener Zapfhahn Zentrale</h1>
-          <p>App wird geladen …</p>
+      <main className="loadingPage">
+        <div className="loaderCard">
+          <div className="crateIcon">
+            🍺🍺🍺
+          </div>
+          <h1>
+            Güstener Zapfhahn Zentrale
+          </h1>
+          <p>
+            App wird geladen ...
+          </p>
         </div>
-
-        <style jsx>{styles}</style>
       </main>
     );
   }
 
   return (
-    <main className="page">
-      <div className="app">
+    <main className="app">
+      <div className="shell">
 
         <header className="hero">
-          <div className="heroLogo">
-            <span className="crateLogo">
-              🍺🍺
-              <br />
-              🍺🍺
-            </span>
+          <div className="brand">
+            <div className="crateLogo">
+              <span>🍺</span>
+              <span>🍺</span>
+              <span>🍺</span>
+              <span>🍺</span>
+              <span>🍺</span>
+              <span>🍺</span>
+            </div>
+
+            <div>
+              <h1>
+                Güstener Zapfhahn Zentrale
+              </h1>
+
+              <p>
+                Events · Getränke · Kosten ·
+                Rankings · Challenges
+              </p>
+            </div>
           </div>
 
-          <div className="heroText">
-            <h1>
-              Güstener Zapfhahn Zentrale
-            </h1>
-            <p>
-              Events · Getränke · Kosten · Rankings
-            </p>
-          </div>
+          <div className="heroActions">
+            <button
+              className="crateButton"
+              onClick={sponsorCrate}
+            >
+              <span className="crateMini">
+                🍺🍺
+                <br />
+                🍺🍺
+              </span>
 
-          <button
-            className="refreshButton"
-            onClick={refresh}
-            title="Aktualisieren"
-          >
-            ↻
-          </button>
+              <span>
+                Bierkiste
+                <small>
+                  +100 Punkte
+                </small>
+              </span>
+            </button>
+
+            <button
+              className="beerButton"
+              onClick={() =>
+                setTab("beer")
+              }
+            >
+              🍺
+              <span>
+                Bier?
+                <small>
+                  Anfrage senden
+                </small>
+              </span>
+            </button>
+          </div>
         </header>
-
-        {message && (
-          <div className="message">
-            {message}
-          </div>
-        )}
 
         <section className="eventCard">
           <div>
@@ -1142,99 +1250,64 @@ export default function Home() {
               AKTUELLES EVENT
             </span>
 
-            <select
-              value={eventId}
-              onChange={(event) =>
-                setEventId(event.target.value)
-              }
-            >
-              <option value="">
-                Event auswählen
+            <h2>
+              {event?.title ??
+                "Kein Event ausgewählt"}
+            </h2>
+
+            <p>
+              {event?.location ||
+                "Güsten"}
+              {" · "}
+              {event?.start_date ||
+                "Datum offen"}
+            </p>
+          </div>
+
+          <select
+            value={eventId}
+            onChange={(e) =>
+              setEventId(e.target.value)
+            }
+          >
+            <option value="">
+              Event auswählen
+            </option>
+
+            {events.map((item) => (
+              <option
+                key={item.id}
+                value={item.id}
+              >
+                {item.title}
               </option>
-
-              {events.map((event) => (
-                <option
-                  key={event.id}
-                  value={event.id}
-                >
-                  {event.title}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {selectedEvent && (
-            <div className="eventInfo">
-              <strong>
-                {selectedEvent.title}
-              </strong>
-
-              {selectedEvent.location && (
-                <span>
-                  📍 {selectedEvent.location}
-                </span>
-              )}
-
-              <span>
-                🔑 Code:{" "}
-                <b>
-                  {selectedEvent.invite_code ||
-                    "—"}
-                </b>
-              </span>
-            </div>
-          )}
-        </section>
-
-        <section className="joinCard">
-          <div>
-            <b>🔑 Event beitreten</b>
-            <small>
-              Einladungscode eingeben
-            </small>
-          </div>
-
-          <div className="joinRow">
-            <input
-              value={joinCode}
-              onChange={(e) =>
-                setJoinCode(e.target.value)
-              }
-              placeholder="Einladungscode"
-            />
-
-            <button
-              onClick={joinEvent}
-              className="primary"
-            >
-              Beitreten
-            </button>
-          </div>
+            ))}
+          </select>
         </section>
 
         <nav className="tabs">
           <button
             className={
-              activeTab === "home"
+              tab === "home"
                 ? "active"
                 : ""
             }
             onClick={() =>
-              setActiveTab("home")
+              setTab("home")
             }
           >
             🏠
-            <span>Übersicht</span>
+            <span>Home</span>
           </button>
 
           <button
             className={
-              activeTab === "drinks"
+              tab === "drinks"
                 ? "active"
                 : ""
             }
             onClick={() =>
-              setActiveTab("drinks")
+              setTab("drinks")
             }
           >
             🍺
@@ -1243,54 +1316,75 @@ export default function Home() {
 
           <button
             className={
-              activeTab === "people"
+              tab === "beer"
                 ? "active"
                 : ""
             }
             onClick={() =>
-              setActiveTab("people")
+              setTab("beer")
             }
           >
-            👥
-            <span>Teilnehmer</span>
+            🍻
+            <span>Bier</span>
+
+            {pendingBeerRequests.length >
+              0 && (
+              <i>
+                {pendingBeerRequests.length}
+              </i>
+            )}
           </button>
 
           <button
             className={
-              activeTab === "challenges"
+              tab === "challenges"
                 ? "active"
                 : ""
             }
             onClick={() =>
-              setActiveTab("challenges")
+              setTab("challenges")
             }
           >
-            🎯
+            🔥
             <span>Challenges</span>
           </button>
 
-          {(currentProfile?.role ===
-            "admin" ||
-            currentProfile?.role ===
-              "owner" ||
-            currentProfile?.is_global_admin) && (
-            <button
-              className={
-                activeTab === "admin"
-                  ? "active"
-                  : ""
-              }
-              onClick={() =>
-                setActiveTab("admin")
-              }
-            >
-              👑
-              <span>Admin</span>
-            </button>
-          )}
+          <button
+            className={
+              tab === "ranking"
+                ? "active"
+                : ""
+            }
+            onClick={() =>
+              setTab("ranking")
+            }
+          >
+            🏆
+            <span>Ranking</span>
+          </button>
+
+          <button
+            className={
+              tab === "stats"
+                ? "active"
+                : ""
+            }
+            onClick={() =>
+              setTab("stats")
+            }
+          >
+            📊
+            <span>Statistik</span>
+          </button>
         </nav>
 
-        {activeTab === "home" && (
+        {message && (
+          <div className="toast">
+            {message}
+          </div>
+        )}
+
+        {tab === "home" && (
           <>
             <section className="statsGrid">
               <div className="stat">
@@ -1298,7 +1392,9 @@ export default function Home() {
                 <strong>
                   {drinks.length}
                 </strong>
-                <small>Getränke</small>
+                <small>
+                  Getränke
+                </small>
               </div>
 
               <div className="stat">
@@ -1306,7 +1402,9 @@ export default function Home() {
                 <strong>
                   {totalLiters.toFixed(1)}
                 </strong>
-                <small>Liter</small>
+                <small>
+                  Liter
+                </small>
               </div>
 
               <div className="stat">
@@ -1314,7 +1412,9 @@ export default function Home() {
                 <strong>
                   {totalCost.toFixed(2)} €
                 </strong>
-                <small>Kosten</small>
+                <small>
+                  Kosten
+                </small>
               </div>
 
               <div className="stat">
@@ -1322,544 +1422,395 @@ export default function Home() {
                 <strong>
                   {members.length}
                 </strong>
-                <small>Teilnehmer</small>
+                <small>
+                  Teilnehmer
+                </small>
               </div>
             </section>
 
-            <section className="actionGrid">
-              <button
-                className="beerAction"
-                onClick={requestBeer}
-                disabled={
-                  Boolean(myPendingBeerRequest)
-                }
-              >
-                <span className="actionIcon">
+            <section className="featureGrid">
+
+              <div className="featureCard beerFeature">
+                <div className="featureIcon">
                   🍺
-                </span>
+                </div>
 
-                <strong>
-                  {myPendingBeerRequest
-                    ? "Anfrage läuft …"
-                    : "Ich möchte ein Bier"}
-                </strong>
+                <div>
+                  <h3>
+                    Ich möchte ein Bier
+                  </h3>
 
-                <small>
-                  Alle Teilnehmer stimmen ab
-                </small>
-              </button>
+                  <p>
+                    Alle Teilnehmer bekommen
+                    eine Anfrage.
+                  </p>
+                </div>
 
-              <button
-                className="crateAction"
-                onClick={sponsorBeerCrate}
-              >
-                <span className="crateVisual">
+                <button
+                  onClick={requestBeer}
+                >
+                  🍺 Bier anfragen
+                </button>
+              </div>
+
+              <div className="featureCard crateFeature">
+                <div className="featureIcon crateVisual">
                   🍺🍺
                   <br />
                   🍺🍺
-                </span>
-
-                <strong>
-                  Bierkiste ausgeben
-                </strong>
-
-                <small>
-                  +50 Punkte
-                </small>
-              </button>
-            </section>
-
-            {pendingBeerRequests.length >
-              0 && (
-              <section className="card">
-                <div className="sectionHeader">
-                  <div>
-                    <span className="eyebrow">
-                      BIER-ANFRAGEN
-                    </span>
-                    <h2>
-                      🍺 Wer möchte ein Bier?
-                    </h2>
-                  </div>
-
-                  <span className="badge">
-                    {pendingBeerRequests.length}
-                  </span>
                 </div>
 
-                {pendingBeerRequests.map(
-                  (request) => {
-                    const requester =
-                      members.find(
-                        (member) =>
-                          member.profile_id ===
-                          request.requester_profile_id
-                      );
+                <div>
+                  <h3>
+                    Bierkiste ausgeben
+                  </h3>
 
-                    const myResponse =
-                      beerResponses.find(
-                        (response) =>
-                          response.request_id ===
-                            request.id &&
-                          response.profile_id ===
-                            currentProfile?.id
-                      );
+                  <p>
+                    Eine Kiste spendieren und
+                    Punkte sammeln.
+                  </p>
+                </div>
 
-                    const isMine =
-                      request.requester_profile_id ===
-                      currentProfile?.id;
+                <button
+                  onClick={sponsorCrate}
+                >
+                  🍻 Kiste ausgeben
+                </button>
+              </div>
 
-                    return (
-                      <div
-                        className="request"
-                        key={request.id}
-                      >
-                        <div>
-                          <strong>
-                            🍺{" "}
-                            {isMine
-                              ? "Du"
-                              : getProfileName(
-                                  requester?.profile ??
-                                    null
-                                )}
-                          </strong>
-
-                          <small>
-                            möchte gerne ein Bier
-                            trinken.
-                          </small>
-                        </div>
-
-                        {!isMine &&
-                          !myResponse && (
-                            <div className="requestButtons">
-                              <button
-                                className="accept"
-                                onClick={() =>
-                                  respondToBeerRequest(
-                                    request,
-                                    "accepted"
-                                  )
-                                }
-                              >
-                                👍 Ja
-                              </button>
-
-                              <button
-                                className="reject"
-                                onClick={() =>
-                                  respondToBeerRequest(
-                                    request,
-                                    "rejected"
-                                  )
-                                }
-                              >
-                                ❌ Nein
-                              </button>
-                            </div>
-                          )}
-
-                        {myResponse && (
-                          <span className="answered">
-                            {myResponse.response ===
-                            "accepted"
-                              ? "👍 Zugestimmt"
-                              : "❌ Abgelehnt"}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  }
-                )}
-              </section>
-            )}
+            </section>
 
             <section className="card">
-              <div className="sectionHeader">
+              <div className="sectionTitle">
                 <div>
                   <span className="eyebrow">
-                    MEIN PROFIL
+                    DEIN EVENT
                   </span>
+
                   <h2>
-                    👤 Promille & Daten
+                    👥 Teilnehmer
                   </h2>
                 </div>
+
+                <span className="countBadge">
+                  {members.length}
+                </span>
               </div>
 
-              <div className="profileGrid">
+              <div className="addRow">
                 <input
-                  type="number"
-                  placeholder="Gewicht kg"
-                  value={weight}
+                  value={personName}
                   onChange={(e) =>
-                    setWeight(e.target.value)
+                    setPersonName(
+                      e.target.value
+                    )
                   }
+                  placeholder="Teilnehmername"
                 />
 
-                <input
-                  type="number"
-                  placeholder="Größe cm"
-                  value={height}
-                  onChange={(e) =>
-                    setHeight(e.target.value)
-                  }
-                />
-
-                <input
-                  type="number"
-                  placeholder="Alter"
-                  value={age}
-                  onChange={(e) =>
-                    setAge(e.target.value)
-                  }
-                />
-
-                <select
-                  value={gender}
-                  onChange={(e) =>
-                    setGender(e.target.value)
-                  }
+                <button
+                  onClick={addPerson}
+                  disabled={saving}
                 >
-                  <option value="male">
-                    Männlich
-                  </option>
-                  <option value="female">
-                    Weiblich
-                  </option>
-                </select>
+                  ➕ Hinzufügen
+                </button>
               </div>
 
-              <button
-                className="secondary"
-                onClick={saveProfileData}
-              >
-                💾 Profildaten speichern
-              </button>
-
-              {eventSettings.show_promille !==
-                false && (
-                <div className="promilleBox">
-                  <div>
-                    <small>
-                      AKTUELLER SCHÄTZWERT
-                    </small>
-                    <strong>
-                      {currentPromille.toFixed(
-                        2
-                      )} ‰
-                    </strong>
-                  </div>
-
-                  <span>
-                    Berechnung anhand der
-                    hinterlegten Körperdaten und
-                    erfassten Getränke.
-                  </span>
-                </div>
-              )}
-            </section>
-
-            {eventSettings.show_ranking !==
-              false && (
-              <section className="card">
-                <div className="sectionHeader">
-                  <div>
-                    <span className="eyebrow">
-                      LEADERBOARD
-                    </span>
-                    <h2>
-                      🏆 Ranking
-                    </h2>
-                  </div>
-
-                  <b>
-                    {totalPoints} Pkt.
-                  </b>
-                </div>
-
-                {ranking.length === 0 ? (
+              <div className="members">
+                {members.length === 0 ? (
                   <div className="empty">
-                    Noch keine Teilnehmer.
+                    👥 Noch keine Teilnehmer.
                   </div>
                 ) : (
-                  ranking.map(
+                  members.map(
                     (member, index) => (
                       <div
-                        className="rankingRow"
+                        className="member"
                         key={member.id}
                       >
-                        <strong className="place">
-                          {index === 0
-                            ? "🥇"
-                            : index === 1
-                            ? "🥈"
-                            : index === 2
-                            ? "🥉"
-                            : `${index + 1}.`}
-                        </strong>
+                        <div className="avatar">
+                          {(
+                            member.profile
+                              ?.name ??
+                            member.profile
+                              ?.username ??
+                            "?"
+                          )
+                            .charAt(0)
+                            .toUpperCase()}
+                        </div>
 
-                        <div className="rankingName">
-                          <b>
-                            {getProfileName(
+                        <div className="memberInfo">
+                          <strong>
+                            {member.profile
+                              ?.name ??
                               member.profile
-                            )}
-                          </b>
+                                ?.username ??
+                              "Teilnehmer"}
+                          </strong>
+
                           <small>
                             🍺{" "}
                             {member.profile
                               ?.drinks_count ??
+                              0}
+                            {" · "}
+                            🏆{" "}
+                            {member.profile
+                              ?.points ??
                               0}{" "}
-                            Getränke
+                            Punkte
                           </small>
                         </div>
 
-                        <strong>
-                          {member.profile
-                            ?.points ?? 0}{" "}
-                          Punkte
-                        </strong>
+                        {index === 0 && (
+                          <span className="miniBadge">
+                            ⭐
+                          </span>
+                        )}
                       </div>
                     )
                   )
                 )}
-              </section>
-            )}
+              </div>
+            </section>
 
-            {eventSettings.cost_overview_enabled !==
-              false && (
-              <section className="card costCard">
+            <section className="card">
+              <div className="sectionTitle">
+                <div>
+                  <span className="eyebrow">
+                    DEIN PROFIL
+                  </span>
+
+                  <h2>
+                    👤 Meine Werte
+                  </h2>
+                </div>
+              </div>
+
+              <div className="profileStats">
+                <div>
+                  <span>🏆</span>
+                  <strong>
+                    {myPoints}
+                  </strong>
+                  <small>
+                    Punkte
+                  </small>
+                </div>
+
+                <div>
+                  <span>🍺</span>
+                  <strong>
+                    {myDrinks.length}
+                  </strong>
+                  <small>
+                    Getränke
+                  </small>
+                </div>
+
+                <div>
+                  <span>💧</span>
+                  <strong>
+                    {myLiters.toFixed(1)}
+                  </strong>
+                  <small>
+                    Liter
+                  </small>
+                </div>
+
+                {settings.show_promille && (
+                  <div>
+                    <span>⚠️</span>
+                    <strong>
+                      {myPromille.toFixed(
+                        2
+                      )}
+                      ‰
+                    </strong>
+                    <small>
+                      Promille
+                    </small>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="card inviteCard">
+              <div>
                 <span className="eyebrow">
-                  KOSTEN
+                  EVENT BEITRETEN
                 </span>
 
                 <h2>
-                  💶 Kostenaufteilung
+                  🔗 Einladungscode
                 </h2>
 
-                <div className="bigMoney">
-                  {totalCost.toFixed(2)} €
-                </div>
-
                 <p>
-                  Gesamtkosten des Events
+                  Freunde können mit dem
+                  Einladungscode beitreten.
                 </p>
+              </div>
 
-                <div className="costRow">
+              <div className="inviteRow">
+                <input
+                  value={inviteCode}
+                  onChange={(e) =>
+                    setInviteCode(
+                      e.target.value
+                    )
+                  }
+                  placeholder="z.B. GUEST2026"
+                />
+
+                <button
+                  onClick={
+                    joinWithInviteCode
+                  }
+                >
+                  Beitreten
+                </button>
+              </div>
+
+              {event?.invite_code && (
+                <div className="currentCode">
                   <span>
-                    👥 Teilnehmer
+                    Dein Event-Code
                   </span>
-                  <b>{members.length}</b>
+
+                  <strong>
+                    {event.invite_code}
+                  </strong>
                 </div>
-
-                <div className="costRow">
-                  <span>
-                    💶 Pro Person
-                  </span>
-                  <b>
-                    {costPerPerson.toFixed(2)} €
-                  </b>
-                </div>
-
-                <div className="costRow">
-                  <span>
-                    🍺 Liter
-                  </span>
-                  <b>
-                    {totalLiters.toFixed(1)} L
-                  </b>
-                </div>
-              </section>
-            )}
-
-            {unreadNotifications > 0 && (
-              <section className="card">
-                <div className="sectionHeader">
-                  <h2>
-                    🔔 Benachrichtigungen
-                  </h2>
-
-                  <span className="badge">
-                    {unreadNotifications}
-                  </span>
-                </div>
-
-                {notifications
-                  .filter(
-                    (notification) =>
-                      !notification.read
-                  )
-                  .map((notification) => (
-                    <div
-                      className="notification"
-                      key={notification.id}
-                      onClick={() =>
-                        markNotificationRead(
-                          notification.id
-                        )
-                      }
-                    >
-                      <strong>
-                        {notification.title}
-                      </strong>
-                      <p>
-                        {notification.message}
-                      </p>
-                    </div>
-                  ))}
-              </section>
-            )}
+              )}
+            </section>
           </>
         )}
 
-        {activeTab === "drinks" && (
+        {tab === "drinks" && (
           <>
             <section className="card">
-              <div className="sectionHeader">
+              <div className="sectionTitle">
+                <div>
+                  <span className="eyebrow">
+                    VERWALTUNG
+                  </span>
+
+                  <h2>
+                    🍺 Getränk hinzufügen
+                  </h2>
+                </div>
+              </div>
+
+              <input
+                value={drinkName}
+                onChange={(e) =>
+                  setDrinkName(
+                    e.target.value
+                  )
+                }
+                placeholder="Getränk"
+              />
+
+              <div className="formGrid">
+                <input
+                  value={brand}
+                  onChange={(e) =>
+                    setBrand(e.target.value)
+                  }
+                  placeholder="Marke"
+                />
+
+                <select
+                  value={category}
+                  onChange={(e) =>
+                    setCategory(
+                      e.target.value
+                    )
+                  }
+                >
+                  <option>Bier</option>
+                  <option>Radler</option>
+                  <option>Wein</option>
+                  <option>Sekt</option>
+                  <option>Spirituose</option>
+                  <option>Longdrink</option>
+                  <option>Softdrink</option>
+                  <option>Sonstiges</option>
+                </select>
+
+                <input
+                  type="number"
+                  step="0.1"
+                  value={liters}
+                  onChange={(e) =>
+                    setLiters(
+                      e.target.value
+                    )
+                  }
+                  placeholder="Liter"
+                />
+
+                <input
+                  type="number"
+                  step="0.1"
+                  value={alcohol}
+                  onChange={(e) =>
+                    setAlcohol(
+                      e.target.value
+                    )
+                  }
+                  placeholder="Alkohol %"
+                />
+
+                <input
+                  type="number"
+                  step="0.01"
+                  value={price}
+                  onChange={(e) =>
+                    setPrice(
+                      e.target.value
+                    )
+                  }
+                  placeholder="Preis €"
+                />
+              </div>
+
+              <button
+                className="primary full"
+                onClick={saveDrink}
+                disabled={saving}
+              >
+                🍻 Getränk speichern
+              </button>
+            </section>
+
+            <section className="card">
+              <div className="sectionTitle">
                 <div>
                   <span className="eyebrow">
                     GETRÄNKE
                   </span>
+
                   <h2>
-                    🍺 Getränkeverwaltung
+                    🍺 Alle Getränke
                   </h2>
                 </div>
 
-                <button
-                  className="primary"
-                  onClick={() =>
-                    setShowDrinkForm(
-                      !showDrinkForm
-                    )
-                  }
-                >
-                  ➕ Getränk
-                </button>
+                <span className="countBadge">
+                  {drinks.length}
+                </span>
               </div>
 
-              {showDrinkForm && (
-                <div className="formCard">
-                  <input
-                    placeholder="Getränk"
-                    value={drinkName}
-                    onChange={(e) =>
-                      setDrinkName(
-                        e.target.value
-                      )
-                    }
-                  />
-
-                  <div className="twoGrid">
-                    <input
-                      placeholder="Marke"
-                      value={drinkBrand}
-                      onChange={(e) =>
-                        setDrinkBrand(
-                          e.target.value
-                        )
-                      }
-                    />
-
-                    <select
-                      value={drinkCategory}
-                      onChange={(e) =>
-                        setDrinkCategory(
-                          e.target.value
-                        )
-                      }
-                    >
-                      <option>Bier</option>
-                      <option>Wein</option>
-                      <option>Sekt</option>
-                      <option>Longdrink</option>
-                      <option>Shot</option>
-                      <option>Softdrink</option>
-                      <option>Wasser</option>
-                      <option>Sonstiges</option>
-                    </select>
+              <div className="drinkList">
+                {drinks.length === 0 ? (
+                  <div className="empty">
+                    🍺 Noch keine Getränke.
                   </div>
-
-                  <div className="fourGrid">
-                    <input
-                      type="number"
-                      step="0.1"
-                      placeholder="Liter"
-                      value={drinkLiters}
-                      onChange={(e) =>
-                        setDrinkLiters(
-                          e.target.value
-                        )
-                      }
-                    />
-
-                    <input
-                      type="number"
-                      step="0.1"
-                      placeholder="%"
-                      value={drinkAlcohol}
-                      onChange={(e) =>
-                        setDrinkAlcohol(
-                          e.target.value
-                        )
-                      }
-                    />
-
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="Preis €"
-                      value={drinkPrice}
-                      onChange={(e) =>
-                        setDrinkPrice(
-                          e.target.value
-                        )
-                      }
-                    />
-
-                    <input
-                      type="number"
-                      min="1"
-                      placeholder="Anzahl"
-                      value={drinkQuantity}
-                      onChange={(e) =>
-                        setDrinkQuantity(
-                          e.target.value
-                        )
-                      }
-                    />
-                  </div>
-
-                  <textarea
-                    placeholder="Kommentar"
-                    value={drinkComment}
-                    onChange={(e) =>
-                      setDrinkComment(
-                        e.target.value
-                      )
-                    }
-                  />
-
-                  <button
-                    className="primary full"
-                    onClick={addDrink}
-                    disabled={saving}
-                  >
-                    {saving
-                      ? "Speichere …"
-                      : "🍻 Getränk speichern"}
-                  </button>
-                </div>
-              )}
-
-              {drinks.length === 0 ? (
-                <div className="empty">
-                  Noch keine Getränke.
-                </div>
-              ) : (
-                <div className="drinkList">
-                  {drinks.map((drink) => (
+                ) : (
+                  drinks.map((drink) => (
                     <div
-                      className="drinkRow"
+                      className="drink"
                       key={drink.id}
                     >
                       <div className="drinkIcon">
@@ -1868,236 +1819,296 @@ export default function Home() {
 
                       <div className="drinkInfo">
                         <strong>
-                          {getDrinkName(
-                            drink
-                          )}
+                          {drink.drink_name ??
+                            drink.getraenk ??
+                            "Getränk"}
                         </strong>
 
                         <small>
-                          {drink.brand ||
-                            drink.marke ||
-                            "—"}
+                          {drink.brand ??
+                            drink.marke ??
+                            ""}
                           {" · "}
-                          {getDrinkLiters(
-                            drink
+                          {Number(
+                            drink.liters ??
+                              drink.menge ??
+                              0
                           ).toFixed(1)}{" "}
                           L
                           {" · "}
-                          {getDrinkAlcohol(
-                            drink
+                          {Number(
+                            drink.alcohol_percent ??
+                              drink.alkohol ??
+                              0
                           ).toFixed(1)}
                           %
                         </small>
                       </div>
 
-                      <div className="drinkPrice">
-                        <b>
-                          {getDrinkPrice(
-                            drink
+                      <div className="drinkRight">
+                        <strong>
+                          {Number(
+                            drink.price ??
+                              drink.preis ??
+                              0
                           ).toFixed(2)}{" "}
                           €
-                        </b>
+                        </strong>
 
                         <button
-                          className="tinyDelete"
                           onClick={() =>
-                            deleteDrink(
-                              drink.id
+                            assignDrink(
+                              drink
                             )
                           }
                         >
-                          ×
+                          Zuordnen
                         </button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                  ))
+                )}
+              </div>
             </section>
           </>
         )}
 
-        {activeTab === "people" && (
+        {tab === "beer" && (
           <>
+            <section className="beerHero">
+              <div className="bigBeer">
+                🍺
+              </div>
+
+              <h2>
+                Ich möchte ein Bier!
+              </h2>
+
+              <p>
+                Alle anderen Teilnehmer
+                bekommen deine Anfrage und
+                können zustimmen oder ablehnen.
+              </p>
+
+              <textarea
+                value={beerMessage}
+                onChange={(e) =>
+                  setBeerMessage(
+                    e.target.value
+                  )
+                }
+                placeholder="Nachricht optional ..."
+              />
+
+              <button
+                className="beerBigButton"
+                onClick={requestBeer}
+              >
+                🍺 BIER ANFRAGEN
+              </button>
+            </section>
+
             <section className="card">
-              <div className="sectionHeader">
+              <div className="sectionTitle">
+                <div>
+                  <span className="eyebrow">
+                    ANFRAGEN
+                  </span>
+
+                  <h2>
+                    🍻 Bier-Anfragen
+                  </h2>
+                </div>
+
+                <span className="countBadge">
+                  {pendingBeerRequests.length}
+                </span>
+              </div>
+
+              <div className="requestList">
+                {beerRequests.length ===
+                0 ? (
+                  <div className="empty">
+                    🍺 Keine Bier-Anfragen.
+                  </div>
+                ) : (
+                  beerRequests.map(
+                    (request) => {
+                      const requester =
+                        members.find(
+                          (member) =>
+                            member.profile_id ===
+                            request.requester_profile_id
+                        );
+
+                      const ownResponse =
+                        beerResponses.find(
+                          (response) =>
+                            response.request_id ===
+                              request.id &&
+                            response.profile_id ===
+                              profile?.id
+                        );
+
+                      const responseCount =
+                        beerResponses.filter(
+                          (response) =>
+                            response.request_id ===
+                            request.id
+                        ).length;
+
+                      return (
+                        <div
+                          className="request"
+                          key={request.id}
+                        >
+                          <div className="requestTop">
+                            <div className="avatar beerAvatar">
+                              🍺
+                            </div>
+
+                            <div>
+                              <strong>
+                                {requester
+                                  ?.profile
+                                  ?.name ??
+                                  requester
+                                    ?.profile
+                                    ?.username ??
+                                  "Teilnehmer"}
+                              </strong>
+
+                              <small>
+                                {request.message}
+                              </small>
+                            </div>
+
+                            <span
+                              className={
+                                "status " +
+                                request.status
+                              }
+                            >
+                              {request.status ===
+                              "accepted"
+                                ? "✅"
+                                : request.status ===
+                                  "declined"
+                                ? "❌"
+                                : "⏳"}
+                            </span>
+                          </div>
+
+                          <div className="votes">
+                            👍{" "}
+                            {responseCount}{" "}
+                            Antworten
+                          </div>
+
+                          {request.status ===
+                            "pending" &&
+                            request.requester_profile_id !==
+                              profile?.id &&
+                            !ownResponse && (
+                              <div className="voteButtons">
+                                <button
+                                  className="accept"
+                                  onClick={() =>
+                                    answerBeerRequest(
+                                      request,
+                                      "accepted"
+                                    )
+                                  }
+                                >
+                                  ✅ Zustimmen
+                                </button>
+
+                                <button
+                                  className="decline"
+                                  onClick={() =>
+                                    answerBeerRequest(
+                                      request,
+                                      "declined"
+                                    )
+                                  }
+                                >
+                                  ❌ Ablehnen
+                                </button>
+                              </div>
+                            )}
+                        </div>
+                      );
+                    }
+                  )
+                )}
+              </div>
+            </section>
+          </>
+        )}
+
+        {tab === "challenges" && (
+          <>
+            <section className="card challengeCreate">
+              <div className="sectionTitle">
                 <div>
                   <span className="eyebrow">
                     EVENT
                   </span>
+
                   <h2>
-                    👥 Teilnehmer
+                    🔥 Challenge erstellen
                   </h2>
                 </div>
-
-                <strong>
-                  {members.length}
-                </strong>
               </div>
 
-              {members.map((member) => (
-                <div
-                  className="personRow"
-                  key={member.id}
-                >
-                  <div className="avatar">
-                    {getProfileName(
-                      member.profile
-                    )
-                      .charAt(0)
-                      .toUpperCase()}
-                  </div>
+              <input
+                value={challengeTitle}
+                onChange={(e) =>
+                  setChallengeTitle(
+                    e.target.value
+                  )
+                }
+                placeholder="Challenge"
+              />
 
-                  <div>
-                    <strong>
-                      {getProfileName(
-                        member.profile
-                      )}
-                    </strong>
+              <textarea
+                value={
+                  challengeDescription
+                }
+                onChange={(e) =>
+                  setChallengeDescription(
+                    e.target.value
+                  )
+                }
+                placeholder="Beschreibung"
+              />
 
-                    <small>
-                      {member.role ||
-                        "member"}
-                    </small>
-                  </div>
+              <input
+                type="number"
+                value={challengePoints}
+                onChange={(e) =>
+                  setChallengePoints(
+                    e.target.value
+                  )
+                }
+                placeholder="Punkte"
+              />
 
-                  <div className="personStats">
-                    <b>
-                      {member.profile
-                        ?.points ?? 0}
-                    </b>
-                    <small>Punkte</small>
-                  </div>
-                </div>
-              ))}
+              <button
+                className="primary full"
+                onClick={
+                  createChallenge
+                }
+              >
+                🔥 Challenge starten
+              </button>
             </section>
 
-            <section className="card">
-              <span className="eyebrow">
-                BIERKISTEN
-              </span>
-
-              <h2>
-                🍺 Ausgegebene Kisten
-              </h2>
-
-              {crates.length === 0 ? (
-                <div className="empty">
-                  Noch keine Kisten.
-                </div>
-              ) : (
-                crates.map((crate) => {
-                  const member =
-                    members.find(
-                      (item) =>
-                        item.profile_id ===
-                        crate.profile_id
-                    );
-
-                  return (
-                    <div
-                      className="crateRow"
-                      key={crate.id}
-                    >
-                      <span className="crateEmoji">
-                        🍺🍺
-                      </span>
-
-                      <div>
-                        <strong>
-                          {getProfileName(
-                            member?.profile ??
-                              null
-                          )}
-                        </strong>
-
-                        <small>
-                          {crate.crates} Kiste
-                          {crate.crates !== 1
-                            ? "n"
-                            : ""}{" "}
-                          · +
-                          {
-                            crate.points_awarded
-                          }{" "}
-                          Punkte
-                        </small>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </section>
-          </>
-        )}
-
-        {activeTab === "challenges" && (
-          <>
-            <section className="card">
-              <span className="eyebrow">
-                COMMUNITY
-              </span>
-
-              <h2>
-                🎯 Challenges
-              </h2>
-
-              {(currentProfile?.role ===
-                "admin" ||
-                currentProfile?.role ===
-                  "owner" ||
-                currentProfile
-                  ?.is_global_admin) && (
-                <div className="formCard">
-                  <input
-                    placeholder="Challenge"
-                    value={challengeTitle}
-                    onChange={(e) =>
-                      setChallengeTitle(
-                        e.target.value
-                      )
-                    }
-                  />
-
-                  <textarea
-                    placeholder="Beschreibung"
-                    value={
-                      challengeDescription
-                    }
-                    onChange={(e) =>
-                      setChallengeDescription(
-                        e.target.value
-                      )
-                    }
-                  />
-
-                  <input
-                    type="number"
-                    placeholder="Punkte"
-                    value={
-                      challengePoints
-                    }
-                    onChange={(e) =>
-                      setChallengePoints(
-                        e.target.value
-                      )
-                    }
-                  />
-
-                  <button
-                    className="primary full"
-                    onClick={
-                      createChallenge
-                    }
-                  >
-                    🎯 Challenge erstellen
-                  </button>
-                </div>
-              )}
-
-              {challenges.length === 0 ? (
-                <div className="empty">
-                  Noch keine Challenges.
+            <section className="challengeGrid">
+              {challenges.length ===
+              0 ? (
+                <div className="card empty">
+                  🔥 Noch keine Challenges.
                 </div>
               ) : (
                 challenges.map(
@@ -2107,44 +2118,37 @@ export default function Home() {
                       key={challenge.id}
                     >
                       <div className="challengeIcon">
-                        🎯
+                        🔥
                       </div>
 
-                      <div className="challengeInfo">
+                      <span className="challengeCategory">
+                        {challenge.category ??
+                          "Event"}
+                      </span>
+
+                      <h3>
+                        {challenge.title ??
+                          "Challenge"}
+                      </h3>
+
+                      <p>
+                        {challenge.description ??
+                          ""}
+                      </p>
+
+                      <div className="challengeBottom">
                         <strong>
-                          {challenge.title ||
-                            "Challenge"}
+                          +{" "}
+                          {challenge.points ??
+                            0}{" "}
+                          Punkte
                         </strong>
 
-                        <p>
-                          {challenge.description ||
-                            "Keine Beschreibung"}
-                        </p>
-
-                        <small>
-                          {challenge.category ||
-                            "Community"}
-                          {" · "}
-                          {
-                            challenge.points
-                          }{" "}
-                          Punkte
-                        </small>
+                        <span>
+                          {challenge.status ??
+                            "open"}
+                        </span>
                       </div>
-
-                      <span
-                        className={
-                          challenge.status ===
-                          "completed"
-                            ? "status done"
-                            : "status"
-                        }
-                      >
-                        {challenge.status ===
-                        "completed"
-                          ? "Erledigt"
-                          : "Offen"}
-                      </span>
                     </div>
                   )
                 )
@@ -2153,181 +2157,459 @@ export default function Home() {
           </>
         )}
 
-        {activeTab === "admin" && (
-          <>
-            <section className="card adminCard">
-              <span className="eyebrow">
-                ADMIN
+        {tab === "ranking" && (
+          <section className="card">
+            <div className="rankingHero">
+              <span>
+                🏆
               </span>
 
               <h2>
-                👑 Event-Verwaltung
+                Güstener Ranking
               </h2>
 
-              {selectedEvent && (
-                <div className="adminInfo">
-                  <div>
-                    <span>Event</span>
-                    <strong>
-                      {selectedEvent.title}
-                    </strong>
-                  </div>
+              <p>
+                Wer sammelt die meisten Punkte?
+              </p>
+            </div>
 
-                  <div>
-                    <span>
-                      Einladungscode
-                    </span>
-                    <strong>
-                      {selectedEvent.invite_code ||
-                        "—"}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>Teilnehmer</span>
-                    <strong>
-                      {members.length}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>Getränke</span>
-                    <strong>
-                      {drinks.length}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>Liter</span>
-                    <strong>
-                      {totalLiters.toFixed(
-                        1
-                      )}{" "}
-                      L
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>Punkte</span>
-                    <strong>
-                      {totalPoints}
-                    </strong>
-                  </div>
+            <div className="rankingList">
+              {ranking.length ===
+              0 ? (
+                <div className="empty">
+                  Noch keine Teilnehmer.
                 </div>
+              ) : (
+                ranking.map(
+                  (member, index) => (
+                    <div
+                      className={
+                        "rankRow " +
+                        (index < 3
+                          ? "top"
+                          : "")
+                      }
+                      key={member.id}
+                    >
+                      <strong className="rankNumber">
+                        {index === 0
+                          ? "🥇"
+                          : index === 1
+                          ? "🥈"
+                          : index === 2
+                          ? "🥉"
+                          : index + 1}
+                      </strong>
+
+                      <div className="avatar">
+                        {(
+                          member.profile
+                            ?.name ??
+                          member.profile
+                            ?.username ??
+                          "?"
+                        )
+                          .charAt(0)
+                          .toUpperCase()}
+                      </div>
+
+                      <div className="rankName">
+                        <strong>
+                          {member.profile
+                            ?.name ??
+                            member.profile
+                              ?.username ??
+                            "Teilnehmer"}
+                        </strong>
+
+                        <small>
+                          🍺{" "}
+                          {member.profile
+                            ?.drinks_count ??
+                            0}{" "}
+                          Getränke
+                        </small>
+                      </div>
+
+                      <strong className="points">
+                        {member.profile
+                          ?.points ??
+                          0}{" "}
+                        P.
+                      </strong>
+                    </div>
+                  )
+                )
               )}
+            </div>
+          </section>
+        )}
+
+        {tab === "stats" && (
+          <>
+            <section className="statsGrid large">
+              <div className="stat">
+                <span>🍺</span>
+                <strong>
+                  {drinks.length}
+                </strong>
+                <small>
+                  Getränke
+                </small>
+              </div>
+
+              <div className="stat">
+                <span>💧</span>
+                <strong>
+                  {totalLiters.toFixed(1)}
+                </strong>
+                <small>
+                  Liter
+                </small>
+              </div>
+
+              <div className="stat">
+                <span>💶</span>
+                <strong>
+                  {totalCost.toFixed(2)} €
+                </strong>
+                <small>
+                  Gesamtkosten
+                </small>
+              </div>
+
+              <div className="stat">
+                <span>👥</span>
+                <strong>
+                  {members.length}
+                </strong>
+                <small>
+                  Teilnehmer
+                </small>
+              </div>
             </section>
 
             <section className="card">
               <h2>
-                ⚙️ Event-Funktionen
+                📊 Kostenaufteilung
               </h2>
 
-              <div className="settingsList">
-                {[
-                  [
-                    "ranking_enabled",
-                    "🏆 Ranking",
-                  ],
-                  [
-                    "show_points",
-                    "⭐ Punkte anzeigen",
-                  ],
-                  [
-                    "show_ranking",
-                    "🏆 Rangliste anzeigen",
-                  ],
-                  [
-                    "show_promille",
-                    "🍷 Promille anzeigen",
-                  ],
-                  [
-                    "show_statistics",
-                    "📊 Statistiken",
-                  ],
-                  [
-                    "show_drink_amounts",
-                    "🍺 Getränkemengen",
-                  ],
-                  [
-                    "photo_required",
-                    "📸 Fotos erforderlich",
-                  ],
-                  [
-                    "ai_recognition_enabled",
-                    "🤖 KI-Erkennung",
-                  ],
-                  [
-                    "manual_entry_allowed",
-                    "✍️ Manuelle Eingabe",
-                  ],
-                  [
-                    "cost_overview_enabled",
-                    "💶 Kostenübersicht",
-                  ],
-                  [
-                    "auto_split_costs",
-                    "💶 Kosten automatisch teilen",
-                  ],
-                  [
-                    "team_mode",
-                    "👥 Team-Modus",
-                  ],
-                  [
-                    "show_photos",
-                    "📸 Fotos anzeigen",
-                  ],
-                  [
-                    "show_costs",
-                    "💶 Kosten anzeigen",
-                  ],
-                  [
-                    "privacy_mode",
-                    "🔒 Datenschutzmodus",
-                  ],
-                ].map(
-                  ([key, label]) => {
-                    const enabled =
-                      Boolean(
-                        selectedEvent?.[
-                          key as keyof Event
-                        ]
-                      );
-
-                    return (
-                      <div
-                        className="settingRow"
-                        key={key}
-                      >
-                        <span>{label}</span>
-                        <span
-                          className={
-                            enabled
-                              ? "toggle on"
-                              : "toggle"
-                          }
-                        >
-                          {enabled
-                            ? "AN"
-                            : "AUS"}
-                        </span>
-                      </div>
-                    );
-                  }
-                )}
+              <div className="costBig">
+                {totalCost.toFixed(2)} €
               </div>
 
-              <p className="hint">
-                Die vorhandenen Event-Einstellungen
-                aus Supabase werden hier
-                berücksichtigt.
-              </p>
+              <div className="costRows">
+                <div>
+                  <span>
+                    👥 Teilnehmer
+                  </span>
+
+                  <strong>
+                    {members.length}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>
+                    💶 Pro Person
+                  </span>
+
+                  <strong>
+                    {costPerPerson.toFixed(
+                      2
+                    )}{" "}
+                    €
+                  </strong>
+                </div>
+
+                <div>
+                  <span>
+                    🏆 Punkte
+                  </span>
+
+                  <strong>
+                    {members.reduce(
+                      (sum, member) =>
+                        sum +
+                        Number(
+                          member.profile
+                            ?.points ??
+                            0
+                        ),
+                      0
+                    )}
+                  </strong>
+                </div>
+              </div>
+            </section>
+
+            {settings.show_promille && (
+              <section className="card">
+                <h2>
+                  ⚠️ Promille
+                </h2>
+
+                <div className="promilleBox">
+                  <strong>
+                    {myPromille.toFixed(
+                      2
+                    )}{" "}
+                    ‰
+                  </strong>
+
+                  <span>
+                    geschätzter aktueller
+                    Wert
+                  </span>
+                </div>
+
+                <p className="warning">
+                  Der Promillewert ist nur eine
+                  Schätzung und kein
+                  medizinisches Messverfahren.
+                </p>
+              </section>
+            )}
+          </>
+        )}
+
+        {tab === "settings" && (
+          <>
+            <section className="card">
+              <h2>
+                👤 Mein Profil
+              </h2>
+
+              <div className="formGrid">
+                <input
+                  type="number"
+                  value={weight}
+                  onChange={(e) =>
+                    setWeight(
+                      e.target.value
+                    )
+                  }
+                  placeholder="Gewicht kg"
+                />
+
+                <input
+                  type="number"
+                  value={height}
+                  onChange={(e) =>
+                    setHeight(
+                      e.target.value
+                    )
+                  }
+                  placeholder="Größe cm"
+                />
+
+                <input
+                  type="number"
+                  value={age}
+                  onChange={(e) =>
+                    setAge(
+                      e.target.value
+                    )
+                  }
+                  placeholder="Alter"
+                />
+
+                <select
+                  value={gender}
+                  onChange={(e) =>
+                    setGender(
+                      e.target.value
+                    )
+                  }
+                >
+                  <option value="male">
+                    Männlich
+                  </option>
+
+                  <option value="female">
+                    Weiblich
+                  </option>
+
+                  <option value="other">
+                    Divers
+                  </option>
+                </select>
+              </div>
+
+              <button
+                className="primary full"
+                onClick={
+                  updateProfile
+                }
+              >
+                💾 Profil speichern
+              </button>
+            </section>
+
+            <section className="card">
+              <h2>
+                ⚙️ Event-Einstellungen
+              </h2>
+
+              <SettingsSwitch
+                label="Ranking aktivieren"
+                value={
+                  settings.ranking_enabled
+                }
+                onChange={(value) =>
+                  setSettings({
+                    ...settings,
+                    ranking_enabled:
+                      value,
+                  })
+                }
+              />
+
+              <SettingsSwitch
+                label="Punkte anzeigen"
+                value={
+                  settings.show_points
+                }
+                onChange={(value) =>
+                  setSettings({
+                    ...settings,
+                    show_points:
+                      value,
+                  })
+                }
+              />
+
+              <SettingsSwitch
+                label="Ranking anzeigen"
+                value={
+                  settings.show_ranking
+                }
+                onChange={(value) =>
+                  setSettings({
+                    ...settings,
+                    show_ranking:
+                      value,
+                  })
+                }
+              />
+
+              <SettingsSwitch
+                label="Promille anzeigen"
+                value={
+                  settings.show_promille
+                }
+                onChange={(value) =>
+                  setSettings({
+                    ...settings,
+                    show_promille:
+                      value,
+                  })
+                }
+              />
+
+              <SettingsSwitch
+                label="Statistiken anzeigen"
+                value={
+                  settings.show_statistics
+                }
+                onChange={(value) =>
+                  setSettings({
+                    ...settings,
+                    show_statistics:
+                      value,
+                  })
+                }
+              />
+
+              <SettingsSwitch
+                label="Getränkemengen anzeigen"
+                value={
+                  settings.show_drink_amounts
+                }
+                onChange={(value) =>
+                  setSettings({
+                    ...settings,
+                    show_drink_amounts:
+                      value,
+                  })
+                }
+              />
+
+              <SettingsSwitch
+                label="Kostenübersicht"
+                value={
+                  settings.cost_overview_enabled
+                }
+                onChange={(value) =>
+                  setSettings({
+                    ...settings,
+                    cost_overview_enabled:
+                      value,
+                  })
+                }
+              />
+
+              <SettingsSwitch
+                label="Kosten automatisch teilen"
+                value={
+                  settings.auto_split_costs
+                }
+                onChange={(value) =>
+                  setSettings({
+                    ...settings,
+                    auto_split_costs:
+                      value,
+                  })
+                }
+              />
+
+              <SettingsSwitch
+                label="Team-Modus"
+                value={
+                  settings.team_mode
+                }
+                onChange={(value) =>
+                  setSettings({
+                    ...settings,
+                    team_mode:
+                      value,
+                  })
+                }
+              />
+
+              <SettingsSwitch
+                label="Privatsphäre-Modus"
+                value={
+                  settings.privacy_mode
+                }
+                onChange={(value) =>
+                  setSettings({
+                    ...settings,
+                    privacy_mode:
+                      value,
+                  })
+                }
+              />
+
+              <button
+                className="primary full"
+                onClick={
+                  saveEventSettings
+                }
+              >
+                💾 Einstellungen speichern
+              </button>
             </section>
           </>
         )}
 
         <footer>
+          <div className="footerLogo">
+            🍻
+          </div>
+
           <strong>
-            🍻 Güstener Zapfhahn Zentrale
+            Güstener Zapfhahn Zentrale
           </strong>
 
           <small>
@@ -2335,860 +2617,1326 @@ export default function Home() {
             Deine Runde.
           </small>
         </footer>
+
       </div>
 
-      <style jsx>{styles}</style>
+      <div className="bottomNav">
+        <button
+          className={
+            tab === "home"
+              ? "active"
+              : ""
+          }
+          onClick={() =>
+            setTab("home")
+          }
+        >
+          🏠
+          <small>
+            Home
+          </small>
+        </button>
+
+        <button
+          className={
+            tab === "drinks"
+              ? "active"
+              : ""
+          }
+          onClick={() =>
+            setTab("drinks")
+          }
+        >
+          🍺
+          <small>
+            Getränke
+          </small>
+        </button>
+
+        <button
+          className="bottomBeer"
+          onClick={requestBeer}
+        >
+          🍺
+        </button>
+
+        <button
+          className={
+            tab === "ranking"
+              ? "active"
+              : ""
+          }
+          onClick={() =>
+            setTab("ranking")
+          }
+        >
+          🏆
+          <small>
+            Ranking
+          </small>
+        </button>
+
+        <button
+          className={
+            tab === "settings"
+              ? "active"
+              : ""
+          }
+          onClick={() =>
+            setTab("settings")
+          }
+        >
+          ⚙️
+          <small>
+            Mehr
+          </small>
+        </button>
+      </div>
+
+      <style jsx global>{`
+        * {
+          box-sizing: border-box;
+        }
+
+        html,
+        body {
+          margin: 0 !important;
+          padding: 0 !important;
+          width: 100%;
+          min-height: 100%;
+          background: #070a0d !important;
+        }
+
+        body {
+          font-family:
+            Arial,
+            Helvetica,
+            sans-serif;
+          color: #f8fafc;
+        }
+
+        button,
+        input,
+        select,
+        textarea {
+          font: inherit;
+        }
+
+        button {
+          border: 0;
+        }
+
+        .app {
+          min-height: 100vh;
+          width: 100%;
+          overflow-x: hidden;
+          background:
+            radial-gradient(
+              circle at 50% -10%,
+              #263a4d 0,
+              #101820 30%,
+              #070a0d 70%
+            );
+        }
+
+        .shell {
+          width: min(
+            1100px,
+            calc(100% - 28px)
+          );
+          margin: 0 auto;
+          padding: 22px 0 110px;
+        }
+
+        .loadingPage {
+          min-height: 100vh;
+          margin: 0;
+          padding: 0;
+          display: grid;
+          place-items: center;
+          background: #070a0d;
+          color: white;
+        }
+
+        .loaderCard {
+          text-align: center;
+          padding: 30px;
+        }
+
+        .loaderCard h1 {
+          font-size: 25px;
+        }
+
+        .crateIcon {
+          font-size: 42px;
+          letter-spacing: -10px;
+          margin-bottom: 20px;
+        }
+
+        .hero {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 20px;
+          padding: 10px 0 25px;
+        }
+
+        .brand {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+
+        .brand h1 {
+          margin: 0;
+          font-size: clamp(
+            22px,
+            4vw,
+            34px
+          );
+          letter-spacing: -0.7px;
+        }
+
+        .brand p {
+          margin: 5px 0 0;
+          color: #94a3b8;
+          font-size: 14px;
+        }
+
+        .crateLogo {
+          width: 72px;
+          height: 72px;
+          padding: 9px;
+          display: grid;
+          grid-template-columns: repeat(
+            2,
+            1fr
+          );
+          gap: 2px;
+          align-content: center;
+          justify-items: center;
+          background:
+            linear-gradient(
+              135deg,
+              #b76b20,
+              #6f3511
+            );
+          border: 3px solid #d28a35;
+          border-radius: 10px;
+          box-shadow:
+            inset 0 0 0 2px
+              rgba(0, 0, 0, 0.35),
+            0 12px 30px
+              rgba(0, 0, 0, 0.35);
+          font-size: 20px;
+          line-height: 19px;
+        }
+
+        .heroActions {
+          display: flex;
+          gap: 9px;
+        }
+
+        .crateButton,
+        .beerButton {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          padding: 10px 13px;
+          border-radius: 14px;
+          cursor: pointer;
+          font-weight: 800;
+          color: white;
+          background: #18222d;
+          border: 1px solid #354657;
+        }
+
+        .crateButton:hover,
+        .beerButton:hover {
+          transform: translateY(-1px);
+          background: #202d3a;
+        }
+
+        .crateButton small,
+        .beerButton small {
+          display: block;
+          color: #94a3b8;
+          font-size: 10px;
+          margin-top: 2px;
+        }
+
+        .crateMini {
+          font-size: 17px;
+          line-height: 15px;
+          background: #8c4918;
+          padding: 6px;
+          border-radius: 5px;
+        }
+
+        .eventCard {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 15px;
+          padding: 20px;
+          margin-bottom: 14px;
+          border: 1px solid #273543;
+          background:
+            linear-gradient(
+              135deg,
+              rgba(255, 255, 255, 0.08),
+              rgba(255, 255, 255, 0.035)
+            );
+          border-radius: 22px;
+        }
+
+        .eyebrow {
+          color: #fbbf24;
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: 1.6px;
+        }
+
+        .eventCard h2 {
+          margin: 4px 0;
+          font-size: 23px;
+        }
+
+        .eventCard p {
+          margin: 0;
+          color: #94a3b8;
+        }
+
+        select,
+        input,
+        textarea {
+          width: 100%;
+          color: white;
+          background: #101820;
+          border: 1px solid #334252;
+          border-radius: 12px;
+          padding: 13px 14px;
+          outline: none;
+        }
+
+        select:focus,
+        input:focus,
+        textarea:focus {
+          border-color: #f59e0b;
+        }
+
+        textarea {
+          min-height: 100px;
+          resize: vertical;
+        }
+
+        .eventCard select {
+          max-width: 310px;
+        }
+
+        .tabs {
+          display: grid;
+          grid-template-columns: repeat(
+            7,
+            1fr
+          );
+          gap: 7px;
+          padding: 7px;
+          background: #0d141b;
+          border: 1px solid #202d38;
+          border-radius: 18px;
+          margin-bottom: 15px;
+        }
+
+        .tabs button {
+          position: relative;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 6px;
+          padding: 12px 8px;
+          color: #8796a7;
+          background: transparent;
+          border-radius: 12px;
+          cursor: pointer;
+          font-weight: 700;
+        }
+
+        .tabs button.active {
+          color: #111827;
+          background: #f59e0b;
+        }
+
+        .tabs i {
+          position: absolute;
+          right: 7px;
+          top: 5px;
+          width: 18px;
+          height: 18px;
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          background: #ef4444;
+          color: white;
+          font-size: 9px;
+          font-style: normal;
+        }
+
+        .toast {
+          position: fixed;
+          top: 18px;
+          right: 18px;
+          z-index: 100;
+          max-width: 420px;
+          padding: 14px 17px;
+          border-radius: 14px;
+          color: #fff;
+          background: #182431;
+          border: 1px solid #46586b;
+          box-shadow:
+            0 20px 60px
+              rgba(0, 0, 0, 0.5);
+        }
+
+        .statsGrid {
+          display: grid;
+          grid-template-columns: repeat(
+            4,
+            1fr
+          );
+          gap: 10px;
+          margin-bottom: 14px;
+        }
+
+        .stat {
+          padding: 18px;
+          text-align: center;
+          border: 1px solid #273543;
+          background: rgba(
+            255,
+            255,
+            255,
+            0.045
+          );
+          border-radius: 18px;
+        }
+
+        .stat span {
+          display: block;
+          font-size: 25px;
+        }
+
+        .stat strong {
+          display: block;
+          margin: 5px 0;
+          font-size: 24px;
+        }
+
+        .stat small {
+          color: #8998a9;
+        }
+
+        .featureGrid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 14px;
+          margin-bottom: 14px;
+        }
+
+        .featureCard {
+          display: grid;
+          grid-template-columns: auto 1fr;
+          gap: 13px;
+          align-items: center;
+          padding: 18px;
+          border-radius: 20px;
+          border: 1px solid #334252;
+        }
+
+        .beerFeature {
+          background:
+            linear-gradient(
+              135deg,
+              rgba(245, 158, 11, 0.18),
+              rgba(245, 158, 11, 0.04)
+            );
+        }
+
+        .crateFeature {
+          background:
+            linear-gradient(
+              135deg,
+              rgba(181, 101, 31, 0.2),
+              rgba(181, 101, 31, 0.04)
+            );
+        }
+
+        .featureIcon {
+          width: 55px;
+          height: 55px;
+          display: grid;
+          place-items: center;
+          border-radius: 15px;
+          background: rgba(
+            255,
+            255,
+            255,
+            0.08
+          );
+          font-size: 29px;
+        }
+
+        .crateVisual {
+          font-size: 16px;
+          line-height: 14px;
+        }
+
+        .featureCard h3 {
+          margin: 0;
+        }
+
+        .featureCard p {
+          margin: 4px 0 10px;
+          color: #94a3b8;
+          font-size: 13px;
+        }
+
+        .featureCard button {
+          grid-column: 1 / -1;
+          width: 100%;
+          padding: 12px;
+          border-radius: 12px;
+          background: #f59e0b;
+          color: #111827;
+          font-weight: 900;
+          cursor: pointer;
+        }
+
+        .card {
+          padding: 20px;
+          margin-bottom: 14px;
+          background: rgba(
+            255,
+            255,
+            255,
+            0.045
+          );
+          border: 1px solid #263442;
+          border-radius: 20px;
+        }
+
+        .sectionTitle {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 15px;
+          margin-bottom: 16px;
+        }
+
+        .sectionTitle h2 {
+          margin: 3px 0 0;
+        }
+
+        .countBadge {
+          min-width: 38px;
+          height: 30px;
+          display: grid;
+          place-items: center;
+          border-radius: 999px;
+          background: #182431;
+          color: #fbbf24;
+          font-weight: 900;
+        }
+
+        .addRow,
+        .inviteRow {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 8px;
+        }
+
+        .addRow button,
+        .inviteRow button {
+          padding: 0 20px;
+          border-radius: 12px;
+          background: #f59e0b;
+          color: #111827;
+          font-weight: 900;
+          cursor: pointer;
+        }
+
+        .members,
+        .drinkList,
+        .requestList,
+        .rankingList {
+          display: grid;
+          gap: 8px;
+        }
+
+        .member,
+        .drink,
+        .request,
+        .rankRow {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 12px;
+          border-radius: 15px;
+          background: rgba(
+            255,
+            255,
+            255,
+            0.045
+          );
+          border: 1px solid
+            rgba(
+              255,
+              255,
+              255,
+              0.04
+            );
+        }
+
+        .avatar {
+          flex: 0 0 42px;
+          width: 42px;
+          height: 42px;
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          background:
+            linear-gradient(
+              135deg,
+              #f59e0b,
+              #b45309
+            );
+          color: #111827;
+          font-weight: 900;
+        }
+
+        .memberInfo,
+        .drinkInfo,
+        .rankName {
+          min-width: 0;
+          flex: 1;
+        }
+
+        .memberInfo strong,
+        .drinkInfo strong,
+        .rankName strong {
+          display: block;
+        }
+
+        .memberInfo small,
+        .drinkInfo small,
+        .rankName small {
+          display: block;
+          margin-top: 3px;
+          color: #8998a9;
+        }
+
+        .miniBadge {
+          font-size: 20px;
+        }
+
+        .formGrid {
+          display: grid;
+          grid-template-columns: repeat(
+            2,
+            1fr
+          );
+          gap: 9px;
+          margin-bottom: 10px;
+        }
+
+        .primary {
+          background: #f59e0b;
+          color: #111827;
+          font-weight: 900;
+          cursor: pointer;
+        }
+
+        .full {
+          width: 100%;
+          padding: 14px;
+          border-radius: 12px;
+        }
+
+        .drinkIcon {
+          width: 45px;
+          height: 45px;
+          display: grid;
+          place-items: center;
+          border-radius: 12px;
+          background: #1b2732;
+          font-size: 22px;
+        }
+
+        .drinkRight {
+          text-align: right;
+        }
+
+        .drinkRight button {
+          margin-top: 5px;
+          padding: 6px 10px;
+          border-radius: 9px;
+          background: #273543;
+          color: white;
+          cursor: pointer;
+          font-size: 11px;
+        }
+
+        .beerHero {
+          text-align: center;
+          padding: 35px 20px;
+          margin-bottom: 14px;
+          border-radius: 24px;
+          border: 1px solid #5b451c;
+          background:
+            radial-gradient(
+              circle at top,
+              rgba(
+                245,
+                158,
+                11,
+                0.2
+              ),
+              rgba(
+                245,
+                158,
+                11,
+                0.03
+              )
+            );
+        }
+
+        .bigBeer {
+          font-size: 70px;
+          filter: drop-shadow(
+            0 10px 20px
+              rgba(245, 158, 11, 0.2)
+          );
+        }
+
+        .beerHero h2 {
+          margin: 10px 0 5px;
+          font-size: 30px;
+        }
+
+        .beerHero p {
+          max-width: 520px;
+          margin: 0 auto 20px;
+          color: #94a3b8;
+        }
+
+        .beerHero textarea {
+          display: block;
+          max-width: 600px;
+          margin: 0 auto 10px;
+        }
+
+        .beerBigButton {
+          width: min(
+            600px,
+            100%
+          );
+          padding: 17px;
+          border-radius: 14px;
+          background: #f59e0b;
+          color: #111827;
+          font-size: 16px;
+          font-weight: 900;
+          cursor: pointer;
+        }
+
+        .request {
+          display: block;
+        }
+
+        .requestTop {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .beerAvatar {
+          background: #f59e0b;
+          font-size: 20px;
+        }
+
+        .requestTop small {
+          display: block;
+          margin-top: 4px;
+          color: #94a3b8;
+        }
+
+        .status {
+          margin-left: auto;
+          font-size: 20px;
+        }
+
+        .votes {
+          margin: 9px 0;
+          color: #8fa0b0;
+          font-size: 12px;
+        }
+
+        .voteButtons {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+        }
+
+        .voteButtons button {
+          padding: 10px;
+          border-radius: 10px;
+          cursor: pointer;
+          font-weight: 800;
+        }
+
+        .accept {
+          background: #166534;
+          color: white;
+        }
+
+        .decline {
+          background: #7f1d1d;
+          color: white;
+        }
+
+        .challengeCreate textarea {
+          margin: 9px 0;
+        }
+
+        .challengeGrid {
+          display: grid;
+          grid-template-columns: repeat(
+            2,
+            1fr
+          );
+          gap: 12px;
+        }
+
+        .challenge {
+          padding: 20px;
+          border-radius: 20px;
+          border: 1px solid #334252;
+          background:
+            linear-gradient(
+              145deg,
+              rgba(
+                239,
+                68,
+                68,
+                0.12
+              ),
+              rgba(
+                255,
+                255,
+                255,
+                0.04
+              )
+            );
+        }
+
+        .challengeIcon {
+          font-size: 32px;
+        }
+
+        .challengeCategory {
+          color: #fbbf24;
+          font-size: 10px;
+          font-weight: 900;
+          text-transform: uppercase;
+        }
+
+        .challenge h3 {
+          margin: 5px 0;
+        }
+
+        .challenge p {
+          color: #94a3b8;
+          min-height: 40px;
+        }
+
+        .challengeBottom {
+          display: flex;
+          justify-content: space-between;
+          padding-top: 12px;
+          border-top: 1px solid #273543;
+        }
+
+        .challengeBottom strong {
+          color: #fbbf24;
+        }
+
+        .challengeBottom span {
+          color: #8fa0b0;
+        }
+
+        .rankingHero {
+          text-align: center;
+          padding: 10px 0 25px;
+        }
+
+        .rankingHero span {
+          font-size: 55px;
+        }
+
+        .rankingHero h2 {
+          margin: 8px 0 3px;
+        }
+
+        .rankingHero p {
+          color: #94a3b8;
+        }
+
+        .rankRow {
+          min-height: 65px;
+        }
+
+        .rankRow.top {
+          background:
+            linear-gradient(
+              90deg,
+              rgba(
+                245,
+                158,
+                11,
+                0.12
+              ),
+              rgba(
+                255,
+                255,
+                255,
+                0.04
+              )
+            );
+        }
+
+        .rankNumber {
+          width: 40px;
+          text-align: center;
+          font-size: 19px;
+        }
+
+        .points {
+          color: #fbbf24;
+        }
+
+        .profileStats {
+          display: grid;
+          grid-template-columns: repeat(
+            4,
+            1fr
+          );
+          gap: 9px;
+        }
+
+        .profileStats div {
+          text-align: center;
+          padding: 13px;
+          border-radius: 13px;
+          background: #111a22;
+        }
+
+        .profileStats span,
+        .profileStats strong,
+        .profileStats small {
+          display: block;
+        }
+
+        .profileStats span {
+          font-size: 20px;
+        }
+
+        .profileStats strong {
+          margin: 3px 0;
+        }
+
+        .profileStats small {
+          color: #8998a9;
+          font-size: 10px;
+        }
+
+        .inviteCard {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 20px;
+          align-items: center;
+        }
+
+        .currentCode {
+          grid-column: 1 / -1;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 14px;
+          border-radius: 13px;
+          background: #111a22;
+        }
+
+        .currentCode span {
+          color: #8998a9;
+        }
+
+        .currentCode strong {
+          color: #fbbf24;
+          letter-spacing: 2px;
+          font-size: 18px;
+        }
+
+        .costBig {
+          margin: 15px 0;
+          text-align: center;
+          font-size: 48px;
+          font-weight: 900;
+          color: #fbbf24;
+        }
+
+        .costRows {
+          display: grid;
+          gap: 8px;
+        }
+
+        .costRows div {
+          display: flex;
+          justify-content: space-between;
+          padding: 14px;
+          border-radius: 12px;
+          background: #111a22;
+        }
+
+        .costRows span {
+          color: #94a3b8;
+        }
+
+        .promilleBox {
+          text-align: center;
+          padding: 30px;
+          border-radius: 18px;
+          background:
+            linear-gradient(
+              135deg,
+              rgba(
+                245,
+                158,
+                11,
+                0.14
+              ),
+              rgba(
+                255,
+                255,
+                255,
+                0.04
+              )
+            );
+        }
+
+        .promilleBox strong,
+        .promilleBox span {
+          display: block;
+        }
+
+        .promilleBox strong {
+          font-size: 50px;
+          color: #fbbf24;
+        }
+
+        .promilleBox span {
+          color: #94a3b8;
+        }
+
+        .warning {
+          color: #fbbf24;
+          font-size: 12px;
+          text-align: center;
+        }
+
+        .empty {
+          text-align: center;
+          padding: 30px;
+          color: #7f8d9c;
+        }
+
+        .inviteCard p {
+          color: #94a3b8;
+        }
+
+        footer {
+          text-align: center;
+          padding: 35px 10px 20px;
+          color: #647384;
+        }
+
+        .footerLogo {
+          font-size: 35px;
+          margin-bottom: 8px;
+        }
+
+        footer strong,
+        footer small {
+          display: block;
+        }
+
+        footer small {
+          margin-top: 5px;
+        }
+
+        .bottomNav {
+          display: none;
+        }
+
+        @media (max-width: 800px) {
+          .hero {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .heroActions {
+            width: 100%;
+          }
+
+          .heroActions button {
+            flex: 1;
+          }
+
+          .tabs {
+            grid-template-columns: repeat(
+              4,
+              1fr
+            );
+          }
+
+          .tabs button:nth-child(
+              5
+            ),
+          .tabs button:nth-child(
+              6
+            ) {
+            display: none;
+          }
+
+          .featureGrid,
+          .challengeGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .inviteCard {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        @media (max-width: 600px) {
+          .shell {
+            width: min(
+              100% - 18px,
+              1100px
+            );
+            padding-top: 10px;
+          }
+
+          .brand h1 {
+            font-size: 22px;
+          }
+
+          .brand p {
+            font-size: 11px;
+          }
+
+          .crateLogo {
+            width: 58px;
+            height: 58px;
+            font-size: 16px;
+          }
+
+          .heroActions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .eventCard {
+            align-items: stretch;
+            flex-direction: column;
+          }
+
+          .eventCard select {
+            max-width: none;
+          }
+
+          .statsGrid {
+            grid-template-columns: repeat(
+              2,
+              1fr
+            );
+          }
+
+          .statsGrid.large {
+            grid-template-columns: repeat(
+              2,
+              1fr
+            );
+          }
+
+          .stat {
+            padding: 13px 8px;
+          }
+
+          .stat strong {
+            font-size: 20px;
+          }
+
+          .tabs {
+            display: none;
+          }
+
+          .formGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .addRow,
+          .inviteRow {
+            grid-template-columns: 1fr;
+          }
+
+          .addRow button,
+          .inviteRow button {
+            min-height: 45px;
+          }
+
+          .profileStats {
+            grid-template-columns: repeat(
+              2,
+              1fr
+            );
+          }
+
+          .bottomNav {
+            position: fixed;
+            display: grid;
+            grid-template-columns: repeat(
+              5,
+              1fr
+            );
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 90;
+            height: 68px;
+            padding: 6px 10px;
+            background: rgba(
+              9,
+              13,
+              17,
+              0.97
+            );
+            border-top: 1px solid #273543;
+            backdrop-filter: blur(
+              15px
+            );
+          }
+
+          .bottomNav button {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            background: transparent;
+            color: #778697;
+            cursor: pointer;
+            border-radius: 12px;
+            font-size: 18px;
+          }
+
+          .bottomNav button.active {
+            color: #fbbf24;
+          }
+
+          .bottomNav small {
+            font-size: 9px;
+          }
+
+          .bottomBeer {
+            width: 56px;
+            height: 56px;
+            margin: -20px auto 0;
+            border-radius: 50% !important;
+            background: #f59e0b !important;
+            color: #111827 !important;
+            box-shadow:
+              0 8px 25px
+                rgba(
+                  245,
+                  158,
+                  11,
+                  0.35
+                );
+          }
+
+          footer {
+            padding-bottom: 30px;
+          }
+
+          .toast {
+            left: 10px;
+            right: 10px;
+            top: 10px;
+            max-width: none;
+          }
+        }
+      `}</style>
     </main>
   );
 }
 
-const styles = `
-  * {
-    box-sizing: border-box;
-  }
-
-  html,
-  body {
-    margin: 0;
-    padding: 0;
-    background: #070b10;
-  }
-
-  body {
-    overflow-x: hidden;
-  }
-
-  button,
-  input,
-  select,
-  textarea {
-    font: inherit;
-  }
-
-  button {
-    border: 0;
-  }
-
-  .page {
-    min-height: 100vh;
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    background:
-      radial-gradient(
-        circle at 50% -10%,
-        #293b4e 0%,
-        #101821 34%,
-        #070b10 72%
-      );
-    color: #fff;
-  }
-
-  .app {
-    width: 100%;
-    max-width: 1050px;
-    margin: 0 auto;
-    padding: 20px;
-  }
-
-  .hero {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 18px 0 24px;
-  }
-
-  .heroLogo {
-    width: 76px;
-    height: 76px;
-    flex: 0 0 76px;
-    border-radius: 22px;
-    background: linear-gradient(
-      145deg,
-      #f59e0b,
-      #b45309
-    );
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow:
-      0 14px 35px rgba(0,0,0,.35);
-  }
-
-  .crateLogo,
-  .crateVisual {
-    display: block;
-    line-height: .82;
-    font-size: 22px;
-    letter-spacing: -4px;
-    transform: rotate(-2deg);
-  }
-
-  .heroText {
-    flex: 1;
-  }
-
-  h1,
-  h2,
-  p {
-    margin-top: 0;
-  }
-
-  h1 {
-    margin-bottom: 5px;
-    font-size: clamp(
-      24px,
-      4vw,
-      38px
-    );
-    letter-spacing: -.7px;
-  }
-
-  h2 {
-    margin-bottom: 12px;
-    font-size: 23px;
-  }
-
-  .heroText p {
-    margin: 0;
-    color: #94a3b8;
-  }
-
-  .refreshButton {
-    width: 45px;
-    height: 45px;
-    border-radius: 14px;
-    background: #18222d;
-    color: #fff;
-    font-size: 26px;
-    cursor: pointer;
-  }
-
-  .message {
-    position: sticky;
-    top: 10px;
-    z-index: 20;
-    padding: 14px 16px;
-    margin-bottom: 14px;
-    border: 1px solid #3b4a59;
-    border-radius: 14px;
-    background: #111b25;
-    color: #fbbf24;
-    box-shadow: 0 12px 30px rgba(0,0,0,.25);
-  }
-
-  .eventCard,
-  .joinCard,
-  .card {
-    border: 1px solid rgba(255,255,255,.08);
-    background: rgba(17,25,34,.88);
-    border-radius: 22px;
-    padding: 20px;
-    margin-bottom: 15px;
-    box-shadow:
-      0 12px 35px rgba(0,0,0,.18);
-  }
-
-  .eventCard {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 18px;
-    align-items: center;
-  }
-
-  .eyebrow {
-    display: block;
-    color: #fbbf24;
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 1.4px;
-    margin-bottom: 7px;
-  }
-
-  .eventInfo {
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-    color: #94a3b8;
-  }
-
-  .eventInfo strong {
-    color: #fff;
-    font-size: 18px;
-  }
-
-  .eventInfo b {
-    color: #fbbf24;
-  }
-
-  input,
-  select,
-  textarea {
-    width: 100%;
-    border: 1px solid #2b3948;
-    border-radius: 13px;
-    padding: 13px 14px;
-    background: #0d151e;
-    color: #fff;
-    outline: none;
-  }
-
-  input:focus,
-  select:focus,
-  textarea:focus {
-    border-color: #f59e0b;
-    box-shadow: 0 0 0 3px rgba(245,158,11,.1);
-  }
-
-  textarea {
-    min-height: 90px;
-    resize: vertical;
-  }
-
-  .joinCard {
-    display: grid;
-    grid-template-columns: 1fr 2fr;
-    gap: 20px;
-    align-items: center;
-  }
-
-  .joinCard small {
-    display: block;
-    margin-top: 4px;
-    color: #7f8da0;
-  }
-
-  .joinRow {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 8px;
-  }
-
-  .tabs {
-    display: flex;
-    gap: 7px;
-    margin: 4px 0 15px;
-    padding: 6px;
-    border: 1px solid rgba(255,255,255,.07);
-    border-radius: 18px;
-    background: #0d141c;
-    overflow-x: auto;
-  }
-
-  .tabs button {
-    flex: 1;
-    min-width: 100px;
-    padding: 11px 12px;
-    border-radius: 13px;
-    background: transparent;
-    color: #8391a1;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-
-  .tabs button.active {
-    background: #f59e0b;
-    color: #111;
-    font-weight: 800;
-  }
-
-  .tabs span {
-    margin-left: 5px;
-  }
-
-  .statsGrid {
-    display: grid;
-    grid-template-columns: repeat(4,1fr);
-    gap: 10px;
-    margin-bottom: 15px;
-  }
-
-  .stat {
-    min-height: 125px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid rgba(255,255,255,.07);
-    border-radius: 19px;
-    background: #111a23;
-    text-align: center;
-  }
-
-  .stat span {
-    font-size: 24px;
-  }
-
-  .stat strong {
-    margin-top: 5px;
-    font-size: 24px;
-  }
-
-  .stat small {
-    color: #7f8da0;
-  }
-
-  .actionGrid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 13px;
-    margin-bottom: 15px;
-  }
-
-  .beerAction,
-  .crateAction {
-    min-height: 145px;
-    border-radius: 21px;
-    padding: 18px;
-    text-align: left;
-    cursor: pointer;
-    transition: transform .15s ease;
-  }
-
-  .beerAction:hover,
-  .crateAction:hover {
-    transform: translateY(-2px);
-  }
-
-  .beerAction {
-    background: linear-gradient(
-      135deg,
-      #f59e0b,
-      #d97706
-    );
-    color: #111;
-  }
-
-  .crateAction {
-    background: linear-gradient(
-      135deg,
-      #26384a,
-      #15222e
-    );
-    color: #fff;
-    border: 1px solid #3b4d60;
-  }
-
-  .beerAction:disabled {
-    opacity: .55;
-    cursor: default;
-  }
-
-  .actionIcon {
-    display: block;
-    font-size: 34px;
-    margin-bottom: 8px;
-  }
-
-  .crateVisual {
-    font-size: 24px;
-    margin-bottom: 8px;
-    letter-spacing: -4px;
-  }
-
-  .beerAction strong,
-  .crateAction strong {
-    display: block;
-    font-size: 18px;
-  }
-
-  .beerAction small,
-  .crateAction small {
-    display: block;
-    margin-top: 5px;
-    opacity: .72;
-  }
-
-  .sectionHeader {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 15px;
-    margin-bottom: 15px;
-  }
-
-  .sectionHeader h2 {
-    margin: 0;
-  }
-
-  .badge {
-    display: inline-flex;
-    min-width: 28px;
-    height: 28px;
-    padding: 0 9px;
-    align-items: center;
-    justify-content: center;
-    border-radius: 99px;
-    background: #f59e0b;
-    color: #111;
-    font-weight: 900;
-  }
-
-  .request {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 13px;
-    margin-top: 8px;
-    border-radius: 15px;
-    background: #151f29;
-  }
-
-  .request small {
-    display: block;
-    color: #8290a0;
-    margin-top: 4px;
-  }
-
-  .requestButtons {
-    display: flex;
-    gap: 7px;
-  }
-
-  .accept,
-  .reject {
-    padding: 10px 13px;
-    border-radius: 11px;
-    cursor: pointer;
-    font-weight: 800;
-  }
-
-  .accept {
-    background: #22c55e;
-    color: #07100a;
-  }
-
-  .reject {
-    background: #ef4444;
-    color: #fff;
-  }
-
-  .answered {
-    color: #94a3b8;
-    font-size: 13px;
-  }
-
-  .profileGrid,
-  .twoGrid {
-    display: grid;
-    grid-template-columns: repeat(2,1fr);
-    gap: 9px;
-    margin-bottom: 10px;
-  }
-
-  .fourGrid {
-    display: grid;
-    grid-template-columns: repeat(4,1fr);
-    gap: 9px;
-    margin-bottom: 10px;
-  }
-
-  .secondary,
-  .primary {
-    padding: 13px 16px;
-    border-radius: 12px;
-    cursor: pointer;
-    font-weight: 800;
-  }
-
-  .primary {
-    background: #f59e0b;
-    color: #111;
-  }
-
-  .secondary {
-    background: #263442;
-    color: #fff;
-  }
-
-  .full {
-    width: 100%;
-  }
-
-  .promilleBox {
-    display: flex;
-    justify-content: space-between;
-    gap: 20px;
-    align-items: center;
-    margin-top: 15px;
-    padding: 18px;
-    border: 1px solid #614b1b;
-    border-radius: 17px;
-    background: #1e1a10;
-  }
-
-  .promilleBox small {
-    display: block;
-    color: #b89a52;
-  }
-
-  .promilleBox strong {
-    display: block;
-    margin-top: 5px;
-    font-size: 36px;
-    color: #fbbf24;
-  }
-
-  .promilleBox span {
-    max-width: 420px;
-    color: #a79b80;
-    font-size: 12px;
-  }
-
-  .rankingRow,
-  .personRow,
-  .crateRow,
-  .drinkRow,
-  .challenge,
-  .notification {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 13px;
-    margin-top: 8px;
-    border-radius: 15px;
-    background: #141e28;
-  }
-
-  .place {
-    width: 40px;
-    text-align: center;
-    font-size: 20px;
-  }
-
-  .rankingName,
-  .drinkInfo,
-  .challengeInfo {
-    flex: 1;
-  }
-
-  .rankingName small,
-  .drinkInfo small,
-  .personRow small,
-  .crateRow small,
-  .challengeInfo small {
-    display: block;
-    color: #7f8da0;
-    margin-top: 4px;
-  }
-
-  .costCard {
-    text-align: center;
-  }
-
-  .bigMoney {
-    color: #fbbf24;
-    font-size: 42px;
-    font-weight: 900;
-  }
-
-  .costCard p {
-    color: #7f8da0;
-  }
-
-  .costRow {
-    display: flex;
-    justify-content: space-between;
-    padding: 12px;
-    margin-top: 7px;
-    border-radius: 12px;
-    background: #141e28;
-  }
-
-  .empty {
-    padding: 25px;
-    text-align: center;
-    color: #748296;
-  }
-
-  .formCard {
-    display: flex;
-    flex-direction: column;
-    gap: 9px;
-    margin-bottom: 15px;
-    padding: 15px;
-    border-radius: 16px;
-    background: #0c141c;
-  }
-
-  .drinkIcon {
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 13px;
-    background: #283744;
-    font-size: 22px;
-  }
-
-  .drinkPrice {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .tinyDelete {
-    width: 29px;
-    height: 29px;
-    border-radius: 9px;
-    background: #303c49;
-    color: #fff;
-    cursor: pointer;
-  }
-
-  .avatar {
-    width: 44px;
-    height: 44px;
-    flex: 0 0 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    background: #f59e0b;
-    color: #111;
-    font-weight: 900;
-    font-size: 19px;
-  }
-
-  .personStats {
-    margin-left: auto;
-    text-align: right;
-  }
-
-  .personStats small {
-    display: block;
-  }
-
-  .crateEmoji {
-    font-size: 22px;
-    letter-spacing: -4px;
-  }
-
-  .challengeIcon {
-    width: 48px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 14px;
-    background: #263442;
-    font-size: 24px;
-  }
-
-  .challengeInfo p {
-    margin: 5px 0;
-    color: #95a2b1;
-  }
-
-  .status {
-    padding: 6px 9px;
-    border-radius: 9px;
-    background: #263442;
-    color: #fbbf24;
-    font-size: 11px;
-    font-weight: 800;
-  }
-
-  .status.done {
-    background: #14532d;
-    color: #86efac;
-  }
-
-  .adminInfo {
-    display: grid;
-    grid-template-columns: repeat(3,1fr);
-    gap: 9px;
-  }
-
-  .adminInfo > div {
-    padding: 14px;
-    border-radius: 13px;
-    background: #141e28;
-  }
-
-  .adminInfo span {
-    display: block;
-    color: #7f8da0;
-    font-size: 11px;
-  }
-
-  .adminInfo strong {
-    display: block;
-    margin-top: 5px;
-  }
-
-  .settingsList {
-    display: grid;
-    grid-template-columns: repeat(2,1fr);
-    gap: 7px;
-  }
-
-  .settingRow {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 10px;
-    padding: 11px 13px;
-    border-radius: 12px;
-    background: #141e28;
-  }
-
-  .toggle {
-    padding: 4px 8px;
-    border-radius: 8px;
-    background: #29343f;
-    color: #7f8da0;
-    font-size: 10px;
-    font-weight: 900;
-  }
-
-  .toggle.on {
-    background: #14532d;
-    color: #86efac;
-  }
-
-  .notification {
-    display: block;
-    cursor: pointer;
-  }
-
-  .notification p {
-    margin: 5px 0 0;
-    color: #8c9aaa;
-  }
-
-  .hint {
-    color: #718096;
-    font-size: 12px;
-  }
-
-  footer {
-    padding: 35px 10px 15px;
-    text-align: center;
-    color: #5f6d7d;
-  }
-
-  footer strong {
-    display: block;
-    color: #8996a5;
-  }
-
-  footer small {
-    display: block;
-    margin-top: 5px;
-  }
-
-  .loading {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-  }
-
-  .beer-loader {
-    font-size: 60px;
-    animation: pulse 1s infinite alternate;
-  }
-
-  @keyframes pulse {
-    from {
-      transform: scale(.9);
-    }
-    to {
-      transform: scale(1.08);
-    }
-  }
-
-  @media (max-width: 750px) {
-    .app {
-      padding: 12px;
-    }
-
-    .hero {
-      padding-top: 8px;
-    }
-
-    .heroLogo {
-      width: 62px;
-      height: 62px;
-      flex-basis: 62px;
-    }
-
-    .eventCard,
-    .joinCard {
-      grid-template-columns: 1fr;
-    }
-
-    .statsGrid {
-      grid-template-columns: repeat(2,1fr);
-    }
-
-    .actionGrid {
-      grid-template-columns: 1fr;
-    }
-
-    .fourGrid {
-      grid-template-columns: repeat(2,1fr);
-    }
-
-    .adminInfo {
-      grid-template-columns: repeat(2,1fr);
-    }
-
-    .settingsList {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  @media (max-width: 500px) {
-    .heroText p {
-      font-size: 12px;
-    }
-
-    .heroText h1 {
-      font-size: 21px;
-    }
-
-    .profileGrid,
-    .twoGrid,
-    .fourGrid {
-      grid-template-columns: 1fr;
-    }
-
-    .promilleBox {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-
-    .request {
-      align-items: flex-start;
-      flex-direction: column;
-    }
-
-    .requestButtons {
-      width: 100%;
-    }
-
-    .requestButtons button {
-      flex: 1;
-    }
-
-    .adminInfo {
-      grid-template-columns: 1fr;
-    }
-
-    .tabs button {
-      min-width: 84px;
-    }
-
-    .tabs span {
-      display: block;
-      margin: 2px 0 0;
-      font-size: 10px;
-    }
-  }
-`;
+function SettingsSwitch({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (
+    value: boolean
+  ) => void;
+}) {
+  return (
+    <div className="settingRow">
+      <span>{label}</span>
+
+      <button
+        type="button"
+        onClick={() =>
+          onChange(!value)
+        }
+        style={{
+          width: 52,
+          height: 29,
+          borderRadius: 999,
+          padding: 3,
+          background: value
+            ? "#f59e0b"
+            : "#273543",
+          cursor: "pointer",
+        }}
+      >
+        <span
+          style={{
+            display: "block",
+            width: 23,
+            height: 23,
+            borderRadius: "50%",
+            background: "white",
+            transform: value
+              ? "translateX(23px)"
+              : "translateX(0)",
+            transition:
+              "transform .2s",
+          }}
+        />
+      </button>
+    </div>
+  );
+}
