@@ -68,11 +68,7 @@ export default function Home() {
       "guester-people-" + eventId
     );
 
-    if (saved) {
-      setPeople(JSON.parse(saved));
-    } else {
-      setPeople([]);
-    }
+    setPeople(saved ? JSON.parse(saved) : []);
   }, [eventId]);
 
   useEffect(() => {
@@ -129,16 +125,16 @@ export default function Home() {
   }
 
   function addPerson() {
-    if (!personName.trim()) {
+    const name = personName.trim();
+
+    if (!name) {
       setMessage("❌ Bitte einen Namen eingeben.");
       return;
     }
 
     if (
       people.some(
-        (p) =>
-          p.name.toLowerCase() ===
-          personName.trim().toLowerCase()
+        (p) => p.name.toLowerCase() === name.toLowerCase()
       )
     ) {
       setMessage("❌ Teilnehmer bereits vorhanden.");
@@ -149,7 +145,7 @@ export default function Home() {
       ...people,
       {
         id: Date.now(),
-        name: personName.trim(),
+        name,
         drinks: 0,
         liters: 0,
         cost: 0,
@@ -180,22 +176,20 @@ export default function Home() {
     );
 
     setPeople(
-      people.map((person) => {
-        if (person.id !== personId) {
-          return person;
-        }
-
-        return {
-          ...person,
-          drinks: person.drinks + 1,
-          liters:
-            person.liters + drinkLiters,
-          cost:
-            person.cost + drinkPrice,
-          points:
-            person.points + 10,
-        };
-      })
+      people.map((person) =>
+        person.id !== personId
+          ? person
+          : {
+              ...person,
+              drinks: person.drinks + 1,
+              liters:
+                person.liters + drinkLiters,
+              cost:
+                person.cost + drinkPrice,
+              points:
+                person.points + 10,
+            }
+      )
     );
 
     setMessage(
@@ -213,8 +207,7 @@ export default function Home() {
 
   const totalCost = drinks.reduce(
     (sum, drink) =>
-      sum +
-      Number(drink.preis || 0),
+      sum + Number(drink.preis || 0),
     0
   );
 
@@ -248,11 +241,140 @@ export default function Home() {
     <main className="page">
       <div className="container">
 
+        {/* =========================
+            HEADER
+        ========================== */}
+
         <header>
-          <div className="logo">
-            <span>🍺</span>
-            <span>🍺</span>
-            <span>🍺</span>
+          <div className="crateLogo">
+
+            {/* Holz-Bierkiste als echtes SVG.
+                Transparenter Hintergrund.
+                KEIN weißer Rand.
+            */}
+            <svg
+              viewBox="0 0 180 145"
+              className="crateSvg"
+              aria-label="Bierkiste"
+            >
+              {/* Flaschen hinten */}
+              <g>
+                <rect
+                  x="22"
+                  y="18"
+                  width="25"
+                  height="75"
+                  rx="8"
+                  fill="#d99b32"
+                  stroke="#6f3c0d"
+                  strokeWidth="4"
+                />
+                <rect
+                  x="77"
+                  y="18"
+                  width="25"
+                  height="75"
+                  rx="8"
+                  fill="#d99b32"
+                  stroke="#6f3c0d"
+                  strokeWidth="4"
+                />
+                <rect
+                  x="132"
+                  y="18"
+                  width="25"
+                  height="75"
+                  rx="8"
+                  fill="#d99b32"
+                  stroke="#6f3c0d"
+                  strokeWidth="4"
+                />
+
+                <rect
+                  x="27"
+                  y="8"
+                  width="15"
+                  height="18"
+                  rx="3"
+                  fill="#d99b32"
+                  stroke="#6f3c0d"
+                  strokeWidth="4"
+                />
+
+                <rect
+                  x="82"
+                  y="8"
+                  width="15"
+                  height="18"
+                  rx="3"
+                  fill="#d99b32"
+                  stroke="#6f3c0d"
+                  strokeWidth="4"
+                />
+
+                <rect
+                  x="137"
+                  y="8"
+                  width="15"
+                  height="18"
+                  rx="3"
+                  fill="#d99b32"
+                  stroke="#6f3c0d"
+                  strokeWidth="4"
+                />
+              </g>
+
+              {/* Bierkiste */}
+              <rect
+                x="8"
+                y="68"
+                width="164"
+                height="68"
+                rx="10"
+                fill="#8b4a17"
+                stroke="#4c2609"
+                strokeWidth="5"
+              />
+
+              {/* obere Holzleiste */}
+              <rect
+                x="8"
+                y="68"
+                width="164"
+                height="18"
+                rx="5"
+                fill="#a86122"
+              />
+
+              {/* untere Holzleiste */}
+              <rect
+                x="8"
+                y="119"
+                width="164"
+                height="17"
+                rx="5"
+                fill="#67350e"
+              />
+
+              {/* Kisten-Fächer */}
+              <path
+                d="M48 86V119
+                   M89 86V119
+                   M130 86V119"
+                stroke="#4c2609"
+                strokeWidth="6"
+              />
+
+              {/* kleines Bier-Symbol */}
+              <text
+                x="90"
+                y="108"
+                textAnchor="middle"
+                fontSize="22"
+              >
+                🍺
+              </text>
+            </svg>
           </div>
 
           <div>
@@ -262,6 +384,10 @@ export default function Home() {
             </p>
           </div>
         </header>
+
+        {/* =========================
+            EVENT
+        ========================== */}
 
         <section className="card">
           <h2>📅 Aktuelles Event</h2>
@@ -287,31 +413,41 @@ export default function Home() {
           </select>
         </section>
 
+        {/* =========================
+            STATS
+        ========================== */}
+
         <div className="stats">
-          <div>
-            🍺
+
+          <div className="stat">
+            <span>🍺</span>
             <b>{drinks.length}</b>
             <small>Getränke</small>
           </div>
 
-          <div>
-            💧
+          <div className="stat">
+            <span>💧</span>
             <b>{totalLiters.toFixed(1)}</b>
             <small>Liter</small>
           </div>
 
-          <div>
-            💶
+          <div className="stat">
+            <span>💶</span>
             <b>{totalCost.toFixed(2)} €</b>
             <small>Kosten</small>
           </div>
 
-          <div>
-            👥
+          <div className="stat">
+            <span>👥</span>
             <b>{people.length}</b>
             <small>Teilnehmer</small>
           </div>
+
         </div>
+
+        {/* =========================
+            TEILNEHMER
+        ========================== */}
 
         <section className="card">
           <h2>👥 Teilnehmer</h2>
@@ -359,6 +495,10 @@ export default function Home() {
           ))}
         </section>
 
+        {/* =========================
+            GETRÄNK HINZUFÜGEN
+        ========================== */}
+
         <section className="card">
           <h2>🍺 Getränk hinzufügen</h2>
 
@@ -371,6 +511,7 @@ export default function Home() {
           />
 
           <div className="three">
+
             <input
               type="number"
               value={liters}
@@ -397,6 +538,7 @@ export default function Home() {
               }
               placeholder="Preis €"
             />
+
           </div>
 
           <button
@@ -406,6 +548,10 @@ export default function Home() {
             🍻 Getränk speichern
           </button>
         </section>
+
+        {/* =========================
+            ZUORDNUNG
+        ========================== */}
 
         <section className="card">
           <h2>🔗 Getränk zuordnen</h2>
@@ -460,6 +606,10 @@ export default function Home() {
           )}
         </section>
 
+        {/* =========================
+            GETRÄNKE
+        ========================== */}
+
         <section className="card">
           <h2>🍺 Getränke</h2>
 
@@ -499,6 +649,10 @@ export default function Home() {
           ))}
         </section>
 
+        {/* =========================
+            KOSTEN
+        ========================== */}
+
         <section className="card cost">
           <h2>💶 Kostenaufteilung</h2>
 
@@ -533,6 +687,10 @@ export default function Home() {
             verteilt.
           </p>
         </section>
+
+        {/* =========================
+            RANKING
+        ========================== */}
 
         <section className="card">
           <h2>🏆 Ranking</h2>
@@ -579,7 +737,6 @@ export default function Home() {
 
         <footer>
           🍻 Güstener Zapfhahn Zentrale
-
           <small>
             Dein Event. Deine Getränke.
             Deine Runde.
@@ -589,6 +746,11 @@ export default function Home() {
       </div>
 
       <style jsx>{`
+
+        /* ==================================
+           GRUNDLAYOUT
+        ================================== */
+
         * {
           box-sizing: border-box;
         }
@@ -597,77 +759,83 @@ export default function Home() {
         body {
           margin: 0;
           padding: 0;
+          background: #080c11;
+        }
+
+        body {
+          overflow-x: hidden;
         }
 
         .page {
           min-height: 100vh;
+          width: 100%;
           background:
             radial-gradient(
               circle at top,
-              #26384b,
-              #080c11 55%
+              #26384b 0%,
+              #111820 35%,
+              #080c11 72%
             );
           color: white;
           padding: 15px;
-          font-family: Arial, sans-serif;
+          font-family:
+            Arial,
+            Helvetica,
+            sans-serif;
         }
 
         .container {
+          width: 100%;
           max-width: 850px;
-          margin: auto;
+          margin: 0 auto;
         }
+
+        /* ==================================
+           HEADER
+        ================================== */
 
         header {
           display: flex;
           align-items: center;
-          gap: 14px;
-          padding: 15px 5px 25px;
+          gap: 16px;
+          padding: 12px 4px 25px;
         }
 
         /*
-          Neue Bierkiste:
-          - kein weißer Rand
-          - kein weißer Hintergrund
-          - direkt in das dunkle Design integriert
-        */
-        .logo {
-          width: 70px;
-          height: 70px;
-          border-radius: 14px;
-          background:
-            linear-gradient(
-              145deg,
-              #8b4513,
-              #5a2d0c
-            );
-          border: none;
-          outline: none;
-          box-shadow:
-            inset 0 0 0 3px #3a1b08,
-            0 8px 18px rgba(0,0,0,.35);
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 3px;
-          padding: 9px;
-          align-items: center;
-          justify-items: center;
-          transform: rotate(-2deg);
-        }
+          WICHTIG:
 
-        .logo span {
-          width: 17px;
-          height: 30px;
+          Der Logo-Container hat:
+          - keinen weißen Hintergrund
+          - keinen weißen Rand
+          - keinen Border
+          - keine Outline
+        */
+
+        .crateLogo {
+          width: 82px;
+          height: 82px;
+          flex: 0 0 82px;
+          background: transparent;
+          border: 0;
+          outline: 0;
+          box-shadow: none;
+          padding: 0;
+          margin: 0;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 20px;
-          filter: drop-shadow(
-            0 2px 1px rgba(0,0,0,.5)
-          );
+        }
+
+        .crateSvg {
+          width: 100%;
+          height: 100%;
+          display: block;
+          overflow: visible;
         }
 
         h1 {
           font-size: 25px;
+          line-height: 1.15;
           margin: 0;
         }
 
@@ -679,43 +847,62 @@ export default function Home() {
           color: #9ca8b5;
         }
 
+        /* ==================================
+           CARDS
+        ================================== */
+
         .card {
-          background: rgba(255,255,255,.06);
-          border: 1px solid rgba(255,255,255,.08);
+          background: rgba(255,255,255,.055);
+          border: 1px solid rgba(255,255,255,.07);
           border-radius: 20px;
           padding: 18px;
           margin-bottom: 14px;
         }
 
+        /* ==================================
+           STATISTIK
+        ================================== */
+
         .stats {
           display: grid;
-          grid-template-columns: repeat(4,1fr);
+          grid-template-columns:
+            repeat(4, 1fr);
           gap: 10px;
           margin-bottom: 14px;
         }
 
-        .stats div {
-          background: rgba(255,255,255,.06);
+        .stat {
+          background: rgba(255,255,255,.055);
+          border: 0;
           border-radius: 16px;
           padding: 14px;
           text-align: center;
           font-size: 22px;
         }
 
-        .stats b,
-        .stats small {
+        .stat span {
+          display: block;
+          font-size: 22px;
+        }
+
+        .stat b,
+        .stat small {
           display: block;
         }
 
-        .stats b {
+        .stat b {
           font-size: 20px;
           margin: 5px 0;
         }
 
-        .stats small {
+        .stat small {
           color: #8995a3;
           font-size: 11px;
         }
+
+        /* ==================================
+           INPUTS
+        ================================== */
 
         input,
         select {
@@ -726,10 +913,17 @@ export default function Home() {
           background: #151d26;
           color: white;
           margin-bottom: 10px;
+          font-size: 15px;
+        }
+
+        input:focus,
+        select:focus {
+          outline: none;
+          border-color: #f59e0b;
         }
 
         button {
-          border: none;
+          border: 0;
           border-radius: 12px;
           padding: 13px 17px;
           background: #f59e0b;
@@ -738,15 +932,21 @@ export default function Home() {
           cursor: pointer;
         }
 
+        button:active {
+          transform: scale(.98);
+        }
+
         .row {
           display: grid;
-          grid-template-columns: 1fr auto;
+          grid-template-columns:
+            1fr auto;
           gap: 8px;
         }
 
         .three {
           display: grid;
-          grid-template-columns: repeat(3,1fr);
+          grid-template-columns:
+            repeat(3, 1fr);
           gap: 8px;
         }
 
@@ -754,6 +954,10 @@ export default function Home() {
           width: 100%;
           margin-top: 4px;
         }
+
+        /* ==================================
+           EINTRÄGE
+        ================================== */
 
         .item {
           display: flex;
@@ -777,9 +981,14 @@ export default function Home() {
           padding: 7px 12px;
         }
 
+        /* ==================================
+           ZUORDNUNG
+        ================================== */
+
         .assignment {
           display: grid;
-          grid-template-columns: 1fr 1.5fr;
+          grid-template-columns:
+            1fr 1.5fr;
           gap: 10px;
           align-items: center;
           margin-bottom: 8px;
@@ -788,6 +997,10 @@ export default function Home() {
         .assignment select {
           margin: 0;
         }
+
+        /* ==================================
+           KOSTEN
+        ================================== */
 
         .cost {
           text-align: center;
@@ -812,9 +1025,14 @@ export default function Home() {
           font-size: 12px;
         }
 
+        /* ==================================
+           RANKING
+        ================================== */
+
         .rank {
           display: grid;
-          grid-template-columns: 45px 1fr auto;
+          grid-template-columns:
+            45px 1fr auto;
           gap: 10px;
           align-items: center;
           background: rgba(255,255,255,.05);
@@ -822,6 +1040,10 @@ export default function Home() {
           border-radius: 13px;
           margin-top: 8px;
         }
+
+        /* ==================================
+           MELDUNG
+        ================================== */
 
         .message {
           background: #172230;
@@ -831,6 +1053,10 @@ export default function Home() {
           margin-bottom: 15px;
           color: #fbbf24;
         }
+
+        /* ==================================
+           FOOTER
+        ================================== */
 
         footer {
           text-align: center;
@@ -843,9 +1069,39 @@ export default function Home() {
           margin-top: 5px;
         }
 
-        @media(max-width:650px) {
+        /* ==================================
+           MOBILE
+        ================================== */
+
+        @media (max-width: 650px) {
+
+          .page {
+            padding: 12px;
+          }
+
+          header {
+            gap: 12px;
+            padding-bottom: 22px;
+          }
+
+          .crateLogo {
+            width: 68px;
+            height: 68px;
+            flex-basis: 68px;
+          }
+
+          h1 {
+            font-size: 20px;
+          }
+
+          header p {
+            font-size: 13px;
+            margin-bottom: 0;
+          }
+
           .stats {
-            grid-template-columns: repeat(2,1fr);
+            grid-template-columns:
+              repeat(2, 1fr);
           }
 
           .three {
@@ -860,20 +1116,12 @@ export default function Home() {
             grid-template-columns: 1fr;
           }
 
-          header {
-            align-items: center;
-          }
-
-          .logo {
-            width: 62px;
-            height: 62px;
-            padding: 7px;
-          }
-
-          h1 {
-            font-size: 21px;
+          .rank {
+            grid-template-columns:
+              40px 1fr auto;
           }
         }
+
       `}</style>
     </main>
   );
